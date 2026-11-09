@@ -7,9 +7,9 @@
 | Mục | Nội dung |
 | --- | --- |
 | Đề tài |Thương mại điện tử|
-| Tên sản phẩm | Website bán sách BookStore|
+| Tên sản phẩm | Website bán sách "Mọt Sách"|
 | Lớp, nhóm | CĐ CNTT 24WEBD – Nhóm TLS |
-| Repository | [https://github.com/...] (Private, đã mời GV) |
+| Repository | [https://github.com/buivantin/Do_An_Chuyen_Nganh_Web_TMDT] (Private, đã mời GV) |
 | Board Trello | [https://trello.com/b/...] (đã mời GV) |
 | Ngày lập | 09/11/2026 |
 
