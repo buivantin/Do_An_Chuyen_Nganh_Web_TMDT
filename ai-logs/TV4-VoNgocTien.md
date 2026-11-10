@@ -1,35 +1,27 @@
-AI log – TV4 – Võ Ngọc Tiên
-Mỗi thành viên một tệp trong ai-logs/. Ghi một mục ngay sau mỗi lần dùng AI có ảnh hưởng đến sản phẩm, commit cùng thay đổi liên quan. Cả đồ án tối thiểu 6 mục có nội dung thực chất. Mã mục tăng dần: AI-01, AI-02, ...
-Mục
-	Thông tin
-	Họ tên, MSSV
-	Võ Ngọc Tiên – [0306241411]
-	Nhóm, đề tài
-	Nhóm [09] – [Thương mại điện tử (Cửa hàng bán sách "Mọt Sách")]
-	Vai trò
-	TV4 – Backend (Cơ sở dữ liệu)
-	Công cụ AI dùng
-	[Gemini]
-	Bảng tổng hợp
-Mã
-	Ngày
-	Giai đoạn
-	Nội dung
-	Commit / PR
-	AI-01
-	[10/11]
-	Thiết kế
-	Chuẩn hóa ERD v2 (3NF), tạo file mo-ta-bang.md và giải thích lưu price ở order_item | docs: erd v2 chuan hoa 3nf 
-	[PR #01]
-	
-	________________
+# AI log – TV4 – Võ Ngọc Tiên
 
+> Mỗi thành viên một tệp trong `ai-logs/`. Ghi một mục ngay sau mỗi lần dùng AI có ảnh hưởng đến sản phẩm, commit cùng thay đổi liên quan. Cả đồ án tối thiểu 6 mục có nội dung thực chất. Mã mục tăng dần: AI-01, AI-02, ...
 
-[AI-01] Chuẩn hóa ERD v2 (3NF), giải thích logic lưu giá và viết tài liệu mô tả bảng
-* Ngày / Người dùng: [2026-11-10] / Võ Ngọc Tiên
+| Mục | Thông tin |
+| :---- | :---- |
+| Họ tên, MSSV | Bùi Văn Tín – 0306241414 |
+| Nhóm, đề tài | Nhóm 09 – Thương mại điện tử (Cửa hàng bán sách "Mọt Sách" |
+| Vai trò | TV1 – LE (Leader) |
+| Công cụ AI dùng | ChatGPT / Gemini / Claude |
+
+## Bảng tổng hợp
+
+| Mã | Ngày | Giai đoạn | Nội dung | Commit / PR |
+| :---- | :---- | :---- | :---- | :---- |
+| AI-01 | 10/11 | Thiết kế | Chuẩn hóa ERD v2 (3NF), tạo file mo-ta-bang.md và giải thích lưu price ở order_item | docs: erd v2 chuan hoa 3nf  |  PR#1|
+
+---
+
+### \[AI-01\] Chuẩn hóa ERD v2 (3NF), giải thích logic lưu giá và viết tài liệu mô tả bảng
+* Ngày / Người dùng: 2026/11/10 / Võ Ngọc Tiên
 Công cụ: Gemini
 * Giai đoạn: Thiết kế
-* Task / Commit / PR: Thẻ [DB] ERD / docs: erd v2 chuan hoa 3nf / [PR #01]
+* Task / Commit / PR: \[DB\] ERD / aa81087 / docs: erd v2 chuan hoa 3nf / PR #01
 * Mục đích: Bổ sung các ràng buộc (NOT NULL, UNIQUE, CHECK), chỉ mục (indexes) cho 7 bảng; giải thích lý do order_item cần lưu giá tại thời điểm mua và sinh nội dung file docs/database/mo-ta-bang.md.
 * Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): "Tôi là TV4. Hãy phân tích các bước chuẩn hóa ERD đến 3NF, giải thích lý do vì sao order_item cần lưu giá tại thời điểm mua, thiết kế chỉ mục cho products(name), products(category_id), orders(user_id, status) và tạo giúp tôi nội dung file docs/database/mo-ta-bang.md hoàn chỉnh."
 * Kết quả AI trả về (tóm tắt):
