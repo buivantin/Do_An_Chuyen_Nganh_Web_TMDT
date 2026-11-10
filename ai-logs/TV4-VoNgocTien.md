@@ -7,7 +7,7 @@
 | Họ tên, MSSV | Võ Ngọc Tiên – 0306241411 |
 | Nhóm, đề tài | Nhóm 09 – Thương mại điện tử (Cửa hàng bán sách "Mọt Sách" |
 | Vai trò | TV4 – Backend (Database) |
-| Gemini |
+| Công cụ AI dùng | Gemini |
 
 ## Bảng tổng hợp
 
