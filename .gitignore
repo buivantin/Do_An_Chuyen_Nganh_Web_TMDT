@@ -1,0 +1,40 @@
+# =========================
+# Laravel (Backend)
+# =========================
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.idea
+/.vscode
+
+# =========================
+# React (Frontend)
+# =========================
+# Nếu thư mục frontend nằm riêng, các file dưới đây sẽ tự động bỏ qua
+build/
+dist/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
