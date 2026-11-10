@@ -4,16 +4,16 @@
 
 | Mục | Thông tin |
 | :---- | :---- |
-| Họ tên, MSSV | Nguyễn Văn A – \[MSSV\] |
-| Nhóm, đề tài | Nhóm \[số\] – \[Đề tài\] |
-| Vai trò | TV1 – LE (Leader) |
+| Họ tên, MSSV | Võ Trần Đỉnh Sươn – \[0306241398\] |
+| Nhóm, đề tài | Nhóm \[9\] – \[Thương mại điện tử\] |
+| Vai trò | TV2 – BE  |
 | Công cụ AI dùng | \[ChatGPT / Claude / Gemini / GitHub Copilot / Cursor\] |
 
 ## Bảng tổng hợp
 
 | Mã | Ngày | Giai đoạn | Nội dung | Commit / PR |
 | :---- | :---- | :---- | :---- | :---- |
-| AI-01 | \[dd/mm\] | Phân tích yêu cầu | Brainstorm chức năng và rủi ro | \[PR \#...\] |
+| AI-01 | \[9/11\] | Phân tích yêu cầu | Brainstorm chức năng và rủi ro | \[PR \#1\] |
 | AI-02 | \[dd/mm\] | Lập kế hoạch | Rà soát user story, chia sprint S1 | \[PR \#...\] |
 
 ---
@@ -23,7 +23,7 @@
 - Ngày / Người dùng: \[2026-11-9\] / Võ Trần Đỉnh Sơn
 - Công cụ: \[Claude (Sonet 5.5)\]  
 - Giai đoạn: Phân tích yêu cầu  
-- Task / Commit / PR: \[DOC\] Đề cương / \[a1b2c3d\] / \[PR \#2\]  
+- Task / Commit / PR: \[DOC\] Đề cương / \[1f79843\] / \[PR \#1\]  
 - Mục đích: Liệt kê chức năng cần có và rủi ro khi làm đề tài \[Thương mại điện tử\] trong 3 tuần với 5 người.  
 - Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): "Nhóm 5 sinh viên làm website \[BookStore\] trong 3 tuần bằng \[Laravel\]. Liệt kê chức năng cho khách và quản trị, chia mức bắt buộc/tùy chọn, và 5 rủi ro lớn nhất kèm cách phòng tránh."  
 - Kết quả AI trả về (tóm tắt): \[AI đề xuất 15 chức năng, 3 rủi ro\]  
