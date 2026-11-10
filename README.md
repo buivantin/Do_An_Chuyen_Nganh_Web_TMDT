@@ -30,3 +30,14 @@
 7. Kiểm tra kết nối CSDL: http://127.0.0.1:8000/db-check
 
 > Lưu ý: không commit file `.env`.
+
+## Hướng dẫn cài đặt & Kết nối CSDL (Development)
+
+1. Sao chép file môi trường:
+   `cp .env.example .env` (hoặc tạo file .env)
+2. Cấu hình thông số CSDL trong file `.env`:
+   - `DB_DATABASE=bookstore`
+   - `DB_USERNAME=root`
+   - `DB_PASSWORD=`
+3. Tạo CSDL `bookstore` trong MySQL local.
+4. Chạy lệnh kiểm tra kết nối tại đường dẫn `/db-check`.
