@@ -2,7 +2,11 @@
 
 ## Cài đặt
 
-**Yêu cầu:** PHP 8.2+, Composer, MySQL.
+*## Yêu cầu hệ thống
+- **Backend:** PHP 8.2+, Composer, MySQL.
+- **Frontend:** Node.js (>= 18.x), npm.
+
+
 
 1. Clone repo và vào thư mục dự án:
    ```
