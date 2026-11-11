@@ -24,7 +24,7 @@ class AuthService
         }
 
         return $this->users->create([
-            'name'     => trim($data['name']),
+            'username'     => trim($data['username']),
             'email'    => $email,
             'password' => Hash::make($data['password']),//bam mat khau
             'role'     => 'customer',
