@@ -58,3 +58,17 @@
 - Cách kiểm chứng: Chạy lại lệnh `git status` và thấy thông báo đang ở nhánh `develop`.
 - Tỷ lệ nội dung AI còn giữ lại: 65%
 - Điều học được: Luôn kiểm tra đường dẫn hiện tại của Terminal (dấu nhắc lệnh) trước khi chạy các lệnh Git.
+
+
+### [AI-04] Tạo mẫu Test Case cho chức năng TM-05
+- Ngày / Người dùng: 11/11/2026 / Bùi Văn Tín
+- Công cụ: Gemini
+- Giai đoạn: Kiểm thử
+- Task / Commit / PR: Tạo file test-cases.md / [Mã commit] / PR #...
+- Mục đích: Tạo 5 test case mẫu cho chức năng Giỏ hàng (TM-05) dựa trên tiêu chí chấp nhận.
+- Prompt chính: "Tạo 5 test case mẫu cho chức năng Giỏ hàng trong website thương mại điện tử. Bao gồm các trường: ID, Mã chức năng, Bước thực hiện, Dữ liệu, Kết quả mong đợi."
+- Kết quả AI trả về: AI đưa ra 5 kịch bản (thêm thành công, thêm vượt tồn kho, sửa số lượng, sửa vượt tồn kho, xóa).
+- Đánh giá: Đúng ý tưởng, nhưng cần điều chỉnh lại cột "Dữ liệu" để khớp với đặc tả của nhóm (VD: Sản phẩm A giá 50k).
+- Đã chỉnh sửa gì: Thêm dữ liệu giả định cụ thể, sửa lại các bước cho rõ ràng hơn.
+- Cách kiểm chứng: Đối chiếu với tiêu chí chấp nhận của TM-05 trong file `01_Dac_ta_yeu_cau...pdf`.
+- Điều học được: AI tạo kịch bản test rất nhanh, nhưng người test (QA) phải là người cung cấp dữ liệu đầu vào (Data) thực tế cho chuẩn.
