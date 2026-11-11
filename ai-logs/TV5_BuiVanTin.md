@@ -72,3 +72,16 @@
 - Đã chỉnh sửa gì: Thêm dữ liệu giả định cụ thể, sửa lại các bước cho rõ ràng hơn.
 - Cách kiểm chứng: Đối chiếu với tiêu chí chấp nhận của TM-05 trong file `01_Dac_ta_yeu_cau...pdf`.
 - Điều học được: AI tạo kịch bản test rất nhanh, nhưng người test (QA) phải là người cung cấp dữ liệu đầu vào (Data) thực tế cho chuẩn.
+
+### [AI-04] Tạo Test Case cho chức năng TM-04 (Đăng ký)
+- Ngày / Người dùng: 12/11/2026 / Bùi Văn Tín
+- Công cụ: Gemini
+- Giai đoạn: Kiểm thử (QA)
+- Task / Commit / PR: Cập nhật file test-cases.md / [Mã commit] / PR #...
+- Mục đích: Viết các kịch bản kiểm thử (Test Case) cho chức năng Đăng ký tài khoản, bao phủ các trường hợp biên và bảo mật.
+- Prompt chính: "Hãy tạo 5 test case cho chức năng Đăng ký tài khoản (email duy nhất, mật khẩu >= 8 ký tự). Gồm các trường: ID, Tên test, Điều kiện, Các bước, Kết quả mong đợi. Nhớ có trường hợp nhập email đã tồn tại và mật khẩu quá ngắn."
+- Kết quả AI trả về: 5 kịch bản test rất chi tiết (đăng ký thành công, bỏ trống, sai định dạng pass, sai xác nhận pass, trùng email).
+- Đánh giá: Đúng, bao quát được các trường hợp cơ bản (happy path và edge cases).
+- Đã chỉnh sửa gì: Thêm bước kiểm tra "Mật khẩu phải được băm (bcrypt) dưới CSDL" vào kết quả mong đợi của TC-04-01 để tăng tính bảo mật.
+- Cách kiểm chứng: Đối chiếu với danh sách tiêu chí chấp nhận (Acceptance Criteria) của TM-04 trong file PDF.
+- Điều học được: AI viết test case rất nhanh, nhưng vai trò của QA là phải bổ sung các góc nhìn về bảo mật và trải nghiệm người dùng mà AI có thể bỏ sót.
