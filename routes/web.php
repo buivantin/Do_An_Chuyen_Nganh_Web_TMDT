@@ -1,6 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Auth\RegisterController;   
+
+Route::get('/register', [RegisterController::class, 'showForm'])->name('register');
+Route::post('/register', [RegisterController::class, 'store']);
 
 Route::get('/db-check', function () {
     try {
