@@ -1,4 +1,4 @@
-# AI log – TV5 – [Họ và Tên Của Bạn]
+# AI log – TV5 – Bùi Văn Tín
 
 | Mục | Thông tin |
 | :---- | :---- |
