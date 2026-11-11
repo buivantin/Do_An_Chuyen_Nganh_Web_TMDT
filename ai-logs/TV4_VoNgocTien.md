@@ -13,8 +13,9 @@
 
 | Mã | Ngày | Giai đoạn | Nội dung | Commit / PR |
 | :---- | :---- | :---- | :---- | :---- |
-| AI-01 | 10/11 | Thiết kế | Chuẩn hóa ERD v2 (3NF), tạo file mo-ta-bang.md và giải thích lưu price ở order_item | docs: erd v2 chuan hoa 3nf | PR #01 |
-| AI-02 | 11/11 | Lập trình | Sinh dữ liệu mẫu Seeder (30 sách Tiếng Việt, 10 đơn hàng, 11 users) và xử lý lỗi thứ tự Migration | feat(db): seed du lieu mau | PR #02 |
+| AI-01 | 10/11 | Thiết kế | Chuẩn hóa ERD v2 (3NF), tạo file mo-ta-bang.md và giải thích lưu price ở order_item | docs: erd v2 chuan hoa 3nf \| PR #01 |
+| AI-02 | 11/11 | Lập trình | Sinh dữ liệu mẫu Seeder (30 sách Tiếng Việt, 10 đơn hàng, 11 users) và xử lý lỗi thứ tự Migration | feat(db): seed du lieu mau \| PR #02 |
+| AI-03 | 11/11 | Tài liệu | Đối chiếu ERD v2 với Migration, hoàn thiện docs CSDL, chuẩn bị kịch bản thuyết trình 2 phút & xử lý Git workflow | docs: erd final \| PR #03 |
 
 ---
 
@@ -34,7 +35,7 @@
 - Cách kiểm chứng:
   - Nhập mã DBML lên dbdiagram.io kiểm tra không còn báo lỗi/cảnh báo vàng.
   - Gán thành viên TV2 review thẻ [DB] ERD trên Trello và đối chiếu danh sách User Story TM-11, TM-12.
-- Tỷ lệ nội dung AI còn giữ lại (ước lượng): 90%
+- Tỷ lệ nội dung AI còn giữ lại (ước lượng): 65%
 - Điều học được: Khóa ngoại trong DBML nếu không khai báo not null sẽ mặc định là Nullable, dẫn đến lệch chuẩn với toán tử quan hệ >; hiểu rõ tầm quan trọng của việc lưu snapshot giá trong thiết kế hóa đơn bán hàng.
 
 ---
@@ -57,5 +58,26 @@
 - Cách kiểm chứng:
   - Chạy lại lệnh `php artisan migrate:fresh --seed` thành công 100% không phát sinh lỗi khóa ngoại.
   - Mở phpMyAdmin kiểm tra CSDL `bookstore` ghi nhận đủ 30 sản phẩm sách, 11 tài khoản người dùng và 10 đơn hàng đa dạng trạng thái.
-- Tỷ lệ nội dung AI còn giữ lại (ước lượng): 85%
+- Tỷ lệ nội dung AI còn giữ lại (ước lượng): 65%
 - Điều học được: Hiểu rõ cơ chế sắp xếp thứ tự chạy Migration trong Laravel dựa trên chuỗi thời gian của tên file; nắm vững cách sử dụng Seeder để khởi tạo dữ liệu mẫu phức tạp phục vụ kiểm thử ứng dụng.
+
+---
+
+### [AI-03] Đối chiếu ERD v2 với Migration, chuẩn bị kịch bản thuyết trình ERD và xử lý Git workflow
+- Ngày / Người dùng: 2026/11/11 / Võ Ngọc Tiên
+- Công cụ: Gemini
+- Giai đoạn: Tài liệu & Bảo vệ
+- Task / Commit / PR: [DB] ERD / docs: erd final / PR #03
+- Mục đích: Đối chiếu tính nhất quán giữa sơ đồ ERD và các file Migration Laravel; sinh kịch bản thuyết trình 2 phút giải thích logic 3NF (tách `order_items` và lưu giá snapshot); hỗ trợ câu lệnh Git lấy thư mục tài liệu từ nhánh cũ sang nhánh mới dựa trên `develop`.
+- Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): "Tôi là TV4. Hãy giúp tôi rà soát tính nhất quán giữa ERD và Migration Laravel, chuẩn bị kịch bản thuyết trình 2 phút giải thích lý do tách order_items và lưu giá snapshot lúc mua, đồng thời hướng dẫn quy trình Git checkout/push file tài liệu lên nhánh docs/erd-final."
+- Kết quả AI trả về (tóm tắt):
+  - Rà soát xác nhận tính nhất quán giữa 7 bảng Migration thực tế và sơ đồ ERD final.
+  - Sinh kịch bản thuyết trình 2 phút cô đọng, nhấn mạnh 2 luận điểm cốt lõi: Triệt tiêu quan hệ N-N đưa về chuẩn 3NF và bảo vệ tính toàn vẹn lịch sử hóa đơn tài chính khi giá sản phẩm biến động.
+  - Hướng dẫn chi tiết lệnh `git checkout origin/docs/erd -- docs/database/` bốc thư mục tài liệu từ nhánh cũ sang nhánh `docs/erd-final` mới mà không dính xung đột lịch sử commit với `develop`.
+- Đánh giá: Kịch bản thuyết trình ngắn gọn, chuẩn chuyên môn CSDL. Câu lệnh Git giải quyết chính xác sự cố lệch commit giữa các nhánh và lỗi `invalid reference`.
+- Đã chỉnh sửa gì: Giữ nguyên 100% kịch bản thuyết trình và bộ lệnh Git thực thi trên Terminal.
+- Cách kiểm chứng:
+  - Mở file `erd-final.png` đối chiếu từng tên cột/khóa ngoại với các file migration trong `database/migrations/` chạy khớp 100%.
+  - Thực thi thành công lệnh `git checkout origin/docs/erd -- docs/database/`, push nhánh `docs/erd-final` và tạo Pull Request PR #03 thành công trên GitHub.
+- Tỷ lệ nội dung AI còn giữ lại (ước lượng): 65%
+- Điều học được: Nắm vững kỹ năng thuyết trình bảo vệ kiến trúc CSDL trước giảng viên và thành thạo thao tác bốc thư mục tài liệu giữa các nhánh trong Git.
