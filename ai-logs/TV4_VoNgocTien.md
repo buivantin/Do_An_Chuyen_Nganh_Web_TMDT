@@ -44,7 +44,7 @@
 - Ngày / Người dùng: 2026/11/11 / Võ Ngọc Tiên
 - Công cụ: Gemini
 - Giai đoạn: Lập trình
-- Task / Commit / PR: [DB] Migration & seed / feat(db): seed du lieu mau / PR #02
+- Task / Commit / PR: [DB] Migration & seed / b245805 / PR #02
 - Mục đích: Viết code `DatabaseSeeder.php` tạo dữ liệu thử nghiệm chuẩn cho 7 bảng (1 Admin, 10 Khách hàng, 5 Danh mục, 30 Sách tiếng Việt, 10 Đơn hàng) và xử lý lỗi dính khóa ngoại `errno: 150` khi chạy Migration.
 - Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): "Hướng dẫn tôi viết DatabaseSeeder trong Laravel nạp 1 admin, 10 khách hàng, 5 danh mục, 30 sách tiếng Việt và 10 đơn hàng mẫu nhiều trạng thái; đồng thời hỗ trợ sửa lỗi SQLSTATE[HY000]: 1005 Can't create table cart_items khi chạy migrate:fresh."
 - Kết quả AI trả về (tóm tắt):
@@ -67,7 +67,7 @@
 - Ngày / Người dùng: 2026/11/11 / Võ Ngọc Tiên
 - Công cụ: Gemini
 - Giai đoạn: Tài liệu & Bảo vệ
-- Task / Commit / PR: [DB] ERD / docs: erd final / PR #03
+- Task / Commit / PR: [DB] ERD / e126e52 / PR #03
 - Mục đích: Đối chiếu tính nhất quán giữa sơ đồ ERD và các file Migration Laravel; sinh kịch bản thuyết trình 2 phút giải thích logic 3NF (tách `order_items` và lưu giá snapshot); hỗ trợ câu lệnh Git lấy thư mục tài liệu từ nhánh cũ sang nhánh mới dựa trên `develop`.
 - Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): "Tôi là TV4. Hãy giúp tôi rà soát tính nhất quán giữa ERD và Migration Laravel, chuẩn bị kịch bản thuyết trình 2 phút giải thích lý do tách order_items và lưu giá snapshot lúc mua, đồng thời hướng dẫn quy trình Git checkout/push file tài liệu lên nhánh docs/erd-final."
 - Kết quả AI trả về (tóm tắt):
