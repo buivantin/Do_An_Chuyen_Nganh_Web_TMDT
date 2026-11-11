@@ -62,4 +62,18 @@
 - Cách kiểm chứng: Đọc lại file `Huong_dan_Trello_01_ThuongMaiDienTu.pdf` của giảng viên.
 - Tỷ lệ nội dung AI còn giữ lại: 70%
 - Điều học được: Quy trình làm việc cần được thống nhất ngay từ ngày đầu tiên để tránh việc mỗi người làm một kiểu.
+
+
+### [AI-04] Vẽ Sequence Diagram cho luồng Đặt hàng
+- Ngày / Người dùng: 12/11/2026 / Bùi Văn Tín
+- Công cụ: Gemini
+- Giai đoạn: Thiết kế hệ thống
+- Task / Commit / PR: Tạo file sequence-dat-hang.md / [Mã commit] / PR #...
+- Mục đích: Vẽ sơ đồ tuần tự mô tả quá trình đặt hàng, đảm bảo thể hiện rõ Transaction và xử lý lỗi (Rollback).
+- Prompt chính: "Viết code PlantUML vẽ sequence diagram cho luồng đặt hàng của website thương mại điện tử. Có các thành phần: Khách hàng, Giao diện, Controller, OrderService, CSDL. Phải có bước kiểm tra tồn kho, tạo đơn, trừ kho, xóa giỏ hàng trong một Transaction và có nhánh Rollback nếu lỗi."
+- Kết quả AI trả về: Đoạn code PlantUML mô tả chi tiết các bước từ lúc khách nhấn đặt hàng đến khi COMMIT hoặc ROLLBACK.
+- Đánh giá: Rất chính xác về mặt logic kỹ thuật. AI hiểu rõ khái niệm Transaction.
+- Đã chỉnh sửa gì: Copy code vào Draw.io để render hình ảnh, điều chỉnh lại vị trí các khối cho đẹp mắt.
+- Cách kiểm chứng: Đối chiếu lại với yêu cầu TM-NFR1 trong file đặc tả (Đặt hàng chạy trong transaction).
+- Điều học được: Dùng AI sinh mã PlantUML giúp tiết kiệm 90% thời gian vẽ tay, nhưng vẫn cần điều chỉnh giao diện bằng công cụ trực quan.
 -->
