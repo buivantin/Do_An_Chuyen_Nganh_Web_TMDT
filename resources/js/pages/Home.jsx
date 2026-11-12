@@ -13,7 +13,7 @@ const MOCK_BOOKS = [
     image: 'https://salt.tikicdn.com/cache/w1200/ts/product/22/cb/a9/524a27dcd45e8a13ae6eecb3dfacba7c.jpg',
   },
   {
-    id: 1,
+    id: 2,
     title: 'Cây Cam Ngọt Của Tôi',
     author: 'José Mauro de Vasconcelos',
     category: 'VĂN HỌC KINH ĐIỂN',
@@ -22,7 +22,7 @@ const MOCK_BOOKS = [
     image: 'https://salt.tikicdn.com/cache/w1200/ts/product/22/cb/a9/524a27dcd45e8a13ae6eecb3dfacba7c.jpg',
   },
   {
-    id: 1,
+    id: 3,
     title: 'Cây Cam Ngọt Của Tôi',
     author: 'José Mauro de Vasconcelos',
     category: 'VĂN HỌC KINH ĐIỂN',
@@ -31,7 +31,7 @@ const MOCK_BOOKS = [
     image: 'https://salt.tikicdn.com/cache/w1200/ts/product/22/cb/a9/524a27dcd45e8a13ae6eecb3dfacba7c.jpg',
   },
   {
-    id: 1,
+    id: 4,
     title: 'Cây Cam Ngọt Của Tôi',
     author: 'José Mauro de Vasconcelos',
     category: 'VĂN HỌC KINH ĐIỂN',
@@ -40,7 +40,7 @@ const MOCK_BOOKS = [
     image: 'https://salt.tikicdn.com/cache/w1200/ts/product/22/cb/a9/524a27dcd45e8a13ae6eecb3dfacba7c.jpg',
   },
   {
-    id: 1,
+    id: 5,
     title: 'Cây Cam Ngọt Của Tôi',
     author: 'José Mauro de Vasconcelos',
     category: 'VĂN HỌC KINH ĐIỂN',
