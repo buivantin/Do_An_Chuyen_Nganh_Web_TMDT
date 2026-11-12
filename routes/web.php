@@ -22,3 +22,6 @@ Route::get('/db-check', function () {
         return 'Kết nối thất bại: ' . $e->getMessage();
     }
 });
+Route::get('/', function () {
+    return view('welcome'); 
+});
