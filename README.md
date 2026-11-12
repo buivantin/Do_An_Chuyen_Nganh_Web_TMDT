@@ -2,7 +2,11 @@
 
 ## Cài đặt
 
-**Yêu cầu:** PHP 8.2+, Composer, MySQL.
+*## Yêu cầu hệ thống
+- **Backend:** PHP 8.2+, Composer, MySQL.
+- **Frontend:** Node.js (>= 18.x), npm.
+
+
 
 1. Clone repo và vào thư mục dự án:
    ```
@@ -41,3 +45,17 @@
    - `DB_PASSWORD=`
 3. Tạo CSDL `bookstore` trong MySQL local.
 4. Chạy lệnh kiểm tra kết nối tại đường dẫn `/db-check`.
+
+## Hướng dẫn Khởi tạo Cơ sở dữ liệu và Dữ liệu mẫu
+
+Chạy các lệnh sau trong Terminal để tạo bảng và nạp dữ liệu thử nghiệm:
+
+```bash
+# 1. Chạy migration tạo 6 bảng CSDL
+php artisan migrate
+
+# 2. Nạp dữ liệu mẫu (5 danh mục, 30 sách, 10 khách hàng, 1 admin, 10 đơn hàng)
+php artisan db:seed
+
+# Hoặc làm mới CSDL và nạp lại từ đầu:
+php artisan migrate:fresh --seed
