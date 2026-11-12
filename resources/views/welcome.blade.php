@@ -19,7 +19,19 @@
             </style>
         @endif
     </head>
-    <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
+        <!--Nut dang xuat tam de test -->
+        <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
+            <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
+        @auth
+            <div style="position:fixed; top:10px; left:10px; z-index:9999; background:#fff; color:#000; padding:8px; border:1px solid #000;">
+                Xin chào, {{ auth()->user()->username }}
+                <form method="POST" action="{{ route('logout') }}" style="display:inline">
+                    @csrf
+                    <button type="submit" style="border:1px solid #000; padding:2px 8px;">Đăng xuất</button>
+                </form>
+            </div>
+        @endauth
+
         <header class="w-full lg:max-w-4xl max-w-[335px] text-sm mb-6 not-has-[nav]:hidden">
             @if (Route::has('login'))
                 <nav class="flex items-center justify-end gap-4">
