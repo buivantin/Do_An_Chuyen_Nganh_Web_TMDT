@@ -1,23 +1,34 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 
 export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSwitchToLogin }) {
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+    setFieldErrors({});
 
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError('Vui lòng điền đầy đủ tất cả thông tin.');
       return;
     }
-    if (password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự.');
+    if (!/^[a-zA-Z0-9_]{3,50}$/.test(username.trim())) {
+      setError('Tên đăng nhập 3–50 ký tự, chỉ gồm chữ không dấu, số và dấu gạch dưới (_).');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự.');
       return;
     }
     if (password !== confirmPassword) {
@@ -25,10 +36,39 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
       return;
     }
 
-    setError('');
-    // Giả lập đăng ký thành công & tự đăng nhập (sau này nối API /register của TV2)
-    onRegisterSuccess?.({ name: name.trim(), email: email.trim() });
-    onClose();
+    setLoading(true);
+    try {
+      const res = await axios.post('/api/register', {
+        username: username.trim(),
+        email: email.trim(),
+        password,
+        password_confirmation: confirmPassword,
+      });
+
+      const { token, user } = res.data;
+      setSuccess(res.data?.message || 'Đăng ký tài khoản thành công!');
+
+      setTimeout(() => {
+        if (token && user) {
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
+          // Truyền kèm name: user.username để Header hiển thị được ngay
+          onRegisterSuccess?.({ ...user, name: user.name || user.username });
+          onClose();
+        } else {
+          onSwitchToLogin?.();
+        }
+      }, 1000);
+    } catch (err) {
+      if (err.response?.status === 422) {
+        setFieldErrors(err.response.data.errors || {});
+        setError(err.response.data.message || 'Thông tin đăng ký chưa hợp lệ.');
+      } else {
+        setError(err.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,7 +80,6 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-md bg-[#FAF8F5] border border-stone-200 rounded-2xl p-6 sm:p-8 shadow-xl"
       >
-        {/* Nút đóng */}
         <button
           type="button"
           onClick={onClose}
@@ -50,7 +89,6 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
           ✕
         </button>
 
-        {/* Tiêu đề */}
         <div className="text-center mb-6">
           <div className="text-xs font-bold uppercase tracking-widest text-[#9A5B13] mb-1">
             Mọt Sách BookHouse
@@ -63,60 +101,97 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
           </p>
         </div>
 
-        {/* Thông báo lỗi tiếng Việt */}
         {error && (
           <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
             {error}
           </div>
         )}
 
-        {/* Form đăng ký */}
+        {success && (
+          <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-medium">
+            {success}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="block text-xs font-semibold text-stone-700 mb-1">
-              Họ và tên
+            <label
+              htmlFor="register-username"
+              className="block text-xs font-semibold text-stone-700 mb-1"
+            >
+              Tên đăng nhập
             </label>
             <input
+              id="register-username"
+              name="username"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nguyễn Văn A"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="nguyenvanb"
               className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
             />
+            {fieldErrors.username && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.username[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700 mb-1">
+            <label
+              htmlFor="register-email"
+              className="block text-xs font-semibold text-stone-700 mb-1"
+            >
               Email
             </label>
             <input
+              id="register-email"
+              name="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="nhapemail@example.com"
               className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
             />
+            {fieldErrors.email && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.email[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700 mb-1">
+            <label
+              htmlFor="register-password"
+              className="block text-xs font-semibold text-stone-700 mb-1"
+            >
               Mật khẩu
             </label>
             <input
+              id="register-password"
+              name="password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="Tối thiểu 8 ký tự"
               className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
             />
+            {fieldErrors.password && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.password[0]}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-stone-700 mb-1">
+            <label
+              htmlFor="register-password-confirmation"
+              className="block text-xs font-semibold text-stone-700 mb-1"
+            >
               Xác nhận mật khẩu
             </label>
             <input
+              id="register-password-confirmation"
+              name="password_confirmation"
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Nhập lại mật khẩu"
@@ -126,13 +201,13 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
 
           <button
             type="submit"
-            className="w-full bg-[#141414] hover:bg-stone-800 text-white font-semibold text-sm py-3 rounded-xl transition cursor-pointer mt-2"
+            disabled={loading}
+            className="w-full bg-[#141414] hover:bg-stone-800 disabled:opacity-60 text-white font-semibold text-sm py-3 rounded-xl transition cursor-pointer mt-2"
           >
-            Đăng ký tài khoản
+            {loading ? 'Đang tạo tài khoản...' : 'Đăng ký tài khoản'}
           </button>
         </form>
 
-        {/* Chuyển sang đăng nhập */}
         <p className="text-center text-xs text-stone-600 mt-5">
           Đã có tài khoản?{' '}
           <button
