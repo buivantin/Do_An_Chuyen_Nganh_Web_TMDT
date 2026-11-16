@@ -4,20 +4,28 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
+
+// Controllers
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Api\Admin\UserController; 
-use App\Http\Controllers\CategoryController;       
+use App\Http\Controllers\Api\CartController;      
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 
-// Route công khai để trang chủ / khách hàng lấy danh sách danh mục 
+// Route trang chủ & danh mục (Của TV3 & TV4)
 Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/home', [HomeController::class, 'index']);
 
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập) ---
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::get('/me', fn (Request $request) => $request->user());
+    
+    // TM-05: Giỏ hàng (Của TV5)
+    Route::post('/cart/add', [CartController::class, 'addToCart']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---
