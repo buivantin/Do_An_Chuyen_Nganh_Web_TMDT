@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import axios from 'axios';
 import Home from './pages/Home';
 import Forbidden from './pages/Forbidden';
+import UserManagement from './pages/Admin/UserManagement'; // Thêm import này
 
 function getStoredUser() {
   try {
@@ -65,7 +66,8 @@ function App() {
     // Giao diện khi đã xác thực đúng vai trò admin
     return (
       <div className="min-h-screen bg-[#FAF8F5] p-8">
-        <div className="max-w-4xl mx-auto bg-white border border-stone-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+        {/* Header Admin */}
+        <div className="max-w-5xl mx-auto bg-white border border-stone-200 rounded-2xl p-6 shadow-sm flex items-center justify-between mb-6">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-[#9A5B13]">
               Mọt Sách BookHouse
@@ -80,6 +82,11 @@ function App() {
           >
             Về trang chủ
           </a>
+        </div>
+
+        {/* Nội dung Component Quản lý người dùng */}
+        <div className="max-w-5xl mx-auto">
+          <UserManagement />
         </div>
       </div>
     );
