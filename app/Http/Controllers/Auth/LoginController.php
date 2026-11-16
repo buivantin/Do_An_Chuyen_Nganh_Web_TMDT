@@ -12,26 +12,26 @@ class LoginController extends Controller
     {
     }
 
-    public function showForm()
-    {
-        return view('auth.login'); // TV3 làm view này
-    }
+   
 
     public function login(LoginRequest $request)
     {
         $user = $this->auth->login(
             $request->input('email'),
             $request->input('password'),
-            $request->boolean('remember')
         );
 
-        return $user->isAdmin() ? redirect('/admin') : redirect('/');
+        return response()->json([
+            'message' => 'Đăng nhập thành công.',
+            'token'   => $this->auth->issueToken($user),
+            'user'    => $user,   // có role để React điều hướng
+        ]);
     }
 
-    public function logout()
+    public function logout(Request $request)
     {
-        $this->auth->logout();
+        $this->auth->logout($request->user());
 
-        return redirect('/');
+        return response()->json(['message' => 'Đăng xuất thành công.']);
     }
 }
