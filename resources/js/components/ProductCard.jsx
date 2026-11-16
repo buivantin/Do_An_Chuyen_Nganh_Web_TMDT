@@ -1,20 +1,34 @@
 import React from 'react';
 
 export default function ProductCard({ book, onAddToCart }) {
+  const cleanTitle = book.title?.normalize('NFC');
+
   return (
     <div className="bg-white rounded-2xl p-3 border border-stone-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-      <div className="bg-[#EAEAEA] rounded-xl p-4 flex items-center justify-center aspect-[4/4.4]">
-        <img src={book.image} alt={book.title} className="h-full object-contain shadow-md" />
+      <div>
+        <div className="bg-[#EAEAEA] rounded-xl p-4 flex items-center justify-center aspect-[4/4.4]">
+          <img src={book.image} alt={cleanTitle} className="h-full object-contain shadow-md" />
+        </div>
+
+        <div className="pt-3">
+          <div className="flex justify-between text-[11px] font-bold text-[#9A5B13]">
+            <span className="uppercase truncate">{book.category?.normalize('NFC')}</span>
+          </div>
+
+          {/* Cho phép xuống 2 dòng + giữ chiều cao cố định 2 dòng để card không bị lệch */}
+          <h3
+            title={cleanTitle}
+            className="font-serif text-lg font-bold text-gray-900 mt-1 line-clamp-2 min-h-[3.5rem]"
+          >
+            {cleanTitle}
+          </h3>
+
+          <p className="text-xs text-gray-500 truncate mt-1">{book.author?.normalize('NFC')}</p>
+        </div>
       </div>
 
       <div className="pt-3">
-        <div className="flex justify-between text-[11px] font-bold text-[#9A5B13]">
-          <span className="uppercase truncate">{book.category}</span>
-        </div>
-        <h3 className="font-serif text-lg font-bold text-gray-900 mt-1 truncate">{book.title}</h3>
-        <p className="text-xs text-gray-500 truncate">{book.author}</p>
-
-        <div className="mt-3 text-lg font-bold text-gray-900">
+        <div className="text-lg font-bold text-gray-900">
           {book.price.toLocaleString('vi-VN')} đ
         </div>
 

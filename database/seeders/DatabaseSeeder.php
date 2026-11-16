@@ -42,7 +42,7 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 3. Seed 30 Đầu sách tiếng Việt
+        // 3. Seed 30 Đầu sách tiếng Việt lấy ảnh từ thư mục public/imgs
         $books = [
             'Đắc Nhân Tâm', 'Nhà Giả Kim', 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Hành Trình Về Phương Đông', 'Tối Ưu Hóa CSDL Với MySQL',
             'Lập Trình Web Với Laravel', 'Cấu Trúc Dữ Liệu Và Giải Thuật', 'Cha Giàu Cha Nghèo', 'Khởi Nghiệp Tinh Gọn', 'Tư Duy Nhanh Và Chậm',
@@ -53,13 +53,25 @@ class DatabaseSeeder extends Seeder
         ];
 
         for ($i = 0; $i < 30; $i++) {
+            // Chuyển tên sách thành slug dấu gạch ngang (VD: "Búp Sen Xanh" -> "bup-sen-xanh")
+            $slugTitle = Str::slug($books[$i]);
+            $imagePath = "/imgs/{$slugTitle}.jpg";
+
+            // Tự động tìm đúng đuôi file (.jpg, .png, .jpeg, .webp) có trong public/imgs
+            foreach (['jpg', 'png', 'jpeg', 'webp'] as $ext) {
+                if (file_exists(public_path("imgs/{$slugTitle}.{$ext}"))) {
+                    $imagePath = "/imgs/{$slugTitle}.{$ext}";
+                    break;
+                }
+            }
+
             DB::table('products')->insert([
                 'name' => $books[$i],
                 'description' => "Cuốn sách {$books[$i]} mang lại nhiều giá trị tri thức và cảm xúc cho người đọc.",
                 'status' => 'active',
                 'price' => rand(50, 350) * 1000,
                 'category_id' => rand(1, 5),
-                'image' => "book_" . ($i + 1) . ".jpg",
+                'image' => $imagePath,
                 'stock' => rand(10, 100),
             ]);
         }
@@ -72,7 +84,7 @@ class DatabaseSeeder extends Seeder
                 'address' => "$i Đường Nguyễn Huệ, Quận 1, TP.HCM",
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
-                'user_id' => rand(2, 11), 
+                'user_id' => rand(2, 11),
                 'created_at' => now(),
             ]);
 
