@@ -4,14 +4,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Api\Admin\UserController; // Của TV1
-use App\Http\Controllers\CategoryController;       // Của TV4
+use App\Http\Controllers\Api\Admin\UserController; 
+use App\Http\Controllers\CategoryController;       
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 
-// Route công khai để trang chủ / khách hàng lấy danh sách danh mục (TV4)
+// Route công khai để trang chủ / khách hàng lấy danh sách danh mục 
 Route::get('/categories', [CategoryController::class, 'index']);
 
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập) ---
