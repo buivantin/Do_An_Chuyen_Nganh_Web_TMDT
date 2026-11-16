@@ -18,6 +18,9 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::get('/me', fn (Request $request) => $request->user());
+
+    // TM-05: Giỏ hàng (Yêu cầu đăng nhập)
+    Route::post('/cart/add', [\App\Http\Controllers\Api\CartController::class, 'addToCart']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---
