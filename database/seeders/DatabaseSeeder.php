@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -42,7 +41,7 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 3. Seed 30 Đầu sách tiếng Việt lấy ảnh từ thư mục public/imgs
+        // 3. Seed 30 Đầu sách tiếng Việt kèm tác giả và đường dẫn ảnh chính xác
         $books = [
             'Đắc Nhân Tâm', 'Nhà Giả Kim', 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Hành Trình Về Phương Đông', 'Tối Ưu Hóa CSDL Với MySQL',
             'Lập Trình Web Với Laravel', 'Cấu Trúc Dữ Liệu Và Giải Thuật', 'Cha Giàu Cha Nghèo', 'Khởi Nghiệp Tinh Gọn', 'Tư Duy Nhanh Và Chậm',
@@ -52,26 +51,34 @@ class DatabaseSeeder extends Seeder
             'Khai Phá Dữ Liệu Lớn', 'Thiết Kế Hệ Thống Phân Tán', 'Búp Sen Xanh', 'Hoàng Tử Bé', 'Chuyện Con Mèo Dạy Hải Âu Bay'
         ];
 
+        $authors = [
+            'Dale Carnegie', 'Paulo Coelho', 'Rosie Nguyễn', 'Baird T. Spalding', 'Baron Schwartz',
+            'Matt Stauffer', 'Lê Minh Hoàng', 'Robert T. Kiyosaki', 'Eric Ries', 'Daniel Kahneman',
+            'Tô Hoài', 'Nguyễn Nhật Ánh', 'Nguyễn Nhật Ánh', 'José Mauro de Vasconcelos', 'David J. Lieberman',
+            'Eckhart Tolle', 'Anthony Robbins', 'Steven D. Levitt', 'Dave Ulrich', 'Robert C. Martin',
+            'Yuval Noah Harari', 'Stephen Hawking', 'Brian Tracy', 'Gustave Le Bon', 'Napoleon Hill',
+            'Foster Provost', 'Martin Kleppmann', 'Sơn Tùng', 'Antoine de Saint-Exupéry', 'Luis Sepúlveda'
+        ];
+
+        $images = [
+            '/imgs/dac-nhan-tam.jpg', '/imgs/nha-gia-kim.jpg', '/imgs/tuoi-tre-dang-gia-bao-nhieu.jpg', '/imgs/hanh-trinh-ve-phuong-dong.jpg', '/imgs/toi-uu-hoa-csdl-voi-mysql.jpg',
+            '/imgs/lap-trinh-web-voi-laravel.jpg', '/imgs/cau-truc-du-lieu-va-giai-thuat.jpg', '/imgs/cha-giau-cha-ngheo.jpg', '/imgs/khoi-nghiep-tinh-gon.jpg', '/imgs/tu-duy-nhanh-va-cham.jpg',
+            '/imgs/de-men-phieu-luu-ky.jpg', '/imgs/toi-thay-hoa-vang-tren-co-xanh.jpg', '/imgs/mat-biec.jpg', '/imgs/cay-cam-ngot-cua-toi.jpg', '/imgs/doc-vi-bat-ky-ai.jpg',
+            '/imgs/suc-manh-cua-hien-tai.jpg', '/imgs/danh-thuc-con-nguoi-phi-thuong-trong-ban.jpg', '/imgs/kinh-te-hoc-hai-huoc.jpg', '/imgs/quan-tri-nhan-su-40.jpg', '/imgs/clean-code-trong-thuc-te.jpg',
+            '/imgs/lich-su-loai-nguoi-sapiens.jpg', '/imgs/vu-tru-trong-vo-hat-de.jpg', '/imgs/thuat-quan-ly-thoi-gian.jpg', '/imgs/tam-ly-hoc-dam-dong.jpg', '/imgs/chien-thang-con-quy-trong-ban.jpg',
+            '/imgs/khai-pha-du-lieu-lon.jpg', '/imgs/thiet-ke-he-thong-phan-tan.jpg', '/imgs/bup-sen-xanh.jpg', '/imgs/hoang-tu-be.jpg', '/imgs/chuyen-con-meo-day-hai-au-bay.jpg'
+        ];
+
+
         for ($i = 0; $i < 30; $i++) {
-            // Chuyển tên sách thành slug dấu gạch ngang (VD: "Búp Sen Xanh" -> "bup-sen-xanh")
-            $slugTitle = Str::slug($books[$i]);
-            $imagePath = "/imgs/{$slugTitle}.jpg";
-
-            // Tự động tìm đúng đuôi file (.jpg, .png, .jpeg, .webp) có trong public/imgs
-            foreach (['jpg', 'png', 'jpeg', 'webp'] as $ext) {
-                if (file_exists(public_path("imgs/{$slugTitle}.{$ext}"))) {
-                    $imagePath = "/imgs/{$slugTitle}.{$ext}";
-                    break;
-                }
-            }
-
             DB::table('products')->insert([
                 'name' => $books[$i],
+                'author' => $authors[$i],
                 'description' => "Cuốn sách {$books[$i]} mang lại nhiều giá trị tri thức và cảm xúc cho người đọc.",
                 'status' => 'active',
                 'price' => rand(50, 350) * 1000,
                 'category_id' => rand(1, 5),
-                'image' => $imagePath,
+                'image' => $images[$i],
                 'stock' => rand(10, 100),
             ]);
         }
