@@ -24,6 +24,10 @@ Route::get('/home', [HomeController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::get('/me', fn (Request $request) => $request->user());
+
+    // TM-06: Đặt hàng
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---
