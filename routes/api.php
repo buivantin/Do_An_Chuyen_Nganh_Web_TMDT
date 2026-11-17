@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\OrderController;
 
 // Controllers
 use App\Http\Controllers\CategoryController;
@@ -23,9 +24,10 @@ Route::get('/home', [HomeController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::get('/me', fn (Request $request) => $request->user());
-    
-    // TM-05: Giỏ hàng (Của TV5)
-    Route::post('/cart/add', [CartController::class, 'addToCart']);
+
+    // TM-06: Đặt hàng
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---
