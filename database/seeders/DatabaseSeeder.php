@@ -39,7 +39,7 @@ class DatabaseSeeder extends Seeder
                 ['Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Nguyễn Nhật Ánh', '/imgs/toi-thay-hoa-vang-tren-co-xanh.jpg'],
                 ['Mắt Biếc', 'Nguyễn Nhật Ánh', '/imgs/mat-biec.jpg'],
                 ['Cây Cam Ngọt Của Tôi', 'José Mauro de Vasconcelos', '/imgs/cay-cam-ngot-cua-toi.jpg'],
-                ['Lịch Sử Loài Người Sapiens', 'Yuval Noah Harari', '/imgs/lich-su-loai-nguoi.jpg'],
+                ['Lịch Sử Loài Người Sapiens', 'Yuval Noah Harari', '/imgs/lich-su-loai-nguoi-sapiens.jpg'],
             ],
             'Kinh tế & Quản lý' => [
                 ['Cha Giàu Cha Nghèo', 'Robert T. Kiyosaki', '/imgs/cha-giau-cha-ngheo.jpg'],
