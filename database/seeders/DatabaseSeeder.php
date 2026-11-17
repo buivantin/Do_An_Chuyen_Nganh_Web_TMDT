@@ -45,7 +45,7 @@ class DatabaseSeeder extends Seeder
                 ['Cha Giàu Cha Nghèo', 'Robert T. Kiyosaki', '/imgs/cha-giau-cha-ngheo.jpg'],
                 ['Khởi Nghiệp Tinh Gọn', 'Eric Ries', '/imgs/khoi-nghiep-tinh-gon.jpg'],
                 ['Kinh Tế Học Hài Hước', 'Steven D. Levitt', '/imgs/kinh-te-hoc-hai-huoc.jpg'],
-                ['Quản Trị Nhân Sự 4.0', 'Dave Ulrich', '/imgs/quan-ly-nhan-su-4.0.jpg'],
+                ['Quản Trị Nhân Sự 4.0', 'Dave Ulrich', '/imgs/quan-tri-nhan-su-40.jpg'],
             ],
             'Kỹ năng sống' => [
                 ['Đắc Nhân Tâm', 'Dale Carnegie', '/imgs/dac-nhan-tam.jpg'],
@@ -59,9 +59,9 @@ class DatabaseSeeder extends Seeder
                 ['Chiến Thắng Con Quỷ Trong Bạn', 'Napoleon Hill', '/imgs/chien-thang-con-quy-trong-ban.jpg'],
             ],
             'Công nghệ thông tin' => [
-                ['Tối Ưu Hóa CSDL Với MySQL', 'Baron Schwartz', '/imgs/toi-uu-hoa-csdl.jpg'],
+                ['Tối Ưu Hóa CSDL Với MySQL', 'Baron Schwartz', '/imgs/toi-uu-hoa-csdl-voi-mysql.jpg'],
                 ['Lập Trình Web Với Laravel', 'Matt Stauffer', '/imgs/lap-trinh-web-voi-laravel.jpg'],
-                ['Cấu Trúc Dữ Liệu Và Giải Thuật', 'Lê Minh Hoàng', '/imgs/cau-truc-du-lieu-giai-thuat.jpg'],
+                ['Cấu Trúc Dữ Liệu Và Giải Thuật', 'Lê Minh Hoàng', '/imgs/cau-truc-du-lieu-va-giai-thuat.jpg'],
                 ['Clean Code Trong Thực Tế', 'Robert C. Martin', '/imgs/clean-code-trong-thuc-te.jpg'],
                 ['Vũ Trụ Trong Vỏ Hạt Dẻ', 'Stephen Hawking', '/imgs/vu-tru-trong-vo-hat-de.jpg'],
                 ['Khai Phá Dữ Liệu Lớn', 'Foster Provost', '/imgs/khai-pha-du-lieu-lon.jpg'],
