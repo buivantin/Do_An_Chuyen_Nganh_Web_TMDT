@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -32,48 +31,69 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        // 2. Seed 5 Danh mục sách
-        $categories = ['Văn học', 'Kinh tế & Quản lý', 'Kỹ năng sống', 'Công nghệ thông tin', 'Sách thiếu nhi'];
-        foreach ($categories as $cat) {
-            DB::table('categories')->insert([
-                'name' => $cat,
-                'description' => "Các đầu sách thuộc thể loại $cat",
-                'status' => 'active',
-            ]);
-        }
-
-        // 3. Seed 30 Đầu sách tiếng Việt lấy ảnh từ thư mục public/imgs
-        $books = [
-            'Đắc Nhân Tâm', 'Nhà Giả Kim', 'Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Hành Trình Về Phương Đông', 'Tối Ưu Hóa CSDL Với MySQL',
-            'Lập Trình Web Với Laravel', 'Cấu Trúc Dữ Liệu Và Giải Thuật', 'Cha Giàu Cha Nghèo', 'Khởi Nghiệp Tinh Gọn', 'Tư Duy Nhanh Và Chậm',
-            'Dế Mèn Phiêu Lưu Ký', 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Mắt Biếc', 'Cây Cam Ngọt Của Tôi', 'Đọc Vị Bất Kỳ Ai',
-            'Sức Mạnh Của Hiện Tại', 'Đánh Thức Con Người Phi Thường Trong Bạn', 'Kinh Tế Học Hài Hước', 'Quản Trị Nhân Sự 4.0', 'Clean Code Trong Thực Tế',
-            'Lịch Sử Loài Người Sapiens', 'Vũ Trụ Trong Vỏ Hạt Dẻ', 'Thuật Quản Lý Thời Gian', 'Tâm Lý Học Đám Đông', 'Chiến Thắng Con Quỷ Trong Bạn',
-            'Khai Phá Dữ Liệu Lớn', 'Thiết Kế Hệ Thống Phân Tán', 'Búp Sen Xanh', 'Hoàng Tử Bé', 'Chuyện Con Mèo Dạy Hải Âu Bay'
+        // 2 & 3. Seed 5 Danh mục kèm đúng 30 Đầu sách (tác giả + ảnh chuẩn)
+        $catalog = [
+            'Văn học' => [
+                ['Nhà Giả Kim', 'Paulo Coelho', '/imgs/nha-gia-kim.jpg'],
+                ['Hành Trình Về Phương Đông', 'Baird T. Spalding', '/imgs/hanh-trinh-ve-phuong-dong.jpg'],
+                ['Tôi Thấy Hoa Vàng Trên Cỏ Xanh', 'Nguyễn Nhật Ánh', '/imgs/toi-thay-hoa-vang-tren-co-xanh.jpg'],
+                ['Mắt Biếc', 'Nguyễn Nhật Ánh', '/imgs/mat-biec.jpg'],
+                ['Cây Cam Ngọt Của Tôi', 'José Mauro de Vasconcelos', '/imgs/cay-cam-ngot-cua-toi.jpg'],
+                ['Lịch Sử Loài Người Sapiens', 'Yuval Noah Harari', '/imgs/lich-su-loai-nguoi-sapiens.jpg'],
+            ],
+            'Kinh tế & Quản lý' => [
+                ['Cha Giàu Cha Nghèo', 'Robert T. Kiyosaki', '/imgs/cha-giau-cha-ngheo.jpg'],
+                ['Khởi Nghiệp Tinh Gọn', 'Eric Ries', '/imgs/khoi-nghiep-tinh-gon.jpg'],
+                ['Kinh Tế Học Hài Hước', 'Steven D. Levitt', '/imgs/kinh-te-hoc-hai-huoc.jpg'],
+                ['Quản Trị Nhân Sự 4.0', 'Dave Ulrich', '/imgs/quan-tri-nhan-su-40.jpg'],
+            ],
+            'Kỹ năng sống' => [
+                ['Đắc Nhân Tâm', 'Dale Carnegie', '/imgs/dac-nhan-tam.jpg'],
+                ['Tuổi Trẻ Đáng Giá Bao Nhiêu', 'Rosie Nguyễn', '/imgs/tuoi-tre-dang-gia-bao-nhieu.jpg'],
+                ['Tư Duy Nhanh Và Chậm', 'Daniel Kahneman', '/imgs/tu-duy-nhanh-va-cham.jpg'],
+                ['Đọc Vị Bất Kỳ Ai', 'David J. Lieberman', '/imgs/doc-vi-bat-ky-ai.jpg'],
+                ['Sức Mạnh Của Hiện Tại', 'Eckhart Tolle', '/imgs/suc-manh-cua-hien-tai.jpg'],
+                ['Đánh Thức Con Người Phi Thường Trong Bạn', 'Anthony Robbins', '/imgs/danh-thuc-con-nguoi-phi-thuong.jpg'],
+                ['Thuật Quản Lý Thời Gian', 'Brian Tracy', '/imgs/thuat-quan-ly-thoi-gian.jpg'],
+                ['Tâm Lý Học Đám Đông', 'Gustave Le Bon', '/imgs/tam-ly-hoc-dam-dong.jpg'],
+                ['Chiến Thắng Con Quỷ Trong Bạn', 'Napoleon Hill', '/imgs/chien-thang-con-quy-trong-ban.jpg'],
+            ],
+            'Công nghệ thông tin' => [
+                ['Tối Ưu Hóa CSDL Với MySQL', 'Baron Schwartz', '/imgs/toi-uu-hoa-csdl-voi-mysql.jpg'],
+                ['Lập Trình Web Với Laravel', 'Matt Stauffer', '/imgs/lap-trinh-web-voi-laravel.jpg'],
+                ['Cấu Trúc Dữ Liệu Và Giải Thuật', 'Lê Minh Hoàng', '/imgs/cau-truc-du-lieu-va-giai-thuat.jpg'],
+                ['Clean Code Trong Thực Tế', 'Robert C. Martin', '/imgs/clean-code-trong-thuc-te.jpg'],
+                ['Vũ Trụ Trong Vỏ Hạt Dẻ', 'Stephen Hawking', '/imgs/vu-tru-trong-vo-hat-de.jpg'],
+                ['Khai Phá Dữ Liệu Lớn', 'Foster Provost', '/imgs/khai-pha-du-lieu-lon.jpg'],
+                ['Thiết Kế Hệ Thống Phân Tán', 'Martin Kleppmann', '/imgs/thiet-ke-he-thong-phan-tan.jpg'],
+            ],
+            'Sách thiếu nhi' => [
+                ['Dế Mèn Phiêu Lưu Ký', 'Tô Hoài', '/imgs/de-men-phieu-luu-ky.jpg'],
+                ['Búp Sen Xanh', 'Sơn Tùng', '/imgs/bup-sen-xanh.jpg'],
+                ['Hoàng Tử Bé', 'Antoine de Saint-Exupéry', '/imgs/hoang-tu-be.jpg'],
+                ['Chuyện Con Mèo Dạy Hải Âu Bay', 'Luis Sepúlveda', '/imgs/chuyen-con-meo-day-hai-au-bay.jpg'],
+            ],
         ];
 
-        for ($i = 0; $i < 30; $i++) {
-            // Chuyển tên sách thành slug dấu gạch ngang (VD: "Búp Sen Xanh" -> "bup-sen-xanh")
-            $slugTitle = Str::slug($books[$i]);
-            $imagePath = "/imgs/{$slugTitle}.jpg";
-
-            // Tự động tìm đúng đuôi file (.jpg, .png, .jpeg, .webp) có trong public/imgs
-            foreach (['jpg', 'png', 'jpeg', 'webp'] as $ext) {
-                if (file_exists(public_path("imgs/{$slugTitle}.{$ext}"))) {
-                    $imagePath = "/imgs/{$slugTitle}.{$ext}";
-                    break;
-                }
-            }
-
-            DB::table('products')->insert([
-                'name' => $books[$i],
-                'description' => "Cuốn sách {$books[$i]} mang lại nhiều giá trị tri thức và cảm xúc cho người đọc.",
+        foreach ($catalog as $categoryName => $books) {
+            $categoryId = DB::table('categories')->insertGetId([
+                'name' => $categoryName,
+                'description' => "Các đầu sách thuộc thể loại $categoryName",
                 'status' => 'active',
-                'price' => rand(50, 350) * 1000,
-                'category_id' => rand(1, 5),
-                'image' => $imagePath,
-                'stock' => rand(10, 100),
             ]);
+
+            foreach ($books as [$name, $author, $image]) {
+                DB::table('products')->insert([
+                    'name' => $name,
+                    'author' => $author,
+                    'description' => "Cuốn sách {$name} mang lại nhiều giá trị tri thức và cảm xúc cho người đọc.",
+                    'status' => 'active',
+                    'price' => rand(50, 350) * 1000,
+                    'category_id' => $categoryId,
+                    'image' => $image,
+                    'stock' => rand(10, 100),
+                ]);
+            }
         }
 
         // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái

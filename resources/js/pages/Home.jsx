@@ -1,295 +1,122 @@
-import React from 'react';
-import MainLayout from '../layouts/MainLayout';
-import ProductCard from '../components/ProductCard';
-
-const MOCK_BOOKS = [
-  {
-    id: 1,
-    title: 'Đắc Nhân Tâm',
-    author: 'Dale Carnegie',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.9,
-    price: 86000,
-    image: 'imgs/dac-nhan-tam.jpg',
-  },
-  {
-    id: 2,
-    title: 'Nhà Giả Kim',
-    author: 'Paulo Coelho',
-    category: 'VĂN HỌC',
-    rating: 4.9,
-    price: 79000,
-    image: 'imgs/nha-gia-kim.jpg',
-  },
-  {
-    id: 3,
-    title: 'Tuổi Trẻ Đáng Giá Bao Nhiêu',
-    author: 'Rosie Nguyễn',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.8,
-    price: 90000,
-    image: 'imgs/tuoi-tre-dang-gia-bao-nhieu.jpg',
-  },
-  {
-    id: 4,
-    title: 'Hành Trình Về Phương Đông',
-    author: 'Baird T. Spalding',
-    category: 'VĂN HỌC',
-    rating: 4.8,
-    price: 115000,
-    image: 'imgs/hanh-trinh-ve-phuong-dong.jpg',
-  },
-  {
-    id: 5,
-    title: 'Tối Ưu Hóa CSDL Với MySQL',
-    author: 'Baron Schwartz',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 4.7,
-    price: 210000,
-    image: 'imgs/toi-uu-hoa-csdl.jpg',
-  },
-  {
-    id: 6,
-    title: 'Lập Trình Web Với Laravel',
-    author: 'Matt Stauffer',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 4.9,
-    price: 245000,
-    image: 'imgs/lap-trinh-web-voi-laravel.jpg',
-  },
-  {
-    id: 7,
-    title: 'Cấu Trúc Dữ Liệu Và Giải Thuật',
-    author: 'Lê Minh Hoàng',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 4.8,
-    price: 195000,
-    image:'imgs/cau-truc-du-lieu-giai-thuat.jpg',
-  },
-  {
-    id: 8,
-    title: 'Cha Giàu Cha Nghèo',
-    author: 'Robert T. Kiyosaki',
-    category: 'KINH TẾ & QUẢN LÝ',
-    rating: 4.9,
-    price: 110000,
-    image: 'imgs/cha-giau-cha-ngheo.jpg',
-  },
-  {
-    id: 9,
-    title: 'Khởi Nghiệp Tinh Gọn',
-    author: 'Eric Ries',
-    category: 'KINH TẾ & QUẢN LÝ',
-    rating: 4.7,
-    price: 135000,
-    image: 'imgs/khoi-nghiep-tinh-gon.jpg',
-  },
-  {
-    id: 10,
-    title: 'Tư Duy Nhanh Và Chậm',
-    author: 'Daniel Kahneman',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.9,
-    price: 185000,
-    image: 'imgs/tu-duy-nhanh-va-cham.jpg',
-  },
-  {
-    id: 11,
-    title: 'Dế Mèn Phiêu Lưu Ký',
-    author: 'Tô Hoài',
-    category: 'SÁCH THIẾU NHI',
-    rating: 4.9,
-    price: 65000,
-    image: 'imgs/de-men-phieu-luu-ky.jpg',
-  },
-  {
-    id: 12,
-    title: 'Tôi Thấy Hoa Vàng Trên Cỏ Xanh',
-    author: 'Nguyễn Nhật Ánh',
-    category: 'VĂN HỌC',
-    rating: 4.9,
-    price: 125000,
-    image: 'imgs/toi-thay-hoa-vang-tren-co-xanh.jpg',
-  },
-  {
-    id: 13,
-    title: 'Mắt Biếc',
-    author: 'Nguyễn Nhật Ánh',
-    category: 'VĂN HỌC',
-    rating: 4.8,
-    price: 110000,
-    image: 'imgs/mat-biec.jpg',
-  },
-  {
-    id: 14,
-    title: 'Cây Cam Ngọt Của Tôi',
-    author: 'José Mauro de Vasconcelos',
-    category: 'VĂN HỌC',
-    rating: 4.9,
-    price: 81000,
-    image: 'imgs/cay-cam-ngot-cua-toi.jpg',
-  },
-  {
-    id: 15,
-    title: 'Đọc Vị Bất Kỳ Ai',
-    author: 'David J. Lieberman',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.7,
-    price: 89000,
-    image: 'imgs/doc-vi-bat-ky-ai.jpg',
-  },
-  {
-    id: 16,
-    title: 'Sức Mạnh Của Hiện Tại',
-    author: 'Eckhart Tolle',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.8,
-    price: 120000,
-    image: 'imgs/suc-manh-cua-hien-tai.jpg',
-  },
-  {
-    id: 17,
-    title: 'Đánh Thức Con Người Phi Thường Trong Bạn',
-    author: 'Anthony Robbins',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.8,
-    price: 165000,
-    image: 'imgs/danh-thuc-con-nguoi-phi-thuong.jpg',
-  },
-  {
-    id: 18,
-    title: 'Kinh Tế Học Hài Hước',
-    author: 'Steven D. Levitt',
-    category: 'KINH TẾ & QUẢN LÝ',
-    rating: 4.7,
-    price: 130000,
-    image: 'imgs/kinh-te-hoc-hai-huoc.jpg',
-  },
-  {
-    id: 19,
-    title: 'Quản Trị Nhân Sự 4.0',
-    author: 'Dave Ulrich',
-    category: 'KINH TẾ & QUẢN LÝ',
-    rating: 4.6,
-    price: 175000,
-    image: 'imgs/quan-ly-nhan-su-4.0.jpg',
-  },
-  {
-    id: 20,
-    title: 'Clean Code Trong Thực Tế',
-    author: 'Robert C. Martin',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 5.0,
-    price: 290000,
-    image: 'imgs/clean-code-trong-thuc-te.jpg',
-  },
-  {
-    id: 21,
-    title: 'Lịch Sử Loài Người Sapiens',
-    author: 'Yuval Noah Harari',
-    category: 'VĂN HỌC',
-    rating: 4.9,
-    price: 225000,
-    image: 'imgs/lich-su-loai-nguoi.jpg',
-  },
-  {
-    id: 22,
-    title: 'Vũ Trụ Trong Vỏ Hạt Dẻ',
-    author: 'Stephen Hawking',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 4.8,
-    price: 150000,
-    image: 'imgs/vu-tru-trong-hat-de.jpg',
-  },
-  {
-    id: 23,
-    title: 'Thuật Quản Lý Thời Gian',
-    author: 'Brian Tracy',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.7,
-    price: 75000,
-    image: 'imgs/thuat-quan-ly-thoi-gian.jpg',
-  },
-  {
-    id: 24,
-    title: 'Tâm Lý Học Đám Đông',
-    author: 'Gustave Le Bon',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.8,
-    price: 95000,
-    image: 'imgs/tam-ly-hoc-dam-dong.jpg',
-  },
-  {
-    id: 25,
-    title: 'Chiến Thắng Con Quỷ Trong Bạn',
-    author: 'Napoleon Hill',
-    category: 'KỸ NĂNG SỐNG',
-    rating: 4.8,
-    price: 118000,
-    image: 'imgs/chien-thang-con-quy-trong-ban.jpg',
-  },
-  {
-    id: 26,
-    title: 'Khai Phá Dữ Liệu Lớn',
-    author: 'Foster Provost',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 4.7,
-    price: 260000,
-    image: 'imgs/khai-pha-du-lieu-lon.jpg',
-  },
-  {
-    id: 27,
-    title: 'Thiết Kế Hệ Thống Phân Tán',
-    author: 'Martin Kleppmann',
-    category: 'CÔNG NGHỆ THÔNG TIN',
-    rating: 5.0,
-    price: 320000,
-    image: 'imgs/thiet-ke-he-thong-phan-tan.jpg',
-  },
-  {
-    id: 28,
-    title: 'Búp Sen Xanh',
-    author: 'Sơn Tùng',
-    category: 'SÁCH THIẾU NHI',
-    rating: 4.9,
-    price: 88000,
-    image: 'imgs/bup-sen-xanh.jpg',
-  },
-  {
-    id: 29,
-    title: 'Hoàng Tử Bé',
-    author: 'Antoine de Saint-Exupéry',
-    category: 'SÁCH THIẾU NHI',
-    rating: 4.9,
-    price: 70000,
-    image: 'imgs/hoang-tu-be.jpg',
-  },
-  {
-    id: 30,
-    title: 'Chuyện Con Mèo Dạy Hải Âu Bay',
-    author: 'Luis Sepúlveda',
-    category: 'SÁCH THIẾU NHI',
-    rating: 4.9,
-    price: 68000,
-    image: 'imgs/chuyen-con-meo-day-hai-au-bay.jpg',
-  },
-];
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import MainLayout from "../layouts/MainLayout";
+import ProductCard from "../components/ProductCard";
 
 export default function Home() {
-  const handleAddToCart = (book) => {
-    alert(`Đã thêm "${book.title}" vào giỏ!`);
-  };
+    const [latestBooks, setLatestBooks] = useState([]);
+    const [categoriesWithBooks, setCategoriesWithBooks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
-  return (
-    <MainLayout>
-      <section className="max-w-7xl mx-auto px-4 py-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Sách mới</h2>
-        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {MOCK_BOOKS.map((item) => (
-            <ProductCard key={item.id} book={item} onAddToCart={handleAddToCart} />
-          ))}
-        </div>
-      </section>
-    </MainLayout>
-  );
+    useEffect(() => {
+        axios
+            .get("/api/home")
+            .then((res) => {
+                const data = res.data.data || {};
+                setLatestBooks(data.latest_books || []);
+                setCategoriesWithBooks(data.categories_with_books || []);
+            })
+            .catch(() => {
+                setError("Không thể tải dữ liệu sách từ hệ thống.");
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+    }, []);
+
+    const handleAddToCart = (book) => {
+        alert(`Đã thêm "${book.title}" vào giỏ!`);
+    };
+
+    return (
+        <MainLayout>
+            <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+                {loading ? (
+                    <div className="py-16 text-center text-sm text-stone-500">
+                        Đang tải dữ liệu sách...
+                    </div>
+                ) : error ? (
+                    <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+                        {error}
+                    </div>
+                ) : (
+                    <>
+                        {/* Khu vực 1: 8 sách mới nhất */}
+                        <section className="space-y-4">
+                            <div className="flex items-end justify-between border-b border-stone-200 pb-3">
+                                <div>
+                                    <span className="text-xs font-bold uppercase tracking-widest text-[#9A5B13]">
+                                        Mới phát hành
+                                    </span>
+                                    <h2 className="font-serif text-2xl font-bold text-gray-900 mt-0.5">
+                                        Sách mới nhất
+                                    </h2>
+                                </div>
+                                <span className="text-xs text-stone-500">
+                                    {latestBooks.length} đầu sách
+                                </span>
+                            </div>
+
+                            {latestBooks.length === 0 ? (
+                                <p className="text-sm text-stone-500">
+                                    Chưa có sách mới.
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {latestBooks.map((item) => (
+                                        <ProductCard
+                                            key={item.id}
+                                            book={item}
+                                            onAddToCart={handleAddToCart}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Khu vực 2: Sách theo từng danh mục */}
+                        {categoriesWithBooks.map((category) => (
+                            <section
+                                key={category.id}
+                                id={`category-${category.id}`}
+                                className="space-y-4 scroll-mt-6"
+                            >
+                                <div className="flex items-end justify-between border-b border-stone-200 pb-3">
+                                    <div>
+                                        <span className="text-xs font-bold uppercase tracking-widest text-[#9A5B13]">
+                                            Danh mục
+                                        </span>
+                                        <h2 className="font-serif text-2xl font-bold text-gray-900 mt-0.5">
+                                            {category.name}
+                                        </h2>
+                                    </div>
+                                    <span className="text-xs text-stone-500">
+                                        {category.books?.length || 0} đầu sách
+                                    </span>
+                                </div>
+
+                                {!category.books ||
+                                category.books.length === 0 ? (
+                                    <p className="text-sm text-stone-500">
+                                        Chưa có sách trong danh mục này.
+                                    </p>
+                                ) : (
+                                    <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {category.books.map((item) => (
+                                            <ProductCard
+                                                key={item.id}
+                                                book={item}
+                                                onAddToCart={handleAddToCart}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        ))}
+                    </>
+                )}
+            </div>
+        </MainLayout>
+    );
 }

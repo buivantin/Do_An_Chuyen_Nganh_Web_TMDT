@@ -1,33 +1,48 @@
-import React from 'react';
-
-const NAV_ITEMS = [
-  { label: 'Trang chủ', href: '/' },
-  { label: 'Sách bán chạy', href: '/best-sellers' },
-  { label: 'Văn học', href: '/category/van-hoc' },
-  { label: 'Kinh tế', href: '/category/kinh-te' },
-  { label: 'Kỹ năng sống', href: '/category/ky-nang-song' },
-  { label: 'Thiếu nhi', href: '/category/thieu-nhi' },
-  { label: 'Khuyến mãi & Sự kiện', href: '/promotions' },
-  { label: 'Blog đọc sách', href: '/blog' },
-];
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
 export default function Navbar() {
-  return (
-    <nav className="bg-[#FAF8F5] border-b border-stone-200/70">
-      <div className="max-w-7xl mx-auto px-4">
-        <ul className="flex items-center gap-6 lg:gap-8 py-3 text-sm font-medium text-stone-700 overflow-x-auto whitespace-nowrap">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.label}>
-              <a
-                href={item.href}
-                className="hover:text-[#9A5B13] transition-colors"
-              >
-                {item.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </nav>
-  );
+    const [categories, setCategories] = useState([]);
+
+    useEffect(() => {
+        axios
+            .get("/api/categories")
+            .then((res) => {
+                const activeCategories = (res.data.data || []).filter(
+                    (cat) => cat.status === "active",
+                );
+                setCategories(activeCategories);
+            })
+            .catch((err) => {
+                console.error("Lỗi tải menu danh mục:", err);
+            });
+    }, []);
+
+    return (
+        <nav className="bg-[#FAF8F5] border-b border-stone-200/70">
+            <div className="max-w-7xl mx-auto px-4">
+                <ul className="flex items-center gap-6 lg:gap-8 py-3 text-sm font-medium text-stone-700 overflow-x-auto whitespace-nowrap">
+                    <li>
+                        <a
+                            href="/"
+                            className="hover:text-[#9A5B13] transition-colors"
+                        >
+                            Trang chủ
+                        </a>
+                    </li>
+
+                    {categories.map((cat) => (
+                        <li key={cat.id}>
+                            <a
+                                href={`/#category-${cat.id}`}
+                                className="hover:text-[#9A5B13] transition-colors"
+                            >
+                                {cat.name}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </nav>
+    );
 }
