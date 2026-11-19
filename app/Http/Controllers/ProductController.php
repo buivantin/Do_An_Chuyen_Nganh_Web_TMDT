@@ -24,7 +24,7 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $products = $this->productService->getAllProducts(
-            $request->only(['keyword', 'category_id', 'status', 'per_page'])
+            $request->only(['keyword', 'search', 'category_id', 'status', 'per_page'])
         );
 
         return response()->json([
@@ -62,7 +62,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'author'      => 'nullable|string|max:255',
-            'price'       => 'required|numeric|min:0',
+            'price'       => 'required|numeric|gt:0',
             'stock'       => 'required|integer|min:0',
             'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
@@ -71,7 +71,7 @@ class ProductController extends Controller
         ], [
             'name.required'        => 'Vui lòng nhập tên sản phẩm.',
             'price.required'       => 'Vui lòng nhập giá bán.',
-            'price.min'            => 'Giá bán không được âm.',
+            'price.gt'  => 'Giá bán phải lớn hơn 0.',
             'stock.required'       => 'Vui lòng nhập số lượng tồn kho.',
             'stock.min'            => 'Số lượng tồn kho không được âm.',
             'category_id.required' => 'Vui lòng chọn danh mục.',
@@ -123,7 +123,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name'        => 'sometimes|required|string|max:255',
             'author'      => 'nullable|string|max:255',
-            'price'       => 'sometimes|required|numeric|min:0',
+            'price'       => 'sometimes|required|numeric|gt:0',
             'stock'       => 'sometimes|required|integer|min:0',
             'category_id' => 'sometimes|required|exists:categories,id',
             'description' => 'nullable|string',
@@ -131,7 +131,7 @@ class ProductController extends Controller
             'image'       => 'nullable|file|mimetypes:image/jpeg,image/png|max:2048',
         ], [
             'name.required'      => 'Tên sản phẩm không được để trống.',
-            'price.min'          => 'Giá bán không được âm.',
+            'price.gt'  => 'Giá bán phải lớn hơn 0.',
             'stock.min'          => 'Số lượng tồn kho không được âm.',
             'category_id.exists' => 'Danh mục không tồn tại.',
             'status.in'          => 'Trạng thái chỉ chấp nhận active hoặc inactive.',

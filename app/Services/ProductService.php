@@ -84,8 +84,8 @@ class ProductService
     {
         $query = Product::with('category:id,name')->orderByDesc('id');
 
-        if (!empty($filters['keyword'])) {
-            $keyword = $filters['keyword'];
+        $keyword = trim((string) ($filters['keyword'] ?? $filters['search'] ?? ''));
+        if ($keyword !== '') {
             $query->where(function ($q) use ($keyword) {
                 $q->where('name', 'like', "%{$keyword}%")
                   ->orWhere('author', 'like', "%{$keyword}%");
@@ -100,7 +100,10 @@ class ProductService
             $query->where('status', $filters['status']);
         }
 
-        return $query->paginate($filters['per_page'] ?? 10);
+        $perPage = (int) ($filters['per_page'] ?? 10);
+        $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 10;
+
+        return $query->paginate($perPage);
     }
 
     /**
