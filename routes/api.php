@@ -9,8 +9,12 @@ use App\Http\Controllers\OrderController;
 // Controllers
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HomeController;
+<<<<<<< Updated upstream
 use App\Http\Controllers\Api\Admin\UserController; 
 use App\Http\Controllers\Api\CartController;      
+=======
+use App\Http\Controllers\ProductController;
+>>>>>>> Stashed changes
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
@@ -45,4 +49,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
+<<<<<<< Updated upstream
+=======
+    // CRUD Quản lý sản phẩm cho Admin (/api/admin/products)
+    Route::apiResource('products', ProductController::class);
+>>>>>>> Stashed changes
 });
