@@ -17,10 +17,13 @@ use App\Http\Controllers\Api\ProfileController;
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
+Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNumber('id');
 
 // Route trang chủ & danh mục (Của TV3 & TV4)
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/home', [HomeController::class, 'index']);
+Route::get('/products', [ProductController::class, 'search']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
 
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập - Dành cho Khách hàng & Admin) ---
 Route::middleware('auth:sanctum')->group(function () {

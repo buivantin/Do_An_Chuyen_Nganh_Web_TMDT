@@ -18,6 +18,68 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
+    public function showPublic(int $id): JsonResponse
+    {
+        $product = Product::with('category:id,name')
+            ->where('status', 'active')
+            ->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Sản phẩm không tồn tại hoặc đã bị ẩn.',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $product,
+        ]);
+    }
+
+    /**
+     * GET /api/products (Tìm kiếm, lọc & phân trang công khai - TM-02)
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $perPage = min(max((int) $request->input('per_page', 12), 1), 50);
+
+        $query = Product::with('category:id,name')
+            ->where('status', 'active')
+            ->when($request->filled('keyword'), function ($q) use ($request) {
+                $keyword = '%' . trim($request->keyword) . '%';
+                $q->where(function ($sub) use ($keyword) {
+                    $sub->where('name', 'LIKE', $keyword)
+                        ->orWhere('author', 'LIKE', $keyword);
+                });
+            })
+            ->when($request->filled('category_id'), function ($q) use ($request) {
+                $q->where('category_id', (int) $request->category_id);
+            })
+            ->when($request->filled('min_price'), function ($q) use ($request) {
+                $q->where('price', '>=', (float) $request->min_price);
+            })
+            ->when($request->filled('max_price'), function ($q) use ($request) {
+                $q->where('price', '<=', (float) $request->max_price);
+            });
+
+        switch ($request->input('sort')) {
+            case 'price_asc':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'price_desc':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'newest':
+            case 'bestseller':
+            default:
+                $query->orderBy('created_at', 'desc');
+                break;
+        }
+
+        return response()->json($query->paginate($perPage));
+    }
+
     /**
      * GET /api/admin/products
      */

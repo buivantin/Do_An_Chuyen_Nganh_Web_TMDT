@@ -10,10 +10,11 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Seed 1 Admin & 10 Khách hàng
+        // 1. Seed 1 Admin & 10 Khách hàng (kèm số điện thoại)
         DB::table('users')->insert([
             'username' => 'admin',
             'email' => 'admin@bookstore.com',
+            'phone' => '0901000000',
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
@@ -24,6 +25,7 @@ class DatabaseSeeder extends Seeder
             DB::table('users')->insert([
                 'username' => "customer$i",
                 'email' => "khachhang$i@gmail.com",
+                'phone' => '09010000' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
                 'status' => 'active',
@@ -53,7 +55,7 @@ class DatabaseSeeder extends Seeder
                 ['Tư Duy Nhanh Và Chậm', 'Daniel Kahneman', '/imgs/tu-duy-nhanh-va-cham.jpg'],
                 ['Đọc Vị Bất Kỳ Ai', 'David J. Lieberman', '/imgs/doc-vi-bat-ky-ai.jpg'],
                 ['Sức Mạnh Của Hiện Tại', 'Eckhart Tolle', '/imgs/suc-manh-cua-hien-tai.jpg'],
-                ['Đánh Thức Con Người Phi Thường Trong Bạn', 'Anthony Robbins', '/imgs/danh-thuc-con-nguoi-phi-thuong.jpg'],
+                ['Đánh Thức Con Người Phi Thường Trong Bạn', 'Anthony Robbins', '/imgs/danh-thuc-con-nguoi-phi-thuong-trong-ban.jpg'],
                 ['Thuật Quản Lý Thời Gian', 'Brian Tracy', '/imgs/thuat-quan-ly-thoi-gian.jpg'],
                 ['Tâm Lý Học Đám Đông', 'Gustave Le Bon', '/imgs/tam-ly-hoc-dam-dong.jpg'],
                 ['Chiến Thắng Con Quỷ Trong Bạn', 'Napoleon Hill', '/imgs/chien-thang-con-quy-trong-ban.jpg'],
@@ -96,12 +98,13 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái
+        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái (kèm SĐT nhận hàng)
         $statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
         for ($i = 1; $i <= 10; $i++) {
             $orderId = DB::table('orders')->insertGetId([
                 'status' => $statuses[array_rand($statuses)],
                 'address' => "$i Đường Nguyễn Huệ, Quận 1, TP.HCM",
+                'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
                 'user_id' => rand(2, 11),

@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
 import Home from './pages/Home';
+import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
 import Account from './pages/Account'; 
+import ProductDetail from './pages/ProductDetail';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 
 function getStoredUser() {
   try {
@@ -17,7 +21,16 @@ function getStoredUser() {
 }
 
 function App() {
-  const pathname = window.location.pathname;
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  
+  if (pathname === '/cart') {
+    return <Cart />;
+  }
+
+  if (pathname === '/checkout') {
+    return <Checkout />;
+  }
+
   const token = localStorage.getItem('token');
   const user = getStoredUser();
 
@@ -114,13 +127,20 @@ function App() {
       </div>
     );
   }
+  
+  const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
+  if (productDetailMatch) {
+    return <ProductDetail productId={productDetailMatch[1]} />;
+  }
 
-  // BỔ SUNG: Xử lý định tuyến cho trang Account
+  if (pathname.startsWith('/products')) {
+    return <ProductList />;
+  }
+
   if (pathname === '/account') {
     return <Account />;
   }
 
-  // Mặc định trả về Home nếu không khớp route nào ở trên
   return <Home />;
 }
 
