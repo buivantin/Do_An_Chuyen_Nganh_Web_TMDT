@@ -8,6 +8,20 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
     onLogout?.();
   };
 
+  const handleSearch = (e) => {
+  e.preventDefault();
+  const params = new URLSearchParams(window.location.search);
+  if (searchTerm.trim()) {
+    params.set('keyword', searchTerm.trim());
+  } else {
+    params.delete('keyword');
+  }
+  params.delete('page');
+  window.location.href = `/products${params.toString() ? `?${params.toString()}` : ''}`;
+  };
+const initialKeyword = new URLSearchParams(window.location.search).get('keyword') || '';
+const [searchTerm, setSearchTerm] = useState(initialKeyword);
+
   return (
     <header className="bg-[#FAF8F5] text-stone-900">
       <div className="max-w-7xl mx-auto px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-4">
@@ -21,24 +35,26 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
 
         {/* Thanh tìm kiếm */}
         <form
-          onSubmit={(e) => e.preventDefault()}
-          className="order-3 md:order-2 w-full md:flex-1 md:max-w-xl bg-white border border-stone-200/90 rounded-xl p-1.5 pl-4 flex items-center shadow-2xs"
+        onSubmit={handleSearch}
+        className="order-3 md:order-2 w-full md:flex-1 md:max-w-xl bg-white border border-stone-200/90 rounded-xl p-1.5 pl-4 flex items-center shadow-2xs"
         >
-          <input
-            type="text"
-            placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
-            className="w-full text-sm text-stone-700 placeholder-stone-400 focus:outline-none bg-transparent"
-          />
-          <button
-            type="submit"
-            aria-label="Tìm kiếm"
-            className="bg-[#141414] hover:bg-stone-800 text-white p-2.5 rounded-lg shrink-0 transition cursor-pointer"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-            </svg>
-          </button>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
+          className="w-full text-sm text-stone-700 placeholder-stone-400 focus:outline-none bg-transparent"
+        />
+        <button
+          type="submit"
+          aria-label="Tìm kiếm"
+          className="bg-[#141414] hover:bg-stone-800 text-white p-2.5 rounded-lg shrink-0 transition cursor-pointer"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+          </svg>
+        </button>
         </form>
 
         {/* Giỏ hàng & Tài khoản */}

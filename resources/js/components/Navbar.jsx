@@ -3,6 +3,7 @@ import axios from "axios";
 
 export default function Navbar() {
     const [categories, setCategories] = useState([]);
+    const pathname = window.location.pathname;
 
     useEffect(() => {
         axios
@@ -25,9 +26,26 @@ export default function Navbar() {
                     <li>
                         <a
                             href="/"
-                            className="hover:text-[#9A5B13] transition-colors"
+                            className={`transition-colors ${
+                                pathname === "/"
+                                    ? "text-[#9A5B13] font-bold"
+                                    : "hover:text-[#9A5B13]"
+                            }`}
                         >
                             Trang chủ
+                        </a>
+                    </li>
+
+                    <li>
+                        <a
+                            href="/products"
+                            className={`transition-colors ${
+                                pathname.startsWith("/products")
+                                    ? "text-[#9A5B13] font-bold"
+                                    : "hover:text-[#9A5B13]"
+                            }`}
+                        >
+                            Xem tất cả sách
                         </a>
                     </li>
 
