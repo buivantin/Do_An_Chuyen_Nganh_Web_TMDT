@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
 import LoginRequiredModal from "../components/LoginRequiredModal";
+import CheckoutStepper from "../components/CheckoutStepper";
 import ProductService from "../services/ProductService";
 
 export default function Cart() {
@@ -106,24 +107,34 @@ export default function Cart() {
         onClose={() => setShowLoginModal(false)}
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6">
-        {/* Breadcrumb */}
-        <nav className="text-xs text-stone-500 flex items-center gap-2">
-          <a href="/" className="hover:text-[#9A5B13]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Breadcrumb đồng bộ Checkout */}
+        <nav className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <a href="/" className="hover:text-[#9A5B13] transition">
             Trang chủ
           </a>
           <span>&rsaquo;</span>
-          <span className="font-semibold text-[#9A5B13]">Giỏ hàng của bạn</span>
+          <span className="text-[#9A5B13]">Giỏ ấn phẩm</span>
         </nav>
 
-        {/* Tiêu đề */}
-        <div className="border-b border-stone-200 pb-4">
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#1A1A1A]">
-            Giỏ hàng của bạn
-          </h1>
-          <p className="text-xs sm:text-sm text-stone-500 mt-1">
-            Hiện có {items.length} đầu sách ({totalBooks} cuốn) trong giỏ
-          </p>
+        {/* Tiêu đề & Thanh tiến trình 3 bước */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-stone-200/80 pb-5">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#9A5B13]">
+              Quy trình hoàn tất bản đặt
+            </div>
+            <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#1A1A1A] mt-1 tracking-tight">
+              Giỏ Ấn Phẩm Của Bạn
+            </h1>
+            <p className="text-xs sm:text-sm text-stone-500 mt-1">
+              Hiện có {items.length} đầu sách ({totalBooks} cuốn) trong giỏ
+            </p>
+          </div>
+
+          <CheckoutStepper
+            currentStep={1}
+            canProceedCheckout={items.length > 0}
+          />
         </div>
 
         {errorMsg && (
@@ -166,9 +177,9 @@ export default function Cart() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Danh sách sản phẩm */}
-            <div className="lg:col-span-2 space-y-3.5">
+            <div className="lg:col-span-7 space-y-3.5">
               {items.map((item) => {
                 const cleanName = (item.name || "").normalize("NFC");
                 const isBusy = updatingId === item.id;
@@ -246,39 +257,58 @@ export default function Cart() {
               })}
             </div>
 
-            {/* Tóm tắt đơn hàng */}
-            <div className="bg-white border border-stone-200/80 rounded-2xl p-5 space-y-4 shadow-2xs">
-              <h2 className="font-serif text-lg font-bold text-stone-900 border-b border-stone-100 pb-3">
-                Tóm tắt đơn hàng
-              </h2>
+            {/* Tóm tắt đơn hàng đồng bộ Checkout */}
+            <aside className="lg:col-span-5 bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xs lg:sticky lg:top-6">
+              <div className="border-b border-stone-100 pb-3">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[#9A5B13]">
+                  Tuyển thư ký gửi
+                </div>
+                <h2 className="font-serif text-xl font-bold text-[#1A1A1A] mt-0.5">
+                  Tóm Tắt Đơn Hàng
+                </h2>
+              </div>
 
               <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between text-stone-600">
-                  <span>Tạm tính ({totalBooks} cuốn)</span>
-                  <span className="font-semibold text-stone-900">
-                    {subtotal.toLocaleString("vi-VN")} ₫
+                  <span>Tạm tính ấn phẩm ({totalBooks} cuốn)</span>
+                  <span className="font-bold text-stone-900">
+                    {subtotal.toLocaleString("vi-VN")}đ
                   </span>
                 </div>
                 <div className="flex justify-between text-stone-600">
-                  <span>Phí vận chuyển</span>
-                  <span className="font-medium text-emerald-700">Miễn phí</span>
+                  <span>Phí vận chuyển tiêu chuẩn</span>
+                  <span className="font-bold text-[#9A5B13]">Miễn phí (0đ)</span>
                 </div>
               </div>
 
-              <div className="border-t border-stone-100 pt-3 flex justify-between items-baseline">
-                <span className="text-sm font-bold text-stone-900">Tổng cộng</span>
-                <span className="text-lg sm:text-xl font-bold text-[#9A5B13]">
-                  {subtotal.toLocaleString("vi-VN")} ₫
-                </span>
+              <div className="bg-[#F3EFEA] border border-stone-200/70 rounded-2xl p-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-stone-800">
+                    Tổng thanh toán
+                    <br />
+                    tạm tính
+                  </div>
+                  <div className="text-[10px] text-stone-500 mt-0.5">
+                    (Đã bao gồm thuế GTGT)
+                  </div>
+                </div>
+
+                <div className="font-serif text-2xl sm:text-3xl font-bold text-[#1A1A1A] tracking-tight text-right">
+                  {subtotal.toLocaleString("vi-VN")}
+                  <span className="text-base sm:text-lg font-sans font-bold ml-0.5">
+                    đ
+                  </span>
+                </div>
               </div>
 
               <a
                 href="/checkout"
-                className="block w-full text-center bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold py-3 rounded-xl transition"
+                className="w-full bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
               >
-                Tiến hành đặt hàng
+                <span>Tiến hành giao nhận &amp; thanh toán</span>
+                <span>&rarr;</span>
               </a>
-            </div>
+            </aside>
           </div>
         )}
       </div>
