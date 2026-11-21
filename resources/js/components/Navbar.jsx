@@ -1,8 +1,18 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+
 export default function Navbar() {
     const [categories, setCategories] = useState([]);
+    const NAV_ITEMS = [
+    { label: 'Trang chủ', href: '/' },
+    { label: 'Tất cả sách', href: '/products' },
+    { label: 'Văn học', href: '/products?category_id=1' },
+    { label: 'Kinh tế', href: '/products?category_id=2' },
+    { label: 'Kỹ năng sống', href: '/products?category_id=3' },
+    { label: 'CNTT & Lập trình', href: '/products?category_id=4' },
+    { label: 'Ngoại ngữ', href: '/products?category_id=5' },
+    ];
 
     useEffect(() => {
         axios

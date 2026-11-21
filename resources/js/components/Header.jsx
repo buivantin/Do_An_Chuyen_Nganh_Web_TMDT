@@ -8,6 +8,20 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
     onLogout?.();
   };
 
+  const handleSearch = (e) => {
+  e.preventDefault();
+  const params = new URLSearchParams(window.location.search);
+  if (searchTerm.trim()) {
+    params.set('keyword', searchTerm.trim());
+  } else {
+    params.delete('keyword');
+  }
+  params.delete('page');
+  window.location.href = `/products${params.toString() ? `?${params.toString()}` : ''}`;
+  };
+const initialKeyword = new URLSearchParams(window.location.search).get('keyword') || '';
+const [searchTerm, setSearchTerm] = useState(initialKeyword);
+
   return (
     <header className="bg-[#FAF8F5] text-stone-900">
       <div className="max-w-7xl mx-auto px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-4">
