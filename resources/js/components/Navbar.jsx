@@ -1,18 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-
 export default function Navbar() {
     const [categories, setCategories] = useState([]);
-    const NAV_ITEMS = [
-    { label: 'Trang chủ', href: '/' },
-    { label: 'Tất cả sách', href: '/products' },
-    { label: 'Văn học', href: '/products?category_id=1' },
-    { label: 'Kinh tế', href: '/products?category_id=2' },
-    { label: 'Kỹ năng sống', href: '/products?category_id=3' },
-    { label: 'CNTT & Lập trình', href: '/products?category_id=4' },
-    { label: 'Ngoại ngữ', href: '/products?category_id=5' },
-    ];
+    const pathname = window.location.pathname;
 
     useEffect(() => {
         axios
@@ -35,9 +26,26 @@ export default function Navbar() {
                     <li>
                         <a
                             href="/"
-                            className="hover:text-[#9A5B13] transition-colors"
+                            className={`transition-colors ${
+                                pathname === "/"
+                                    ? "text-[#9A5B13] font-bold"
+                                    : "hover:text-[#9A5B13]"
+                            }`}
                         >
                             Trang chủ
+                        </a>
+                    </li>
+
+                    <li>
+                        <a
+                            href="/products"
+                            className={`transition-colors ${
+                                pathname.startsWith("/products")
+                                    ? "text-[#9A5B13] font-bold"
+                                    : "hover:text-[#9A5B13]"
+                            }`}
+                        >
+                            Xem tất cả sách
                         </a>
                     </li>
 

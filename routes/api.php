@@ -21,6 +21,7 @@ Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5
 // Route trang chủ & danh mục (Của TV3 & TV4)
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/home', [HomeController::class, 'index']);
+Route::get('/products', [ProductController::class, 'search']);
 
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập) ---
 Route::middleware('auth:sanctum')->group(function () {
