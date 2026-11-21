@@ -7,6 +7,8 @@ import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
 import ProductDetail from './pages/ProductDetail';
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 
 function getStoredUser() {
   try {
@@ -18,7 +20,15 @@ function getStoredUser() {
 }
 
 function App() {
-  const pathname = window.location.pathname;
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  if (pathname === '/cart') {
+  return <Cart />;
+  }
+
+  if (pathname === '/checkout') {
+    return <Checkout />;
+  }
+
   const token = localStorage.getItem('token');
   const user = getStoredUser();
 
@@ -46,6 +56,7 @@ function App() {
       });
   }, [adminStatus, token]);
 
+  
   if (pathname === '/403' || adminStatus === 'forbidden') {
     return <Forbidden />;
   }

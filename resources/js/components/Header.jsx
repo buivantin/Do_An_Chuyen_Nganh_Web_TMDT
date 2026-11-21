@@ -1,84 +1,128 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from "react";
+import ProductService from "../services/ProductService";
 
 export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLogout, onOpenLogin }) {
   const [openMenu, setOpenMenu] = useState(false);
+  const initialKeyword = new URLSearchParams(window.location.search).get("keyword") || "";
+  const [searchTerm, setSearchTerm] = useState(initialKeyword);
+  const [cartSummary, setCartSummary] = useState({ count: cartCount, total: cartTotal });
+
+  const fetchCartSummary = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setCartSummary({ count: 0, total: 0 });
+      return;
+    }
+
+    try {
+      const items = await ProductService.getCart();
+      const totalCount = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      const totalPrice = items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0
+      );
+      setCartSummary({ count: totalCount, total: totalPrice });
+    } catch {
+      // Giữ nguyên trạng thái hiện tại nếu lỗi mạng tạm thời
+    }
+  };
+
+  useEffect(() => {
+    if (cartCount > 0 || cartTotal > 0) {
+      setCartSummary({ count: cartCount, total: cartTotal });
+    }
+  }, [cartCount, cartTotal]);
+
+  useEffect(() => {
+    fetchCartSummary();
+
+    const handleCartUpdated = () => fetchCartSummary();
+    const handleOpenLogin = () => onOpenLogin?.();
+
+    window.addEventListener("cart-updated", handleCartUpdated);
+    window.addEventListener("open-login-modal", handleOpenLogin);
+
+    return () => {
+      window.removeEventListener("cart-updated", handleCartUpdated);
+      window.removeEventListener("open-login-modal", handleOpenLogin);
+    };
+  }, [user, onOpenLogin]);
 
   const handleLogout = () => {
     setOpenMenu(false);
+    setCartSummary({ count: 0, total: 0 });
     onLogout?.();
   };
 
   const handleSearch = (e) => {
-  e.preventDefault();
-  const params = new URLSearchParams(window.location.search);
-  if (searchTerm.trim()) {
-    params.set('keyword', searchTerm.trim());
-  } else {
-    params.delete('keyword');
-  }
-  params.delete('page');
-  window.location.href = `/products${params.toString() ? `?${params.toString()}` : ''}`;
+    e.preventDefault();
+    const params = new URLSearchParams(window.location.search);
+    if (searchTerm.trim()) {
+      params.set("keyword", searchTerm.trim());
+    } else {
+      params.delete("keyword");
+    }
+    params.delete("page");
+    window.location.href = `/products${params.toString() ? `?${params.toString()}` : ""}`;
   };
-const initialKeyword = new URLSearchParams(window.location.search).get('keyword') || '';
-const [searchTerm, setSearchTerm] = useState(initialKeyword);
 
   return (
     <header className="bg-[#FAF8F5] text-stone-900">
-      <div className="max-w-7xl mx-auto px-4 pt-4 pb-2 flex flex-wrap items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-3.5 sm:pt-4 pb-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-4">
         {/* Tên thương hiệu */}
         <a
           href="/"
-          className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-[#1A1A1A] shrink-0"
+          className="font-serif text-base min-[380px]:text-xl sm:text-2xl font-bold tracking-tight text-[#1A1A1A] shrink-0"
         >
           Mọt Sách BookHouse
         </a>
 
         {/* Thanh tìm kiếm */}
         <form
-        onSubmit={handleSearch}
-        className="order-3 md:order-2 w-full md:flex-1 md:max-w-xl bg-white border border-stone-200/90 rounded-xl p-1.5 pl-4 flex items-center shadow-2xs"
+          onSubmit={handleSearch}
+          className="order-3 md:order-2 w-full md:flex-1 md:max-w-xl bg-white border border-stone-200/90 rounded-xl p-1 sm:p-1.5 pl-3 sm:pl-4 flex items-center shadow-2xs"
         >
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
-          className="w-full text-sm text-stone-700 placeholder-stone-400 focus:outline-none bg-transparent"
-        />
-        <button
-          type="submit"
-          aria-label="Tìm kiếm"
-          className="bg-[#141414] hover:bg-stone-800 text-white p-2.5 rounded-lg shrink-0 transition cursor-pointer"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-          </svg>
-        </button>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
+            className="w-full min-w-0 text-xs sm:text-sm text-stone-700 placeholder-stone-400 focus:outline-none bg-transparent"
+          />
+          <button
+            type="submit"
+            aria-label="Tìm kiếm"
+            className="bg-[#141414] hover:bg-stone-800 text-white p-2 sm:p-2.5 rounded-lg shrink-0 transition cursor-pointer"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </form>
 
         {/* Giỏ hàng & Tài khoản */}
-        <div className="order-2 md:order-3 flex items-center gap-4 sm:gap-5 shrink-0">
+        <div className="order-2 md:order-3 flex items-center gap-2 sm:gap-5 shrink-0">
           {/* Giỏ hàng */}
           <a
             href="/cart"
-            className="bg-[#F3EFEA] hover:bg-[#EBE5DD] rounded-xl px-3.5 py-2 flex items-center gap-3 transition"
+            className="bg-[#F3EFEA] hover:bg-[#EBE5DD] rounded-xl px-2.5 sm:px-3.5 py-2 flex items-center gap-2 sm:gap-3 transition"
           >
             <div className="relative text-stone-800">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-5 h-5">
                 <path d="M6 7h12l1 13H5L6 7Z" strokeLinejoin="round" />
                 <path d="M9 7V5a3 3 0 0 1 6 0v2" strokeLinecap="round" />
               </svg>
-              {cartCount > 0 && (
+              {cartSummary.count > 0 && (
                 <span className="absolute -top-1.5 -right-2 bg-[#9A5B13] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {cartCount}
+                  {cartSummary.count}
                 </span>
               )}
             </div>
-            <div className="leading-tight">
+            <div className="hidden min-[400px]:block leading-tight">
               <div className="text-[11px] text-stone-500">Giỏ hàng</div>
               <div className="text-sm font-bold text-stone-900">
-                {cartCount > 0 ? `${cartTotal.toLocaleString('vi-VN')} đ` : 'Trống'}
+                {cartSummary.count > 0 ? `${cartSummary.total.toLocaleString("vi-VN")} đ` : "Trống"}
               </div>
             </div>
           </a>
@@ -86,9 +130,9 @@ const [searchTerm, setSearchTerm] = useState(initialKeyword);
           {/* Trạng thái chưa đăng nhập / Đã đăng nhập */}
           {!user ? (
             <button
-            type="button"
-            onClick={onOpenLogin}
-            className="bg-[#141414] hover:bg-stone-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition cursor-pointer"
+              type="button"
+              onClick={onOpenLogin}
+              className="bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap"
             >
               Đăng nhập
             </button>
@@ -97,17 +141,17 @@ const [searchTerm, setSearchTerm] = useState(initialKeyword);
               <button
                 type="button"
                 onClick={() => setOpenMenu(!openMenu)}
-                className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-[#F3EFEA] transition cursor-pointer"
+                className="flex items-center gap-2 p-1 rounded-xl hover:bg-[#F3EFEA] transition cursor-pointer"
               >
                 {user.avatar ? (
                   <img
                     src={user.avatar}
                     alt={user.name}
-                    className="w-9 h-9 rounded-full object-cover border border-stone-200"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-stone-200"
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-stone-800 text-white text-sm font-bold flex items-center justify-center">
-                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-stone-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center">
+                    {user.name?.charAt(0).toUpperCase() || "U"}
                   </div>
                 )}
 
