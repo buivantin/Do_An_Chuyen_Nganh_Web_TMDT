@@ -6,6 +6,7 @@ import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
+import Account from './pages/Account'; 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -21,8 +22,9 @@ function getStoredUser() {
 
 function App() {
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  
   if (pathname === '/cart') {
-  return <Cart />;
+    return <Cart />;
   }
 
   if (pathname === '/checkout') {
@@ -56,7 +58,6 @@ function App() {
       });
   }, [adminStatus, token]);
 
-  
   if (pathname === '/403' || adminStatus === 'forbidden') {
     return <Forbidden />;
   }
@@ -127,13 +128,17 @@ function App() {
     );
   }
   
-const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
-if (productDetailMatch) {
-  return <ProductDetail productId={productDetailMatch[1]} />;
-}
+  const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
+  if (productDetailMatch) {
+    return <ProductDetail productId={productDetailMatch[1]} />;
+  }
 
   if (pathname.startsWith('/products')) {
     return <ProductList />;
+  }
+
+  if (pathname === '/account') {
+    return <Account />;
   }
 
   return <Home />;
