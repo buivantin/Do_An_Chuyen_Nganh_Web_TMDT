@@ -9,8 +9,10 @@ use App\Http\Controllers\OrderController;
 // Controllers
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\Api\Admin\UserController; 
-//use App\Http\Controllers\Api\CartController;      
+//use App\Http\Controllers\Api\CartController;  
+
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
@@ -44,6 +46,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
-    Route::apiResource
+
+    Route::apiResource('products', ProductController::class);
 
 });
