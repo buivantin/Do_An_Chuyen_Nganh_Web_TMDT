@@ -18,6 +18,25 @@ class ProductController extends Controller
         $this->productService = $productService;
     }
 
+    public function showPublic(int $id): JsonResponse
+    {
+        $product = Product::with('category:id,name')
+            ->where('status', 'active')
+            ->find($id);
+
+        if (!$product) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Sản phẩm không tồn tại hoặc đã bị ẩn.',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $product,
+        ]);
+    }
+
     /**
      * GET /api/products (Tìm kiếm, lọc & phân trang công khai - TM-02)
      */

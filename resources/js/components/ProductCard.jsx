@@ -1,16 +1,16 @@
 import React from "react";
 
 export default function ProductCard({ book, onAddToCart }) {
-    const cleanTitle = book.title?.normalize("NFC");
+    const cleanTitle = (book.title || book.name)?.normalize("NFC");
 
     return (
         <div className="bg-white rounded-2xl p-3 border border-stone-100 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-            <div>
+            <a href={`/products/${book.id}`} className="block group">
                 <div className="bg-[#EAEAEA] rounded-xl p-4 flex items-center justify-center aspect-[4/4.4]">
                     <img
                         src={book.image}
                         alt={cleanTitle}
-                        className="h-full object-contain shadow-md"
+                        className="h-full object-contain shadow-md group-hover:scale-[1.02] transition"
                     />
                 </div>
 
@@ -24,7 +24,7 @@ export default function ProductCard({ book, onAddToCart }) {
                     {/* Cho phép xuống 2 dòng + giữ chiều cao cố định 2 dòng để card không bị lệch */}
                     <h3
                         title={cleanTitle}
-                        className="font-serif text-lg font-bold text-gray-900 mt-1 line-clamp-2 min-h-[3.5rem]"
+                        className="font-serif text-lg font-bold text-gray-900 mt-1 line-clamp-2 min-h-[3.5rem] group-hover:text-[#9A5B13] transition-colors"
                     >
                         {cleanTitle}
                     </h3>
@@ -33,11 +33,11 @@ export default function ProductCard({ book, onAddToCart }) {
                         {book.author?.normalize("NFC")}
                     </p>
                 </div>
-            </div>
+            </a>
 
             <div className="pt-3">
                 <div className="text-lg font-bold text-gray-900">
-                    {book.price.toLocaleString("vi-VN")} đ
+                    {Number(book.price || 0).toLocaleString("vi-VN")} ₫
                 </div>
 
                 <button
