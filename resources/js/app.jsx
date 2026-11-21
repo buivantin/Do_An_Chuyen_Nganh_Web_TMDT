@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
+import Account from './pages/Account'; 
 
 function getStoredUser() {
   try {
@@ -114,6 +115,12 @@ function App() {
     );
   }
 
+  // BỔ SUNG: Xử lý định tuyến cho trang Account
+  if (pathname === '/account') {
+    return <Account />;
+  }
+
+  // Mặc định trả về Home nếu không khớp route nào ở trên
   return <Home />;
 }
 
