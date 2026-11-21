@@ -71,18 +71,59 @@ const ProductService = {
     };
   },
 
+  getAuthHeaders() {
+    const token = localStorage.getItem("token");
+    return {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    };
+  },
+
+  async getCart() {
+    const { data } = await axios.get("/api/cart", {
+      headers: this.getAuthHeaders(),
+    });
+
+    const raw = data?.data?.items ?? data?.data ?? data?.items ?? data?.cart ?? data;
+    const list = Array.isArray(raw) ? raw : [];
+
+    return list.map((row) => {
+      const product = row.product || row;
+      return {
+        id: row.id,
+        product_id: row.product_id ?? product.id,
+        quantity: Number(row.quantity || 1),
+        name: product.name || product.title || "",
+        author: product.author || "Đang cập nhật",
+        price: Number(row.price ?? product.price ?? 0),
+        stock: Number(product.stock ?? 0),
+        image: product.image || product.thumbnail || "",
+      };
+    });
+  },
+
   async addToCart(productId, quantity = 1) {
-    const token = localStorage.getItem('token');
     const { data } = await axios.post(
-      '/api/cart/add',
+      "/api/cart/add",
       { product_id: productId, quantity },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      }
+      { headers: this.getAuthHeaders() }
     );
+    return data;
+  },
+
+  async updateCartItem(cartItemId, quantity) {
+    const { data } = await axios.put(
+      `/api/cart/${cartItemId}`,
+      { quantity },
+      { headers: this.getAuthHeaders() }
+    );
+    return data;
+  },
+
+  async removeCartItem(cartItemId) {
+    const { data } = await axios.delete(`/api/cart/${cartItemId}`, {
+      headers: this.getAuthHeaders(),
+    });
     return data;
   },
 };

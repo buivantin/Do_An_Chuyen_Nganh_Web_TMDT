@@ -4,6 +4,7 @@ import axios from "axios";
 export default function Navbar() {
     const [categories, setCategories] = useState([]);
     const pathname = window.location.pathname;
+    const activeCategoryId = new URLSearchParams(window.location.search).get("category_id");
 
     useEffect(() => {
         axios
@@ -40,7 +41,7 @@ export default function Navbar() {
                         <a
                             href="/products"
                             className={`transition-colors ${
-                                pathname.startsWith("/products")
+                                pathname === "/products" && !activeCategoryId
                                     ? "text-[#9A5B13] font-bold"
                                     : "hover:text-[#9A5B13]"
                             }`}
@@ -49,16 +50,26 @@ export default function Navbar() {
                         </a>
                     </li>
 
-                    {categories.map((cat) => (
-                        <li key={cat.id}>
-                            <a
-                                href={`/#category-${cat.id}`}
-                                className="hover:text-[#9A5B13] transition-colors"
-                            >
-                                {cat.name}
-                            </a>
-                        </li>
-                    ))}
+                    {categories.map((cat) => {
+                        const isActive =
+                            pathname === "/products" &&
+                            String(activeCategoryId) === String(cat.id);
+
+                        return (
+                            <li key={cat.id}>
+                                <a
+                                    href={`/products?category_id=${cat.id}`}
+                                    className={`transition-colors ${
+                                        isActive
+                                            ? "text-[#9A5B13] font-bold"
+                                            : "hover:text-[#9A5B13]"
+                                    }`}
+                                >
+                                    {cat.name}
+                                </a>
+                            </li>
+                        );
+                    })}
                 </ul>
             </div>
         </nav>
