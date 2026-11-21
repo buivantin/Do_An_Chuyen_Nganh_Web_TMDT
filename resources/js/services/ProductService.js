@@ -48,6 +48,44 @@ const ProductService = {
       total: data.total || data.meta?.total || items.length,
     };
   },
+  // Thêm vào object ProductService trong resources/js/services/ProductService.js
+  async getById(id) {
+    const { data } = await axios.get(`/api/products/${id}`, {
+      headers: { Accept: 'application/json' },
+    });
+
+    const item = data.data || data;
+    return {
+      id: item.id,
+      title: item.title || item.name || '',
+      author: item.author || 'Đang cập nhật',
+      description: item.description || '',
+      stock: Number(item.stock ?? 0),
+      price: Number(item.price || 0),
+      image: item.image || item.thumbnail || '',
+      category_id: item.category_id ?? item.category?.id ?? null,
+      category:
+        typeof item.category === 'object' && item.category !== null
+          ? item.category.name
+          : item.category || item.category_name || 'Sách',
+    };
+  },
+
+  async addToCart(productId, quantity = 1) {
+    const token = localStorage.getItem('token');
+    const { data } = await axios.post(
+      '/api/cart/add',
+      { product_id: productId, quantity },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      }
+    );
+    return data;
+  },
 };
+
 
 export default ProductService;

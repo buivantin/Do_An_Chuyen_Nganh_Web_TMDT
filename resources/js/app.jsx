@@ -6,6 +6,7 @@ import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
+import ProductDetail from './pages/ProductDetail';
 
 function getStoredUser() {
   try {
@@ -114,6 +115,11 @@ function App() {
       </div>
     );
   }
+  
+const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
+if (productDetailMatch) {
+  return <ProductDetail productId={productDetailMatch[1]} />;
+}
 
   if (pathname.startsWith('/products')) {
     return <ProductList />;
