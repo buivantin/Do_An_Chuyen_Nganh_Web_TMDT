@@ -10,10 +10,11 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Seed 1 Admin & 10 Khách hàng
+        // 1. Seed 1 Admin & 10 Khách hàng (kèm số điện thoại)
         DB::table('users')->insert([
             'username' => 'admin',
             'email' => 'admin@bookstore.com',
+            'phone' => '0901000000',
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
@@ -24,6 +25,7 @@ class DatabaseSeeder extends Seeder
             DB::table('users')->insert([
                 'username' => "customer$i",
                 'email' => "khachhang$i@gmail.com",
+                'phone' => '09010000' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
                 'status' => 'active',
@@ -96,12 +98,13 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái
+        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái (kèm SĐT nhận hàng)
         $statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
         for ($i = 1; $i <= 10; $i++) {
             $orderId = DB::table('orders')->insertGetId([
                 'status' => $statuses[array_rand($statuses)],
                 'address' => "$i Đường Nguyễn Huệ, Quận 1, TP.HCM",
+                'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
                 'user_id' => rand(2, 11),
