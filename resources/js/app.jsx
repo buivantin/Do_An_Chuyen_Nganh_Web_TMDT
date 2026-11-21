@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
 import Home from './pages/Home';
+import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
@@ -112,6 +113,10 @@ function App() {
         </div>
       </div>
     );
+  }
+
+  if (pathname.startsWith('/products')) {
+    return <ProductList />;
   }
 
   return <Home />;
