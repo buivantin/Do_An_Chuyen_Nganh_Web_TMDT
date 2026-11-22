@@ -464,6 +464,36 @@ const VIETNAM_ADDRESSES = [
   },
 ];
 
+const PAYMENT_METHODS = [
+  {
+    id: "cod",
+    title: "Thanh toán khi nhận hàng (COD)",
+    badge: "Tiền mặt",
+    badgeClass: "bg-stone-100 text-stone-700 border-stone-200",
+    description: "Kiểm tra nguyên vẹn gáy sách trước khi thanh toán tiền mặt",
+  },
+  {
+    id: "vnpay",
+    title: "Thanh toán qua VNPay",
+    badge: "VNPAY-QR",
+    badgeClass: "bg-sky-50 text-sky-700 border-sky-200",
+    description: "Quét mã VNPAY-QR, thẻ ATM nội địa hoặc thẻ quốc tế",
+  },
+  {
+    id: "momo",
+    title: "Thanh toán qua Ví MoMo",
+    badge: "MoMo",
+    badgeClass: "bg-pink-50 text-pink-700 border-pink-200",
+    description: "Thanh toán nhanh qua ứng dụng Ví điện tử MoMo",
+  },
+];
+
+function getPaymentMethodLabel(method) {
+  const key = String(method || "cod").toLowerCase();
+  const found = PAYMENT_METHODS.find((item) => item.id === key);
+  return found ? found.title : "Thanh toán khi nhận hàng (COD)";
+}
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem("user");
@@ -510,7 +540,7 @@ export default function Checkout() {
 
   // Phương thức giao hàng & thanh toán
   const [shippingMethod, setShippingMethod] = useState("standard"); // 'standard' | 'express'
-  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' | 'banking'
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' | 'vnpay' | 'momo'
 
   // Mã ưu đãi
   const [promoInput, setPromoInput] = useState("");
@@ -732,7 +762,6 @@ export default function Checkout() {
               })
             ).data;
 
-      // Nếu chọn địa chỉ mới và tích lưu làm mặc định -> cập nhật lại hồ sơ
       if (addressMode === "new" && saveAsDefault && finalShippingAddress) {
         axios
           .put(
@@ -891,9 +920,7 @@ export default function Checkout() {
               <div className="flex justify-between gap-3">
                 <span className="text-stone-500">Thanh toán:</span>
                 <span className="font-medium text-stone-800">
-                  {orderSuccess.paymentMethod === "banking"
-                    ? "Chuyển khoản ngân hàng"
-                    : "Thanh toán khi nhận hàng (COD)"}
+                  {getPaymentMethodLabel(orderSuccess.paymentMethod)}
                 </span>
               </div>
               <div className="border-t border-stone-200/80 pt-2 flex justify-between items-baseline">
@@ -1140,7 +1167,7 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  {/* CHẾ ĐỘ 1: Địa chỉ lưu sẵn -> Chỉ hiển thị thông tin đã lưu, KHÔNG hiện dropdown chọn địa chỉ */}
+                  {/* CHẾ ĐỘ 1: Địa chỉ lưu sẵn */}
                   {addressMode === "saved" ? (
                     <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-xl p-4 space-y-2">
                       <div className="flex items-center justify-between gap-2">
@@ -1175,7 +1202,7 @@ export default function Checkout() {
                       )}
                     </div>
                   ) : (
-                    /* CHẾ ĐỘ 2: Giao tới địa chỉ mới -> Hiện dropdown Tỉnh/Thành, Quận/Huyện, Phường/Xã + Số nhà + Map */
+                    /* CHẾ ĐỘ 2: Giao tới địa chỉ mới */
                     <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 space-y-3.5">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
@@ -1422,7 +1449,7 @@ export default function Checkout() {
                 </div>
               </section>
 
-              {/* KHỐI 3: Phương Thức Thanh Toán */}
+              {/* KHỐI 3: Phương Thức Thanh Toán (COD, VNPay, MoMo) */}
               <section className="bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xs">
                 <div className="flex items-start gap-3">
                   <span className="w-7 h-7 rounded-lg bg-[#141414] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -1438,66 +1465,50 @@ export default function Checkout() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("cod")}
-                    className={`text-left p-3.5 rounded-xl border transition cursor-pointer ${
-                      paymentMethod === "cod"
-                        ? "bg-[#FAF6F0] border-[#9A5B13]/60"
-                        : "bg-white border-stone-200/80 hover:border-stone-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                          paymentMethod === "cod"
-                            ? "border-[#9A5B13]"
-                            : "border-stone-400"
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {PAYMENT_METHODS.map((method) => {
+                    const isSelected = paymentMethod === method.id;
+                    return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`text-left p-3.5 rounded-xl border transition cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? "bg-[#FAF6F0] border-[#9A5B13]/60 shadow-2xs"
+                            : "bg-white border-stone-200/80 hover:border-stone-300"
                         }`}
                       >
-                        {paymentMethod === "cod" && (
-                          <span className="w-2 h-2 rounded-full bg-[#9A5B13]" />
-                        )}
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-stone-900">
-                        Thanh toán khi nhận hàng (COD)
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-1.5 pl-6">
-                      Kiểm tra nguyên vẹn gáy sách trước khi thanh toán tiền mặt
-                    </p>
-                  </button>
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span
+                              className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                                isSelected ? "border-[#9A5B13]" : "border-stone-400"
+                              }`}
+                            >
+                              {isSelected && (
+                                <span className="w-2 h-2 rounded-full bg-[#9A5B13]" />
+                              )}
+                            </span>
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod("banking")}
-                    className={`text-left p-3.5 rounded-xl border transition cursor-pointer ${
-                      paymentMethod === "banking"
-                        ? "bg-[#FAF6F0] border-[#9A5B13]/60"
-                        : "bg-white border-stone-200/80 hover:border-stone-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                          paymentMethod === "banking"
-                            ? "border-[#9A5B13]"
-                            : "border-stone-400"
-                        }`}
-                      >
-                        {paymentMethod === "banking" && (
-                          <span className="w-2 h-2 rounded-full bg-[#9A5B13]" />
-                        )}
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-stone-900">
-                        Chuyển khoản ngân hàng / QR
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500 mt-1.5 pl-6">
-                      Xác nhận tự động 24/7 qua mã VietQR ngân hàng
-                    </p>
-                  </button>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${method.badgeClass}`}
+                            >
+                              {method.badge}
+                            </span>
+                          </div>
+
+                          <div className="text-xs sm:text-sm font-bold text-stone-900">
+                            {method.title}
+                          </div>
+                        </div>
+
+                        <p className="text-[11px] text-stone-500 mt-1.5 leading-relaxed">
+                          {method.description}
+                        </p>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             </div>

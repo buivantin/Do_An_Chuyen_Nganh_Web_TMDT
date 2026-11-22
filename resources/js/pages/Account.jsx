@@ -505,6 +505,48 @@ const TABS = [
   },
 ];
 
+const PAYMENT_METHOD_LABELS = {
+  cod: "Thanh toán khi nhận hàng (COD)",
+  vnpay: "Thanh toán qua VNPay",
+  momo: "Thanh toán qua Ví MoMo",
+  banking: "Chuyển khoản ngân hàng",
+};
+
+const ORDER_STATUS_CONFIG = {
+  pending: {
+    label: "Chờ xác nhận",
+    badge: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+  processing: {
+    label: "Đang xử lý",
+    badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
+  },
+  shipping: {
+    label: "Đang giao hàng",
+    badge: "bg-sky-50 text-sky-800 border-sky-200",
+  },
+  shipped: {
+    label: "Đang giao hàng",
+    badge: "bg-sky-50 text-sky-800 border-sky-200",
+  },
+  completed: {
+    label: "Hoàn thành",
+    badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    badge: "bg-stone-100 text-stone-600 border-stone-200",
+  },
+};
+
+const ORDER_FILTERS = [
+  { id: "all", label: "Tất cả" },
+  { id: "pending", label: "Chờ xác nhận" },
+  { id: "shipping", label: "Đang giao" },
+  { id: "completed", label: "Hoàn thành" },
+  { id: "cancelled", label: "Đã hủy" },
+];
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem("user");
@@ -619,10 +661,36 @@ function parseAddressParts(rawAddress = "") {
   };
 }
 
-function resolveAvatarUrl(path) {
+function resolveAssetUrl(path) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
   return path.startsWith("/") ? path : `/${path}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function extractOrderItems(order) {
+  if (!order || typeof order !== "object") return [];
+  const list =
+    order.items ||
+    order.order_items ||
+    order.orderItems ||
+    order.order_details ||
+    order.orderDetails ||
+    order.products ||
+    [];
+  return Array.isArray(list) ? list : [];
 }
 
 export default function Account({ user: propUser = null, orders: propOrders = [] }) {
@@ -641,7 +709,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   });
 
   const [user, setUser] = useState(initialUser);
-  const [orders, setOrders] = useState(Array.isArray(propOrders) ? propOrders : []);
   const [profileForm, setProfileForm] = useState({
     username: initialUser.username,
     phone: initialUser.phone,
@@ -651,6 +718,15 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     new_password: "",
     new_password_confirmation: "",
   });
+
+  // State đơn hàng của user
+  const [orders, setOrders] = useState(Array.isArray(propOrders) ? propOrders : []);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [detailLoadingId, setDetailLoadingId] = useState(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
   const [provinceCode, setProvinceCode] = useState(initialAddr.provinceCode);
   const [districtCode, setDistrictCode] = useState(initialAddr.districtCode);
@@ -684,6 +760,44 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     window.dispatchEvent(new CustomEvent("user-updated", { detail: normalized }));
   }, []);
 
+  const fetchUserOrders = useCallback(async (signal) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setOrdersLoading(true);
+    setOrdersError("");
+    try {
+      const res = await axios.get("/api/orders", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        signal,
+      });
+
+      const raw = res.data?.orders ?? res.data?.data ?? res.data;
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.data)
+        ? raw.data
+        : [];
+      setOrders(list);
+    } catch (err) {
+      if (axios.isCancel(err)) return;
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setShowLoginModal(true);
+      } else {
+        setOrdersError(
+          err.response?.data?.message || "Không thể tải danh sách đơn hàng."
+        );
+      }
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!propUser) return;
     syncUserState(propUser);
@@ -698,38 +812,122 @@ export default function Account({ user: propUser = null, orders: propOrders = []
       return;
     }
 
-    if (propUser) return;
-
     const controller = new AbortController();
-    axios
-      .get("/api/profile", {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-        signal: controller.signal,
-      })
-      .then((res) => {
-        const rawUser = res.data?.user || res.data?.data || res.data;
-        syncUserState(rawUser);
-        if (Array.isArray(res.data?.orders)) {
-          setOrders(res.data.orders);
-        }
-      })
-      .catch((err) => {
-        if (axios.isCancel(err)) return;
-        if (err.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setShowLoginModal(true);
-        } else {
-          setMsg({
-            type: "error",
-            text: err.response?.data?.message || "Không thể kết nối đến máy chủ API.",
-          });
-        }
-      })
-      .finally(() => setLoading(false));
+
+    if (!propUser) {
+      axios
+        .get("/api/profile", {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          signal: controller.signal,
+        })
+        .then((res) => {
+          const rawUser = res.data?.user || res.data?.data || res.data;
+          syncUserState(rawUser);
+          if (Array.isArray(res.data?.orders) && res.data.orders.length > 0) {
+            setOrders(res.data.orders);
+          }
+        })
+        .catch((err) => {
+          if (axios.isCancel(err)) return;
+          if (err.response?.status === 401) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            setShowLoginModal(true);
+          } else {
+            setMsg({
+              type: "error",
+              text: err.response?.data?.message || "Không thể kết nối đến máy chủ API.",
+            });
+          }
+        })
+        .finally(() => setLoading(false));
+    }
+
+    if (!Array.isArray(propOrders) || propOrders.length === 0) {
+      fetchUserOrders(controller.signal);
+    }
 
     return () => controller.abort();
-  }, [propUser, syncUserState]);
+  }, [propUser, propOrders, syncUserState, fetchUserOrders]);
+
+  const handleToggleOrderDetail = async (order) => {
+    if (expandedOrderId === order.id) {
+      setExpandedOrderId(null);
+      return;
+    }
+
+    setExpandedOrderId(order.id);
+    if (extractOrderItems(order).length > 0) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    setDetailLoadingId(order.id);
+    try {
+      const res = await axios.get(`/api/orders/${order.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+      const detail = res.data?.order || res.data?.data || res.data;
+      if (detail && typeof detail === "object") {
+        setOrders((prev) =>
+          prev.map((item) => (item.id === order.id ? { ...item, ...detail } : item))
+        );
+      }
+    } catch {
+      // Giữ nguyên dữ liệu hiện có nếu API chi tiết chưa trả về items
+    } finally {
+      setDetailLoadingId(null);
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    const token = localStorage.getItem("token");
+    if (!token) return setShowLoginModal(true);
+
+    if (!window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này không?")) {
+      return;
+    }
+
+    setCancellingOrderId(orderId);
+    setMsg({ type: "", text: "" });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    };
+
+    try {
+      let res;
+      try {
+        res = await axios.post(`/api/orders/${orderId}/cancel`, {}, { headers });
+      } catch (err) {
+        if (err.response?.status === 404 || err.response?.status === 405) {
+          res = await axios.put(`/api/orders/${orderId}/cancel`, {}, { headers });
+        } else {
+          throw err;
+        }
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: "cancelled" } : o))
+      );
+      setMsg({
+        type: "success",
+        text: res?.data?.message || "Đã hủy đơn hàng thành công!",
+      });
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text:
+          err.response?.data?.message ||
+          "Không thể hủy đơn hàng này. Vui lòng thử lại.",
+      });
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
 
   const currentProvince = useMemo(
     () => VIETNAM_ADDRESSES.find((p) => p.code === provinceCode) || null,
@@ -885,9 +1083,23 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   const switchTab = (tabId) => {
     setActiveTab(tabId);
     setMsg({ type: "", text: "" });
+    if (tabId === "orders" && orders.length === 0 && !ordersLoading) {
+      fetchUserOrders();
+    }
   };
 
-  const avatarSrc = resolveAvatarUrl(user.image_path);
+  const filteredOrders = useMemo(() => {
+    if (orderStatusFilter === "all") return orders;
+    return orders.filter((o) => {
+      const st = String(o.status || "pending").toLowerCase();
+      if (orderStatusFilter === "shipping") {
+        return st === "shipping" || st === "shipped";
+      }
+      return st === orderStatusFilter;
+    });
+  }, [orders, orderStatusFilter]);
+
+  const avatarSrc = resolveAssetUrl(user.image_path);
   const avatarInitial = (user.username || user.email || "U")
     .trim()
     .charAt(0)
@@ -910,7 +1122,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
       />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Breadcrumb đồng bộ Cart & Checkout */}
+        {/* Breadcrumb */}
         <nav className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 flex flex-wrap items-center gap-1.5 sm:gap-2">
           <a href="/" className="hover:text-[#9A5B13] transition">
             Trang chủ
@@ -989,22 +1201,36 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                       key={tab.id}
                       type="button"
                       onClick={() => switchTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                      className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
                         isActive
                           ? "bg-[#141414] text-white shadow-xs"
                           : "text-stone-600 hover:bg-[#FAF8F5] hover:text-stone-900"
                       }`}
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        className="w-4 h-4 shrink-0"
-                      >
-                        {tab.icon}
-                      </svg>
-                      <span>{tab.label}</span>
+                      <span className="flex items-center gap-3">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          className="w-4 h-4 shrink-0"
+                        >
+                          {tab.icon}
+                        </svg>
+                        <span>{tab.label}</span>
+                      </span>
+
+                      {tab.id === "orders" && orders.length > 0 && (
+                        <span
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-[#F5EDE2] text-[#9A5B13]"
+                          }`}
+                        >
+                          {orders.length}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1288,36 +1514,299 @@ export default function Account({ user: propUser = null, orders: propOrders = []
 
               {/* TAB 3: ĐƠN HÀNG CỦA TÔI */}
               {activeTab === "orders" && (
-                <div className="space-y-6">
-                  <div className="border-b border-stone-100 pb-4">
-                    <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#1A1A1A]">
-                      Đơn Hàng Của Tôi
-                    </h2>
-                    <p className="text-xs text-stone-500 mt-1">
-                      Theo dõi lịch sử đặt mua và trạng thái giao nhận ấn phẩm
-                    </p>
+                <div className="space-y-5">
+                  <div className="border-b border-stone-100 pb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#1A1A1A]">
+                        Đơn Hàng Của Tôi
+                      </h2>
+                      <p className="text-xs text-stone-500 mt-1">
+                        Theo dõi lịch sử đặt mua và trạng thái giao nhận ấn phẩm
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => fetchUserOrders()}
+                      disabled={ordersLoading}
+                      className="px-3.5 py-2 rounded-xl bg-[#FAF8F5] hover:bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-700 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {ordersLoading ? "Đang tải..." : "Làm mới"}
+                    </button>
                   </div>
 
-                  {orders.length > 0 ? (
-                    <div className="space-y-3">
-                      {orders.map((order) => (
-                        <div
-                          key={order.id}
-                          className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3"
-                        >
-                          <div>
-                            <div className="text-xs font-bold text-[#9A5B13]">
-                              Mã đơn #{order.id}
+                  {/* Thanh lọc trạng thái đơn hàng */}
+                  {orders.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {ORDER_FILTERS.map((filter) => {
+                        const isSelected = orderStatusFilter === filter.id;
+                        const count =
+                          filter.id === "all"
+                            ? orders.length
+                            : orders.filter((o) => {
+                                const st = String(o.status || "pending").toLowerCase();
+                                if (filter.id === "shipping") {
+                                  return st === "shipping" || st === "shipped";
+                                }
+                                return st === filter.id;
+                              }).length;
+
+                        return (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            onClick={() => setOrderStatusFilter(filter.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                              isSelected
+                                ? "bg-[#141414] text-white border-[#141414]"
+                                : "bg-[#FAF8F5] text-stone-600 border-stone-200/80 hover:border-stone-300"
+                            }`}
+                          >
+                            {filter.label} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {ordersError && (
+                    <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700">
+                      {ordersError}
+                    </div>
+                  )}
+
+                  {ordersLoading ? (
+                    <div className="py-14 text-center text-sm text-stone-500">
+                      Đang tải danh sách đơn hàng của bạn...
+                    </div>
+                  ) : filteredOrders.length > 0 ? (
+                    <div className="space-y-4">
+                      {filteredOrders.map((order) => {
+                        const statusKey = String(
+                          order.status || "pending"
+                        ).toLowerCase();
+                        const statusInfo = ORDER_STATUS_CONFIG[statusKey] || {
+                          label: order.status || "Đang xử lý",
+                          badge: "bg-stone-100 text-stone-700 border-stone-200",
+                        };
+                        const orderCode =
+                          order.order_code || order.code || `#MS${order.id}`;
+                        const orderItems = extractOrderItems(order);
+                        const isExpanded = expandedOrderId === order.id;
+                        const paymentKey = String(
+                          order.payment_method || "cod"
+                        ).toLowerCase();
+                        const paymentLabel =
+                          PAYMENT_METHOD_LABELS[paymentKey] ||
+                          order.payment_method ||
+                          "Thanh toán khi nhận hàng (COD)";
+
+                        return (
+                          <div
+                            key={order.id}
+                            className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 sm:p-5 space-y-3.5"
+                          >
+                            {/* Hàng tiêu đề đơn hàng */}
+                            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-200/70 pb-3">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs sm:text-sm font-bold text-[#9A5B13]">
+                                    Đơn hàng {orderCode}
+                                  </span>
+                                  <span
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusInfo.badge}`}
+                                  >
+                                    {statusInfo.label}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-stone-500 mt-1">
+                                  Ngày đặt: {formatDateTime(order.created_at)}
+                                </div>
+                              </div>
+
+                              <div className="text-left sm:text-right">
+                                <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
+                                  Tổng thanh toán
+                                </div>
+                                <div className="text-base sm:text-lg font-bold text-stone-900">
+                                  {Number(order.total_amount || 0).toLocaleString(
+                                    "vi-VN"
+                                  )}{" "}
+                                  ₫
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-stone-500 mt-0.5">
-                              {order.created_at}
+
+                            {/* Xem trước danh sách sản phẩm trong đơn */}
+                            {orderItems.length > 0 && (
+                              <div className="space-y-2.5">
+                                {(isExpanded
+                                  ? orderItems
+                                  : orderItems.slice(0, 2)
+                                ).map((item, idx) => {
+                                  const product = item.product || item;
+                                  const itemName = (
+                                    item.product_name ||
+                                    product.name ||
+                                    product.title ||
+                                    "Ấn phẩm sách"
+                                  ).normalize("NFC");
+                                  const itemImg = resolveAssetUrl(
+                                    item.image ||
+                                      product.image ||
+                                      product.image_path
+                                  );
+                                  const qty = Number(
+                                    item.quantity || item.pivot?.quantity || 1
+                                  );
+                                  const unitPrice = Number(
+                                    item.price ||
+                                      item.pivot?.price ||
+                                      product.price ||
+                                      0
+                                  );
+
+                                  return (
+                                    <div
+                                      key={item.id || `${order.id}-${idx}`}
+                                      className="flex items-center justify-between gap-3 bg-white border border-stone-200/70 rounded-xl p-2.5"
+                                    >
+                                      <div className="flex items-center gap-3 min-w-0">
+                                        {itemImg ? (
+                                          <img
+                                            src={itemImg}
+                                            alt={itemName}
+                                            className="w-10 h-14 object-contain rounded bg-stone-100 p-0.5 shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="w-10 h-14 rounded bg-stone-100 text-stone-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                            SÁCH
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <div className="font-serif text-xs sm:text-sm font-bold text-stone-900 line-clamp-1">
+                                            {itemName}
+                                          </div>
+                                          <div className="text-[11px] text-stone-500 mt-0.5">
+                                            Số lượng:{" "}
+                                            <strong className="text-stone-800">
+                                              {qty}
+                                            </strong>{" "}
+                                            &bull;{" "}
+                                            {unitPrice.toLocaleString("vi-VN")} ₫
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-xs sm:text-sm font-bold text-stone-900 shrink-0">
+                                        {(unitPrice * qty).toLocaleString("vi-VN")}{" "}
+                                        ₫
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {!isExpanded && orderItems.length > 2 && (
+                                  <div className="text-[11px] text-stone-500 italic">
+                                    Và {orderItems.length - 2} ấn phẩm khác...
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Chi tiết giao nhận khi bấm Xem chi tiết */}
+                            {isExpanded && (
+                              <div className="bg-white border border-stone-200/80 rounded-xl p-3.5 text-xs space-y-1.5 text-stone-600">
+                                {detailLoadingId === order.id ? (
+                                  <div className="text-stone-500">
+                                    Đang tải chi tiết đơn hàng...
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <span className="font-semibold text-stone-800">
+                                        Người nhận:
+                                      </span>{" "}
+                                      {order.shipping_name ||
+                                        order.receiver_name ||
+                                        user.username}{" "}
+                                      {order.shipping_phone ||
+                                      order.receiver_phone ||
+                                      order.phone
+                                        ? `(${
+                                            order.shipping_phone ||
+                                            order.receiver_phone ||
+                                            order.phone
+                                          })`
+                                        : ""}
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-stone-800">
+                                        Địa chỉ giao:
+                                      </span>{" "}
+                                      {order.shipping_address ||
+                                        order.receiver_address ||
+                                        order.address ||
+                                        "Theo địa chỉ mặc định"}
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-stone-800">
+                                        Thanh toán:
+                                      </span>{" "}
+                                      {paymentLabel}
+                                    </div>
+                                    {order.note && (
+                                      <div>
+                                        <span className="font-semibold text-stone-800">
+                                          Ghi chú:
+                                        </span>{" "}
+                                        {order.note}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Nút hành động */}
+                            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleOrderDetail(order)}
+                                className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-800 transition cursor-pointer"
+                              >
+                                {isExpanded ? "Thu gọn" : "Xem chi tiết"}
+                              </button>
+
+                              {statusKey === "pending" && (
+                                <button
+                                  type="button"
+                                  disabled={cancellingOrderId === order.id}
+                                  onClick={() => handleCancelOrder(order.id)}
+                                  className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-xs font-semibold text-red-700 transition cursor-pointer disabled:opacity-50"
+                                >
+                                  {cancellingOrderId === order.id
+                                    ? "Đang hủy..."
+                                    : "Hủy đơn"}
+                                </button>
+                              )}
                             </div>
                           </div>
-                          <div className="text-sm font-bold text-stone-900">
-                            {Number(order.total_amount || 0).toLocaleString("vi-VN")} ₫
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
+                    </div>
+                  ) : orders.length > 0 ? (
+                    <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-8 text-center space-y-2">
+                      <p className="text-sm font-semibold text-stone-800">
+                        Không có đơn hàng nào ở trạng thái này
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setOrderStatusFilter("all")}
+                        className="text-xs font-bold text-[#9A5B13] hover:underline cursor-pointer"
+                      >
+                        Xem tất cả đơn hàng
+                      </button>
                     </div>
                   ) : (
                     <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-8 sm:p-12 text-center space-y-3.5">
