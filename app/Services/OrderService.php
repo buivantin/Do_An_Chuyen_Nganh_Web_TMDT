@@ -90,16 +90,52 @@ class OrderService
 
     public function listForUser(int $userId, int $perPage = 10)
     {
-        return Order::withCount('items')
+        $orders = Order::with(['items.product'])
             ->where('user_id', $userId)
             ->latest()
             ->paginate($perPage);
+
+        $userReviews = \App\Models\Review::where('user_id', $userId)
+            ->get()
+            ->keyBy('product_id');
+
+        $orders->getCollection()->transform(function (Order $order) use ($userReviews) {
+            $order->items->transform(function ($item) use ($userReviews) {
+                $review = $userReviews->get($item->product_id);
+                $item->setAttribute('user_review', $review ? [
+                    'id'      => $review->id,
+                    'rating'  => $review->rating,
+                    'comment' => $review->comment,
+                ] : null);
+                return $item;
+            });
+            return $order;
+        });
+
+        return $orders;
     }
 
     public function findForUser(int $userId, int $orderId): Order
     {
-        return Order::with('items')
+        $order = Order::with(['items.product'])
             ->where('user_id', $userId)
             ->findOrFail($orderId);
+
+        $userReviews = \App\Models\Review::where('user_id', $userId)
+            ->whereIn('product_id', $order->items->pluck('product_id'))
+            ->get()
+            ->keyBy('product_id');
+
+        $order->items->transform(function ($item) use ($userReviews) {
+            $review = $userReviews->get($item->product_id);
+            $item->setAttribute('user_review', $review ? [
+                'id'      => $review->id,
+                'rating'  => $review->rating,
+                'comment' => $review->comment,
+            ] : null);
+            return $item;
+        });
+
+        return $order;
     }
 }

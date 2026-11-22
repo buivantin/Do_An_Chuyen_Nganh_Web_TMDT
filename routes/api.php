@@ -13,10 +13,12 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\Api\Admin\UserController; 
 use App\Http\Controllers\Api\CartController;       
 use App\Http\Controllers\Api\ProfileController; 
+use App\Http\Controllers\Api\ReviewController;
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
+Route::get('/products/{productId}/reviews', [ReviewController::class, 'index']);
 
 // Route trang chủ & danh mục (Của TV3 & TV4)
 Route::get('/categories', [CategoryController::class, 'index']);
@@ -33,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::post('/reviews', [ReviewController::class, 'store']);
 
     // TM-05: Giỏ hàng (Của TV5)
     Route::get('/cart', [CartController::class, 'index']);
