@@ -185,10 +185,7 @@ const Account = () => {
         <div className="bg-[#F9F6F0] py-10 min-h-[calc(100vh-200px)]">
             <div className="max-w-6xl mx-auto px-4">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-<<<<<<< HEAD
-=======
                     {/* SIDEBAR TRÁI */}
->>>>>>> b10e10385845bcdb0d298a39daf2667e784d7131
                     <div className="md:col-span-4 lg:col-span-3">
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center sticky top-24">
                             <div className="relative group cursor-pointer mb-4" onClick={() => fileInputRef.current?.click()}>
