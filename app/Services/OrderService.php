@@ -11,15 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
-    /**
-     * Đặt hàng: đọc giỏ -> kiểm tra tồn kho -> tạo order + order_items
-     * -> trừ kho -> xóa giỏ. Tất cả trong 1 transaction.
-     */
     public function placeOrder(int $userId, array $data): Order
     {
         return DB::transaction(function () use ($userId, $data) {
-
-            // 1. Đọc giỏ hàng của user
             $cartItems = CartItem::where('user_id', $userId)->get();
 
             if ($cartItems->isEmpty()) {
@@ -28,15 +22,13 @@ class OrderService
                 ]);
             }
 
-            // 2. Khóa các sản phẩm trong giỏ (sắp theo id để tránh deadlock)
             $products = Product::whereIn('id', $cartItems->pluck('product_id'))
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
 
-            // 3. Kiểm tra từng dòng và tính tổng tiền từ giá trong CSDL
-            $total = 0;
+            $subtotal = 0;
             foreach ($cartItems as $item) {
                 $product = $products->get($item->product_id);
 
@@ -52,22 +44,24 @@ class OrderService
                     ]);
                 }
 
-                $total += $product->price * $item->quantity;
+                $subtotal += $product->price * $item->quantity;
             }
 
-            // 4. Tạo đơn hàng
+            // Lấy phí ship từ Frontend gửi lên (mặc định là 0)
+            $shippingFee = (float) ($data['shipping_fee'] ?? 0);
+            $grandTotal = $subtotal + $shippingFee;
+
             $order = Order::create([
                 'user_id'        => $userId,
-                'voucher_id'     => null, // TODO: xử lý voucher sau
+                'voucher_id'     => null,
                 'status'         => 'pending',
-                'payment_method' => 'cod',
-                'total_amount'   => $total,
+                'payment_method' => strtolower(trim($data['payment_method'] ?? 'cod')),
+                'total_amount'   => $grandTotal, // Lưu tổng tiền đã cộng phí ship
                 'address'        => trim($data['address']),
-                'receiver_name' => trim($data['receiver_name']),
-                'phone'         => trim($data['phone']),
+                'receiver_name'  => trim($data['receiver_name']),
+                'phone'          => trim($data['phone']),
             ]);
 
-            // 5. Tạo chi tiết đơn và trừ kho
             foreach ($cartItems as $item) {
                 $product = $products->get($item->product_id);
 
@@ -75,30 +69,100 @@ class OrderService
                     'order_id'   => $order->id,
                     'product_id' => $product->id,
                     'quantity'   => $item->quantity,
-                    'price'      => $product->price, // giá tại thời điểm mua
+                    'price'      => $product->price,
                 ]);
 
                 $product->decrement('stock', $item->quantity);
             }
 
-            // 6. Xóa giỏ hàng
             CartItem::where('user_id', $userId)->delete();
 
             return $order;
         });
     }
-    
+
     public function listForUser(int $userId, int $perPage = 10)
     {
         return Order::withCount('items')
             ->where('user_id', $userId)
             ->latest()
-            ->paginate($perPage);   // phân trang phía server (NFR-03)
+            ->paginate($perPage);
     }
+
     public function findForUser(int $userId, int $orderId): Order
     {
         return Order::with('items')
             ->where('user_id', $userId)
             ->findOrFail($orderId);
+    }
+
+    // TM-07: Khách tự hủy đơn
+    public function cancelOrder(int $userId, int $orderId): Order
+    {
+        return DB::transaction(function () use ($userId, $orderId) {
+            $order = Order::with('items')->where('user_id', $userId)->findOrFail($orderId);
+
+            if ($order->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'order' => 'Không thể hủy đơn hàng vì đơn hàng đã được bàn giao cho đơn vị vận chuyển.',
+                ]);
+            }
+
+            foreach ($order->items as $item) {
+                Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+            }
+
+            $order->status = 'cancelled';
+            $order->save();
+
+            return $order;
+        });
+    }
+
+    // TM-13: Admin lấy danh sách đơn (có lọc)
+    public function listAllForAdmin(?string $status = null, int $perPage = 15)
+    {
+        $query = Order::withCount('items')->with('user')->latest();
+        
+        if ($status && $status !== 'all') {
+            $query->where('status', $status);
+        }
+        
+        return $query->paginate($perPage);
+    }
+
+    // TM-13: Admin cập nhật trạng thái (chặn đi lùi)
+    public function updateStatus(int $orderId, string $newStatus): Order
+    {
+        return DB::transaction(function () use ($orderId, $newStatus) {
+            $order = Order::with('items')->findOrFail($orderId);
+            $currentStatus = $order->status;
+
+            // Đồng bộ trạng thái với Frontend và Controller
+            $allowedTransitions = [
+                'pending'    => ['shipping', 'cancelled'], 
+                'shipping'   => ['completed', 'cancelled'],             
+                'completed'  => [],
+                'cancelled'  => []
+            ];
+
+            if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [])) {
+                throw ValidationException::withMessages([
+                    'status' => "Lỗi: Không thể chuyển từ trạng thái '{$currentStatus}' sang '{$newStatus}'."
+                ]);
+            }
+
+            // Nếu Admin hủy đơn, phải hoàn kho
+            if ($newStatus === 'cancelled') {
+                foreach ($order->items as $item) {
+                    Product::where('id', $item->product_id)->increment('stock', $item->quantity);
+                }
+            }
+
+            $order->status = $newStatus;
+            $order->save();
+
+            return $order;
+        });
     }
 }
