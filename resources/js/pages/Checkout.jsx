@@ -4,6 +4,7 @@ import MainLayout from "../layouts/MainLayout";
 import LoginRequiredModal from "../components/LoginRequiredModal";
 import ProductService from "../services/ProductService";
 import CheckoutStepper from "../components/CheckoutStepper";
+import AddressPickerMap from "../components/AddressPickerMap";
 
 function getStoredUser() {
   try {
@@ -16,6 +17,8 @@ function getStoredUser() {
 
 export default function Checkout() {
   const storedUser = useMemo(() => getStoredUser(), []);
+  const initialName = storedUser?.username || storedUser?.name || "";
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -26,20 +29,19 @@ export default function Checkout() {
   // Chế độ địa chỉ: 'saved' | 'new'
   const [addressMode, setAddressMode] = useState("saved");
   const [savedProfile, setSavedProfile] = useState({
-    name: storedUser?.name || "",
+    name: initialName,
     phone: storedUser?.phone || "",
     email: storedUser?.email || "",
     address: storedUser?.address || "",
   });
 
   // Form thông tin giao nhận
-  const [fullName, setFullName] = useState(storedUser?.name || "");
+  const [fullName, setFullName] = useState(initialName);
   const [phone, setPhone] = useState(storedUser?.phone || "");
   const [email, setEmail] = useState(storedUser?.email || "");
-  const [province, setProvince] = useState("TP. Hồ Chí Minh");
-  const [district, setDistrict] = useState("");
-  const [ward, setWard] = useState("");
-  const [streetAddress, setStreetAddress] = useState(storedUser?.address || "");
+  const [shippingAddress, setShippingAddress] = useState(
+    storedUser?.address || ""
+  );
   const [saveAsDefault, setSaveAsDefault] = useState(true);
   const [note, setNote] = useState("");
 
@@ -76,10 +78,14 @@ export default function Checkout() {
 
         setItems(Array.isArray(cartItems) ? cartItems : []);
 
-        const p = profileRes?.data?.data || profileRes?.data?.user || profileRes?.data;
+        const p =
+          profileRes?.data?.user ||
+          profileRes?.data?.data ||
+          profileRes?.data;
+
         if (p && typeof p === "object") {
           const nextProfile = {
-            name: p.name || storedUser?.name || "",
+            name: p.username || p.name || initialName,
             phone: p.phone || storedUser?.phone || "",
             email: p.email || storedUser?.email || "",
             address: p.address || storedUser?.address || "",
@@ -88,7 +94,7 @@ export default function Checkout() {
           if (nextProfile.name) setFullName(nextProfile.name);
           if (nextProfile.phone) setPhone(nextProfile.phone);
           if (nextProfile.email) setEmail(nextProfile.email);
-          if (nextProfile.address) setStreetAddress(nextProfile.address);
+          if (nextProfile.address) setShippingAddress(nextProfile.address);
         }
       } catch (err) {
         if (err.response?.status === 401) {
@@ -106,7 +112,7 @@ export default function Checkout() {
     };
 
     fetchInitialData();
-  }, [storedUser]);
+  }, [storedUser, initialName]);
 
   const handleSelectAddressMode = (mode) => {
     setAddressMode(mode);
@@ -114,13 +120,11 @@ export default function Checkout() {
       setFullName(savedProfile.name || "");
       setPhone(savedProfile.phone || "");
       setEmail(savedProfile.email || "");
-      setStreetAddress(savedProfile.address || "");
+      setShippingAddress(savedProfile.address || "");
     } else {
       setFullName("");
       setPhone("");
-      setDistrict("");
-      setWard("");
-      setStreetAddress("");
+      setShippingAddress("");
     }
   };
 
@@ -165,21 +169,13 @@ export default function Checkout() {
       return;
     }
 
-    if (!fullName.trim() || !phone.trim() || !streetAddress.trim()) {
+    const fullAddress = shippingAddress.trim();
+    if (!fullName.trim() || !phone.trim() || !fullAddress) {
       setErrorMsg(
         "Vui lòng điền đầy đủ Họ tên, Số điện thoại và Địa chỉ giao nhận."
       );
       return;
     }
-
-    const fullAddress = [
-      streetAddress.trim(),
-      ward.trim(),
-      district.trim(),
-      province.trim(),
-    ]
-      .filter(Boolean)
-      .join(", ");
 
     const payload = {
       shipping_name: fullName.trim(),
@@ -215,6 +211,40 @@ export default function Checkout() {
                 },
               })
             ).data;
+
+      // Lưu làm địa chỉ mặc định nếu người dùng tích chọn
+      if (saveAsDefault && fullAddress !== savedProfile.address) {
+        axios
+          .put(
+            "/api/profile",
+            {
+              username: fullName.trim(),
+              name: fullName.trim(),
+              phone: phone.trim(),
+              address: fullAddress,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/json",
+              },
+            }
+          )
+          .then(() => {
+            const currentStored = getStoredUser() || {};
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                ...currentStored,
+                username: fullName.trim(),
+                name: fullName.trim(),
+                phone: phone.trim(),
+                address: fullAddress,
+              })
+            );
+          })
+          .catch(() => null);
+      }
 
       const createdOrder = response?.data || response?.order || response || {};
       setOrderSuccess({
@@ -502,8 +532,8 @@ export default function Checkout() {
                   </button>
                 </div>
 
-                {/* Các trường nhập liệu địa chỉ */}
-                <div className="space-y-3.5">
+                {/* Các trường nhập liệu thông tin & địa chỉ */}
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
@@ -589,68 +619,13 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                        Tỉnh / Thành phố <span className="text-[#9A5B13]">*</span>
-                      </label>
-                      <select
-                        value={province}
-                        onChange={(e) => setProvince(e.target.value)}
-                        className="w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 focus:outline-none transition"
-                      >
-                        <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                        <option value="Hà Nội">Hà Nội</option>
-                        <option value="Đà Nẵng">Đà Nẵng</option>
-                        <option value="Cần Thơ">Cần Thơ</option>
-                        <option value="Hải Phòng">Hải Phòng</option>
-                        <option value="Bình Dương">Bình Dương</option>
-                        <option value="Đồng Nai">Đồng Nai</option>
-                        <option value="Khác">Tỉnh / Thành phố khác</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                        Quận / Huyện
-                      </label>
-                      <input
-                        type="text"
-                        value={district}
-                        onChange={(e) => setDistrict(e.target.value)}
-                        placeholder="VD: Quận 1"
-                        className="w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                        Phường / Xã
-                      </label>
-                      <input
-                        type="text"
-                        value={ward}
-                        onChange={(e) => setWard(e.target.value)}
-                        placeholder="VD: Phường Bến Nghé"
-                        className="w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                      Địa chỉ cụ thể (Số nhà, tên phố, tòa nhà){" "}
-                      <span className="text-[#9A5B13]">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={streetAddress}
-                      onChange={(e) => setStreetAddress(e.target.value)}
-                      placeholder="Số nhà, tên đường..."
-                      className="w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition"
-                    />
-                  </div>
+                  {/* Dropdown Tỉnh/Thành - Quận/Huyện - Xã/Phường + Địa chỉ chi tiết + Bản đồ Google Maps */}
+                  <AddressPickerMap
+                    required
+                    value={shippingAddress}
+                    labelPrefix="Địa chỉ giao nhận"
+                    onChange={(fullAddr) => setShippingAddress(fullAddr)}
+                  />
 
                   <label className="inline-flex items-center gap-2 text-xs text-stone-600 cursor-pointer select-none">
                     <input
@@ -1040,25 +1015,33 @@ export default function Checkout() {
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#9A5B13] mt-0.5 shrink-0">&#128737;</span>
                   <span>
-                    Bảo mật giao dịch chuẩn <strong className="text-stone-700">SSL 256-bit</strong> tiêu chuẩn ngân hàng
+                    Bảo mật giao dịch chuẩn{" "}
+                    <strong className="text-stone-700">SSL 256-bit</strong> tiêu
+                    chuẩn ngân hàng
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#9A5B13] mt-0.5 shrink-0">&#128230;</span>
                   <span>
-                    Đóng gói 4 lớp hộp carton cao cấp <strong className="text-stone-700">chống móp gáy 100%</strong>
+                    Đóng gói 4 lớp hộp carton cao cấp{" "}
+                    <strong className="text-stone-700">
+                      chống móp gáy 100%
+                    </strong>
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#9A5B13] mt-0.5 shrink-0">&#8635;</span>
                   <span>
-                    Đổi trả ấn bản tận nhà trong <strong className="text-stone-700">15 ngày</strong> nếu phát hiện lỗi in ấn
+                    Đổi trả ấn bản tận nhà trong{" "}
+                    <strong className="text-stone-700">15 ngày</strong> nếu phát
+                    hiện lỗi in ấn
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#9A5B13] mt-0.5 shrink-0">&#127911;</span>
                   <span>
-                    Hỗ trợ thủ thư trực tiếp: <strong className="text-stone-700">1900 6886</strong>
+                    Hỗ trợ thủ thư trực tiếp:{" "}
+                    <strong className="text-stone-700">1900 6886</strong>
                   </span>
                 </li>
               </ul>
