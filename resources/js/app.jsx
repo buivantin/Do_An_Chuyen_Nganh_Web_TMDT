@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
+
+// Pages & Components
 import Home from './pages/Home';
 import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
-import UserManagement from './pages/Admin/UserManagement'; 
+import UserManagement from './pages/admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
-
-// ĐÃ THÊM LẠI 2 IMPORT NÀY
-import Account from './pages/Account';
+import Account from './pages/Account'; 
 import MainLayout from './layouts/MainLayout';
 
 function getStoredUser() {
@@ -24,8 +24,10 @@ function getStoredUser() {
 }
 
 function App() {
+  // Lấy đường dẫn hiện tại trên thanh địa chỉ (ví dụ: /account, /admin/users)
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
   
+  // --- 1. CÁC TRANG ĐỘC LẬP KHÔNG DÙNG MAINLAYOUT ---
   if (pathname === '/cart') {
     return <Cart />;
   }
@@ -37,6 +39,7 @@ function App() {
   const token = localStorage.getItem('token');
   const user = getStoredUser();
 
+  // --- 2. XỬ LÝ KHU VỰC ADMIN ---
   const [adminStatus, setAdminStatus] = useState(() => {
     if (!pathname.startsWith('/admin')) return 'not-admin-route';
     if (!token || !user) return 'unauthenticated';
@@ -131,16 +134,20 @@ function App() {
     );
   }
   
+  // --- 3. CÁC TRANG DÀNH CHO KHÁCH HÀNG ---
+  
+  // Trang chi tiết sản phẩm (VD: /products/1)
   const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
   if (productDetailMatch) {
     return <ProductDetail productId={productDetailMatch[1]} />;
   }
 
+  // Trang danh sách sản phẩm
   if (pathname.startsWith('/products')) {
     return <ProductList />;
   }
 
-  // ĐÃ THÊM LẠI ĐOẠN ROUTE CHO TRANG ACCOUNT
+  // TRANG HỒ SƠ CÁ NHÂN (Bọc MainLayout)
   if (pathname === '/account' || pathname === '/profile') {
     return (
       <MainLayout>
@@ -149,6 +156,7 @@ function App() {
     );
   }
 
+  // Mặc định là Trang chủ
   return <Home />;
 }
 

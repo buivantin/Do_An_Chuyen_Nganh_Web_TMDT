@@ -69,7 +69,6 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
   return (
     <header className="bg-[#FAF8F5] text-stone-900">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-3.5 sm:pt-4 pb-2 flex flex-wrap items-center justify-between gap-2.5 sm:gap-4">
-        {/* Tên thương hiệu */}
         <a
           href="/"
           className="font-serif text-base min-[380px]:text-xl sm:text-2xl font-bold tracking-tight text-[#1A1A1A] shrink-0"
@@ -77,7 +76,6 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
           Mọt Sách BookHouse
         </a>
 
-        {/* Thanh tìm kiếm */}
         <form
           onSubmit={handleSearch}
           className="order-3 md:order-2 w-full md:flex-1 md:max-w-xl bg-white border border-stone-200/90 rounded-xl p-1 sm:p-1.5 pl-3 sm:pl-4 flex items-center shadow-2xs"
@@ -101,9 +99,7 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
           </button>
         </form>
 
-        {/* Giỏ hàng & Tài khoản */}
         <div className="order-2 md:order-3 flex items-center gap-2 sm:gap-5 shrink-0">
-          {/* Giỏ hàng */}
           <a
             href="/cart"
             className="bg-[#F3EFEA] hover:bg-[#EBE5DD] rounded-xl px-2.5 sm:px-3.5 py-2 flex items-center gap-2 sm:gap-3 transition"
@@ -127,7 +123,6 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
             </div>
           </a>
 
-          {/* Trạng thái chưa đăng nhập / Đã đăng nhập */}
           {!user ? (
             <button
               type="button"
@@ -143,9 +138,10 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
                 onClick={() => setOpenMenu(!openMenu)}
                 className="flex items-center gap-2 p-1 rounded-xl hover:bg-[#F3EFEA] transition cursor-pointer"
               >
-                {user.avatar ? (
+                {/* CHỈ SỬA TẠI ĐÂY: Đổi user.avatar thành user.image_path và thêm link backend */}
+                {user.image_path ? (
                   <img
-                    src={user.avatar}
+                    src={`http://127.0.0.1:8000/${user.image_path}`}
                     alt={user.name}
                     className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-stone-200"
                   />

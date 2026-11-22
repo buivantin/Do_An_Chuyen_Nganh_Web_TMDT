@@ -18,7 +18,7 @@ const Account = () => {
     const [selectedProvince, setSelectedProvince] = useState('');
     const [selectedDistrict, setSelectedDistrict] = useState('');
     const [selectedWard, setSelectedWard] = useState('');
-    const [streetAddress, setStreetAddress] = useState(''); 
+    const [streetAddress, setStreetAddress] = useState(''); // Số nhà, đường
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -79,6 +79,7 @@ const Account = () => {
                     address: res.data.user.address || ''
                 });
                 
+                // Nếu đã có địa chỉ cũ, tạm thời đưa vào ô Số nhà/Đường để người dùng sửa
                 if (res.data.user.address) {
                     setStreetAddress(res.data.user.address);
                 }
@@ -126,6 +127,7 @@ const Account = () => {
         setSaving(true);
         setMsg({ type: '', text: '' });
 
+        // Ghép địa chỉ: Số nhà, Phường, Quận, Tỉnh
         let finalAddress = streetAddress.trim();
         if (selectedWard) {
             const wardName = wards.find(w => w.code === Number(selectedWard))?.name;
@@ -140,7 +142,9 @@ const Account = () => {
             if (provinceName) finalAddress += `, ${provinceName}`;
         }
 
+        // Xóa dấu phẩy thừa ở đầu/cuối nếu có
         finalAddress = finalAddress.replace(/^,|,$/g, '').trim();
+
         const dataToSubmit = { ...profileForm, address: finalAddress };
 
         try {
@@ -181,6 +185,10 @@ const Account = () => {
         <div className="bg-[#F9F6F0] py-10 min-h-[calc(100vh-200px)]">
             <div className="max-w-6xl mx-auto px-4">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+<<<<<<< HEAD
+=======
+                    {/* SIDEBAR TRÁI */}
+>>>>>>> b10e10385845bcdb0d298a39daf2667e784d7131
                     <div className="md:col-span-4 lg:col-span-3">
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col items-center sticky top-24">
                             <div className="relative group cursor-pointer mb-4" onClick={() => fileInputRef.current?.click()}>
