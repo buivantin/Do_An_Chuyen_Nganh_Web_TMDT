@@ -52,8 +52,14 @@ export default function MainLayout({ children }) {
             });
     }, []);
 
-    const handleAuthSuccess = (userData) => {
+    // CHỈ SỬA TẠI ĐÂY: Lưu token khi đăng nhập thành công
+    const handleAuthSuccess = (data) => {
+        if (data.token) {
+            localStorage.setItem("token", data.token);
+        }
+        const userData = data.user ? data.user : data;
         const normalized = normalizeUser(userData);
+        
         if (normalized) {
             localStorage.setItem("user", JSON.stringify(normalized));
             setUser(normalized);
