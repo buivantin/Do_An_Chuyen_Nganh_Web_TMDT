@@ -154,7 +154,7 @@ export default function Footer() {
                         Liên hệ &amp; Thanh toán
                     </h3>
                     <div className="space-y-2 text-xs text-stone-600">
-                        <p>48 Tràng Tiền, Quận Hoàn Kiếm, Hà Nội</p>
+                        <p>65 Huỳnh Thúc Kháng, phường Sài Gòn, tp. Hồ Chí Minh7</p>
                         <p>
                             Hotline: <span className="font-semibold text-stone-800">1900 6886</span>{" "}
                             •{" "}

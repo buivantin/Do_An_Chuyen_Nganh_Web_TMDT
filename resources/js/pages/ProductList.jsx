@@ -241,7 +241,6 @@ export default function ProductList({
     return `${min} - ${max}`;
   };
 
-  const handleAdd = onAddToCart || ((item) => alert(`Đã thêm "${item.title}" vào giỏ hàng!`));
 
   const content = (
     <div className="bg-[#FCFBF9] min-h-screen">
@@ -499,7 +498,7 @@ export default function ProductList({
             <>
               <div className="grid grid-cols-1 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {books.map((book) => (
-                  <ProductCard key={book.id} book={book} onAddToCart={handleAdd} />
+                  <ProductCard key={book.id} book={book} onAddToCart={onAddToCart} />
                 ))}
               </div>
 

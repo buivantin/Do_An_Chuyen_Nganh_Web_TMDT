@@ -9,12 +9,15 @@ export default function ProductCard({ book, onAddToCart }) {
     const [feedback, setFeedback] = useState("");
 
     const cleanTitle = (book.title || book.name || "").normalize("NFC");
+    const categoryName =
+        typeof book.category === "object" && book.category !== null
+            ? book.category.name
+            : book.category || "";
 
     const handleAddClick = async (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        // Bước ii (UC-C1): Kiểm tra token trong localStorage
         const token = localStorage.getItem("token");
         if (!token) {
             setShowLoginModal(true);
@@ -32,11 +35,11 @@ export default function ProductCard({ book, onAddToCart }) {
             }
             setFeedback("Đã thêm vào giỏ!");
             window.dispatchEvent(new CustomEvent("cart-updated"));
-            setTimeout(() => setFeedback(""), 2000);
+            setTimeout(() => setFeedback(""), 2200);
         } catch (err) {
             const msg = err.response?.data?.message || "Số lượng vượt quá tồn kho";
             setFeedback(msg);
-            setTimeout(() => setFeedback(""), 2500);
+            setTimeout(() => setFeedback(""), 2200);
         } finally {
             setAdding(false);
         }
@@ -55,9 +58,11 @@ export default function ProductCard({ book, onAddToCart }) {
                     </div>
 
                     <div className="pt-2.5 sm:pt-3">
-                        <div className="text-[10px] sm:text-[11px] font-bold text-[#9A5B13] uppercase truncate">
-                            {book.category?.normalize("NFC")}
-                        </div>
+                        {categoryName && (
+                            <div className="text-[10px] sm:text-[11px] font-bold text-[#9A5B13] uppercase truncate">
+                                {categoryName.normalize("NFC")}
+                            </div>
+                        )}
 
                         <h3
                             title={cleanTitle}
@@ -67,7 +72,7 @@ export default function ProductCard({ book, onAddToCart }) {
                         </h3>
 
                         <p className="text-[11px] sm:text-xs text-gray-500 truncate mt-1">
-                            {book.author?.normalize("NFC")}
+                            {book.author?.normalize("NFC") || "Đang cập nhật"}
                         </p>
                     </div>
                 </a>
