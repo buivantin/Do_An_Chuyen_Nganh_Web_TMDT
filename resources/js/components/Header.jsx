@@ -6,6 +6,7 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
   const initialKeyword = new URLSearchParams(window.location.search).get("keyword") || "";
   const [searchTerm, setSearchTerm] = useState(initialKeyword);
   const [cartSummary, setCartSummary] = useState({ count: cartCount, total: cartTotal });
+  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
 
   const fetchCartSummary = async () => {
     const token = localStorage.getItem("token");
@@ -173,6 +174,26 @@ export default function Header({ cartCount = 0, cartTotal = 0, user = null, onLo
                     Tài khoản của tôi
                   </a>
                   <hr className="my-1 border-stone-100" />
+                  {isAdmin && (
+                    <a
+                      href="/admin"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-xs sm:text-sm font-semibold text-[#9A5B13] bg-[#FAF6F0] hover:bg-[#F5EDE2] border-b border-stone-100 transition"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        className="w-4 h-4 shrink-0"
+                      >
+                        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                      </svg>
+                      <span>Trang quản lý</span>
+                    </a>
+                  )}
                   <button
                     type="button"
                     onClick={handleLogout}

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import LoginRequiredModal from "../components/LoginRequiredModal";
+import PasswordInput from "../components/PasswordInput";
 
 const VIETNAM_ADDRESSES = [
   {
@@ -1717,15 +1718,14 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                       <label className={UI.label}>
                         Mật khẩu hiện tại <span className="text-[#9A5B13]">*</span>
                       </label>
-                      <input
-                        type="password"
+                      <PasswordInput
                         required
                         value={passwordForm.old_password}
                         onChange={(e) =>
                           setPasswordForm({ ...passwordForm, old_password: e.target.value })
                         }
                         placeholder="Nhập mật khẩu hiện tại"
-                        className={UI.input}
+                        autoComplete="current-password"
                       />
                     </div>
 
@@ -1734,8 +1734,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                         Mật khẩu mới (tối thiểu 8 ký tự){" "}
                         <span className="text-[#9A5B13]">*</span>
                       </label>
-                      <input
-                        type="password"
+                      <PasswordInput
                         required
                         minLength={8}
                         value={passwordForm.new_password}
@@ -1743,7 +1742,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                           setPasswordForm({ ...passwordForm, new_password: e.target.value })
                         }
                         placeholder="Nhập mật khẩu mới"
-                        className={UI.input}
+                        autoComplete="new-password"
                       />
                     </div>
 
@@ -1751,8 +1750,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                       <label className={UI.label}>
                         Xác nhận mật khẩu mới <span className="text-[#9A5B13]">*</span>
                       </label>
-                      <input
-                        type="password"
+                      <PasswordInput
                         required
                         minLength={8}
                         value={passwordForm.new_password_confirmation}
@@ -1763,7 +1761,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                           })
                         }
                         placeholder="Nhập lại mật khẩu mới"
-                        className={UI.input}
+                        autoComplete="new-password"
                       />
                     </div>
 
