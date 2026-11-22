@@ -10,6 +10,10 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 
+// ĐÃ THÊM LẠI 2 IMPORT NÀY
+import Account from './pages/Account';
+import MainLayout from './layouts/MainLayout';
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('user');
@@ -21,8 +25,9 @@ function getStoredUser() {
 
 function App() {
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  
   if (pathname === '/cart') {
-  return <Cart />;
+    return <Cart />;
   }
 
   if (pathname === '/checkout') {
@@ -56,7 +61,6 @@ function App() {
       });
   }, [adminStatus, token]);
 
-  
   if (pathname === '/403' || adminStatus === 'forbidden') {
     return <Forbidden />;
   }
@@ -127,13 +131,22 @@ function App() {
     );
   }
   
-const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
-if (productDetailMatch) {
-  return <ProductDetail productId={productDetailMatch[1]} />;
-}
+  const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
+  if (productDetailMatch) {
+    return <ProductDetail productId={productDetailMatch[1]} />;
+  }
 
   if (pathname.startsWith('/products')) {
     return <ProductList />;
+  }
+
+  // ĐÃ THÊM LẠI ĐOẠN ROUTE CHO TRANG ACCOUNT
+  if (pathname === '/account' || pathname === '/profile') {
+    return (
+      <MainLayout>
+        <Account />
+      </MainLayout>
+    );
   }
 
   return <Home />;
