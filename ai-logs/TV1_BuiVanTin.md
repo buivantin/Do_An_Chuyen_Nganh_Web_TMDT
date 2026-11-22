@@ -76,4 +76,30 @@
 - Đã chỉnh sửa gì: Copy code vào Draw.io để render hình ảnh, điều chỉnh lại vị trí các khối cho đẹp mắt.
 - Cách kiểm chứng: Đối chiếu lại với yêu cầu TM-NFR1 trong file đặc tả (Đặt hàng chạy trong transaction).
 - Điều học được: Dùng AI sinh mã PlantUML giúp tiết kiệm 90% thời gian vẽ tay, nhưng vẫn cần điều chỉnh giao diện bằng công cụ trực quan.
+
+
+### [AI-05] Sửa lỗi mất Token (Lỗi 401) khi tải trang Hồ sơ
+- Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
+- Công cụ: ChatGPT
+- Giai đoạn: Gỡ lỗi Frontend (TM-08)
+- Mục đích: Trang Account liên tục báo "Phiên đăng nhập không tồn tại" dù đã đăng nhập thành công.
+- Prompt chính: "Tôi dùng React gọi API qua axios, đã lưu user vào localStorage nhưng khi vào trang Profile lại bị lỗi 401 Unauthorized. Nguyên nhân do đâu?"
+- Kết quả AI trả về: AI chỉ ra rằng hàm xử lý đăng nhập (handleAuthSuccess) chỉ lưu `user` mà quên lưu `token` vào localStorage. Đồng thời hướng dẫn cấu hình Axios interceptor để tự động đính kèm Bearer Token.
+- Đánh giá: Đúng trọng tâm. AI phát hiện chính xác lỗ hổng logic trong luồng đăng nhập.
+- Đã chỉnh sửa gì: Cập nhật lại hàm `handleAuthSuccess` trong `MainLayout.jsx` để lưu cả `token`. Cấu hình lại `axiosConfig` trong `Account.jsx` để đính kèm token vào headers.
+- Cách kiểm chứng: Đăng nhập lại, mở F12 -> Network kiểm tra request `/api/profile` thấy có header Authorization và trả về status 200.
+- Tỷ lệ nội dung AI còn giữ lại: 80%
+
+### [AI-06] Xây dựng tính năng chọn địa chỉ 3 cấp (Tỉnh/Quận/Phường)
+- Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
+- Công cụ: Gemini
+- Giai đoạn: Lập trình Frontend (TM-08)
+- Mục đích: Tạo dropdown chọn địa chỉ 3 cấp tự động load dữ liệu và ghép thành chuỗi lưu vào database.
+- Prompt chính: "Viết code React sử dụng axios để call API provinces.open-api.vn. Xử lý sự kiện khi chọn Tỉnh thì load Quận, chọn Quận thì load Phường. Viết hàm ghép nối Tỉnh/Quận/Phường và số nhà thành một chuỗi địa chỉ hoàn chỉnh."
+- Kết quả AI trả về: Cung cấp đoạn code useState, useEffect và các hàm handleChange. Có sẵn logic ghép chuỗi `finalAddress`.
+- Đánh giá: Rất hữu ích và chạy được ngay, tuy nhiên AI chưa xử lý việc disable dropdown (không cho chọn Quận khi chưa chọn Tỉnh).
+- Đã chỉnh sửa gì: Tự bổ sung prop `disabled={!selectedProvince}` vào thẻ `<select>` của Quận/Huyện và Phường/Xã.
+- Cách kiểm chứng: Thao tác chọn địa chỉ trên UI, lưu thành công, kiểm tra lại trong MySQL thấy chuỗi địa chỉ được lưu đúng định dạng.
+- Tỷ lệ nội dung AI còn giữ lại: 70%
+
 -->

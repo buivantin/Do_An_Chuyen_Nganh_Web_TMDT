@@ -85,3 +85,51 @@
 - Đã chỉnh sửa gì: Thêm bước kiểm tra "Mật khẩu phải được băm (bcrypt) dưới CSDL" vào kết quả mong đợi của TC-04-01 để tăng tính bảo mật.
 - Cách kiểm chứng: Đối chiếu với danh sách tiêu chí chấp nhận (Acceptance Criteria) của TM-04 trong file PDF.
 - Điều học được: AI viết test case rất nhanh, nhưng vai trò của QA là phải bổ sung các góc nhìn về bảo mật và trải nghiệm người dùng mà AI có thể bỏ sót.
+
+# AI log – TV5 – Bùi Văn Tín
+
+| Mục | Thông tin |
+| :---- | :---- |
+| Họ tên, MSSV | Bùi Văn Tín – 0306241414 |
+| Nhóm, đề tài | Nhóm 09 – Thương mại điện tử (Website bán sách) |
+| Vai trò | TV5 – Git & QA (Kiểm thử) |
+| Công cụ AI dùng | Gemini / ChatGPT |
+
+## Bảng tổng hợp
+
+| Mã | Ngày | Giai đoạn | Nội dung | Commit / PR |
+| :---- | :---- | :---- | :---- | :---- |
+| AI-01 | 10/11 | Khởi tạo | Cấu hình .gitignore cho Laravel + React | PR #2 |
+| AI-02 | 10/11 | Quy trình | Thiết lập Branch Protection và PR Template | PR #3 |
+| AI-03 | 11/11 | Gỡ lỗi | Xử lý lỗi Git "not a git repository" | Commit trực tiếp |
+| AI-04 | 11/11 | Kiểm thử | Tạo mẫu Test Case cho chức năng TM-05 | PR #4 |
+| AI-05 | 12/11 | Kiểm thử | Tạo Test Case cho chức năng TM-04 (Đăng ký) | PR #5 |
+| AI-06 | 17/11 | Gỡ lỗi Git | Xử lý xung đột (Conflict) khi pull nhánh develop | PR #76 |
+| AI-07 | 17/11 | Gỡ lỗi BE | Sửa lỗi API 500 cho chức năng Giỏ hàng (TM-05) | PR #76 |
+
+
+### [AI-06] Xử lý xung đột (Conflict) khi gộp nhánh develop
+- Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
+- Công cụ: ChatGPT
+- Giai đoạn: Quản lý mã nguồn (Git)
+- Task / Commit / PR: Merge nhánh `feature/TM-05-gio-hang` / cf15798 / PR #76
+- Mục đích: Giải quyết lỗi xung đột (CONFLICT) ở các file `app.jsx`, `Account.jsx` khi kéo code mới nhất từ nhánh `develop` về máy.
+- Prompt chính: "Git báo lỗi CONFLICT (content) ở file app.jsx và Account.jsx sau khi chạy git pull. Làm sao để gộp code an toàn mà không làm mất code của người khác?"
+- Kết quả AI trả về: Hướng dẫn mở file, tìm các dấu `<<<<<<<`, `=======`, `>>>>>>>`, giữ lại code hợp lệ của cả 2 bên và xóa các dấu này đi. Hướng dẫn dùng `git add .` và `git commit` để hoàn tất merge.
+- Đánh giá: Đúng quy trình. AI cung cấp các bước xử lý conflict chuẩn xác.
+- Đã chỉnh sửa gì: Tự mở VS Code, so sánh code của mình và code của TV3, gộp các component (Header, MainLayout) lại với nhau một cách logic nhất.
+- Cách kiểm chứng: Chạy `npm run dev` không báo lỗi cú pháp, giao diện hiển thị đầy đủ và push lên GitHub thành công (PR #76 đã Merge).
+- Tỷ lệ nội dung AI còn giữ lại: 90% (AI chỉ hướng dẫn lý thuyết, việc gộp code thực tế do mình tự quyết định).
+
+### [AI-07] Sửa lỗi API 500 (Internal Server Error) của chức năng Giỏ hàng
+- Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
+- Công cụ: Gemini
+- Giai đoạn: Gỡ lỗi Backend (TM-05)
+- Task / Commit / PR: Cập nhật CartController / de6f158 / PR #76
+- Mục đích: Khắc phục lỗi không thể lấy dữ liệu giỏ hàng, khiến số lượng trên icon Giỏ hàng luôn hiển thị sai hoặc bị trống.
+- Prompt chính: "Gọi API GET /api/cart bị lỗi 500. Kiểm tra log thấy báo 'Method App\Http\Controllers\Api\CartController::index does not exist'. Cách sửa?"
+- Kết quả AI trả về: AI giải thích rằng Controller được khai báo trong Route nhưng chưa hề viết hàm `index()` để xử lý dữ liệu trả về. Cung cấp code mẫu hàm `index()` gọi tới `CartService`.
+- Đánh giá: Chỉ ra chính xác nguyên nhân gốc rễ (thiếu hàm).
+- Đã chỉnh sửa gì: Bổ sung hàm `index()` và hàm `update()`, `destroy()` vào `CartController`. Viết thêm các hàm tương ứng trong `CartService` để lấy danh sách sản phẩm từ DB.
+- Cách kiểm chứng: Bấm thêm sách vào giỏ, icon Giỏ hàng lập tức cập nhật số lượng. Vào trang `/cart` hiển thị đúng danh sách và tổng tiền. Kiểm tra Network thấy API trả về 200 OK.
+- Tỷ lệ nội dung AI còn giữ lại: 85%

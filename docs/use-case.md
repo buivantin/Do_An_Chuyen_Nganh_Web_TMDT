@@ -119,11 +119,15 @@
 #### UC-C4: Xem hồ sơ cá nhân & Cập nhật
 - **Tác nhân:** Customer.
 - **Luồng chính:**
-  - Hiển thị thông tin: Username, Email, SĐT, Địa chỉ.
-- **Luồng cập nhật:**
-  - Sửa Họ tên, SĐT, Địa chỉ. API `PUT /api/profile`.
+  - Hiển thị thông tin: Username, Email, SĐT, Địa chỉ, Ảnh đại diện.
+- **Luồng cập nhật thông tin:**
+  - Sửa Họ tên, SĐT. API `PUT /api/profile`.
+- **Luồng cập nhật địa chỉ (Nâng cao):**
+  - Sử dụng Dropdown 3 cấp gọi API của `provinces.open-api.vn` để lấy Tỉnh/Thành, Quận/Huyện, Phường/Xã. Kết hợp ô nhập Số nhà để tự động ghép thành 1 chuỗi địa chỉ hoàn chỉnh trước khi lưu vào CSDL.
+- **Luồng upload ảnh (Nâng cao):**
+  - Upload file ảnh (validate định dạng Image, <2MB). Backend lưu vào thư mục `public/avatars`, trả về URL và cập nhật cột `image_path`.
 - **Luồng đổi mật khẩu:**
-  - Bắt buộc nhập Mật khẩu cũ (để xác thực) + Mật khẩu mới + Nhập lại mật khẩu mới. API `PUT /api/profile/change-password`.
+  - Bắt buộc nhập Mật khẩu cũ (để xác thực) + Mật khẩu mới (>=8 ký tự) + Nhập lại mật khẩu mới. API `PUT /api/profile/change-password`.
 
 #### UC-C6: Đánh giá sản phẩm (Mức C)
 - **Tác nhân:** Customer.
@@ -178,3 +182,14 @@
 - **Luồng chính:**
   - Gọi API trả về: Tổng doanh thu (tính tổng `total_amount` của đơn `completed`), Top 5 sản phẩm bán chạy, Số lượng đơn hàng theo từng trạng thái.
   - Giao diện Frontend vẽ biểu đồ (sử dụng thư viện như Chart.js hoặc Recharts).
+
+
+  #### UC-C3: Xem đơn hàng của tôi
+- **Tác nhân:** Customer.
+- **Mô tả:** Xem danh sách và chi tiết đơn hàng.
+- **Luồng chính:**
+  - Gọi API `GET /api/orders`. Backend sử dụng `paginate(10)` để phân trang. Chỉ `SELECT` các order có `user_id = Auth::id()` (Chặn xem đơn người khác - TM-NFR4).
+- **Luồng Hủy đơn:**
+  - Khách nhấn "Hủy đơn".
+  - Backend kiểm tra: Chỉ cho phép hủy khi `status == 'pending'`.
+  - Nếu hợp lệ: Chuyển `status = 'cancelled'` và dùng DB Transaction để **cộng lại `stock`** cho tất cả sản phẩm trong đơn đó.
