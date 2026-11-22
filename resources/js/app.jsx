@@ -8,15 +8,16 @@ import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 
 // Sử dụng chung thư mục Admin (viết hoa) để tránh lỗi
-import UserManagement from './pages/Admin/UserManagement'; 
-import CategoryManagement from './pages/Admin/CategoryManagement'; 
-import OrderManagement from './pages/Admin/OrderManagement'; 
-import Dashboard from './pages/Admin/Dashboard'; // Của TV4
+import OrderManagement from './pages/Admin/OrderManagement';
+import Dashboard from './pages/Admin/Dashboard';
+import UserManagement from './pages/Admin/UserManagement';
+import CategoryManagement from './pages/Admin/CategoryManagement';
+import ProductManagement from './pages/Admin/ProductManagement';
 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
-import Account from './pages/Account'; 
+import Account from './pages/Account';
 import MainLayout from './layouts/MainLayout';
 
 function getStoredUser() {
@@ -30,7 +31,7 @@ function getStoredUser() {
 
 function App() {
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
-  
+
   // --- 1. CÁC TRANG ĐỘC LẬP ---
   if (pathname === '/cart') {
     return <Cart />;
@@ -51,7 +52,7 @@ function App() {
     return 'checking';
   });
 
-  // --- STATE CHO CHUÔNG THÔNG BÁO (Của bạn) ---
+  // --- STATE CHO CHUÔNG THÔNG BÁO ---
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -112,6 +113,7 @@ function App() {
     const getTitle = () => {
       if (pathname === '/admin/orders') return 'Quản lý đơn hàng';
       if (pathname === '/admin/categories') return 'Quản lý danh mục sách';
+      if (pathname === '/admin/products') return 'Quản lý sản phẩm';
       if (pathname === '/admin/users') return 'Quản lý người dùng';
       return 'Trang quản trị Admin';
     };
@@ -141,8 +143,8 @@ function App() {
               <a href="/admin/categories" className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${pathname === '/admin/categories' ? 'bg-[#9A5B13] text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
                 Quản lý danh mục
               </a>
-              
-              {/* NÚT QUẢN LÝ ĐƠN HÀNG CÓ CHUÔNG THÔNG BÁO CỦA BẠN */}
+
+              {/* NÚT QUẢN LÝ ĐƠN HÀNG CÓ CHUÔNG THÔNG BÁO */}
               <a href="/admin/orders" className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${pathname === '/admin/orders' ? 'bg-[#9A5B13] text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
                 <span className={pendingCount > 0 ? "animate-pulse text-sm" : "text-sm"}>
                   🔔
@@ -155,6 +157,9 @@ function App() {
                 )}
               </a>
 
+              <a href="/admin/products" className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${pathname === '/admin/products' ? 'bg-[#9A5B13] text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
+                Quản lý sản phẩm
+              </a>
               <a href="/" className="px-4 py-2 rounded-xl bg-[#141414] text-white text-xs font-semibold hover:bg-stone-800 transition">
                 Về trang chủ
               </a>
@@ -163,18 +168,19 @@ function App() {
 
           {/* NỘI DUNG RENDER THEO ĐƯỜNG DẪN */}
           <div className="max-w-6xl mx-auto">
-            {pathname === '/admin' && <Dashboard />} {/* Của TV4 */}
-            {pathname === '/admin/orders' && <OrderManagement />} {/* Của bạn */}
+            {pathname === '/admin' && <Dashboard />}
+            {pathname === '/admin/orders' && <OrderManagement />}
             {pathname === '/admin/users' && <UserManagement />}
             {pathname === '/admin/categories' && <CategoryManagement />}
+            {pathname === '/admin/products' && <ProductManagement />}
           </div>
         </div>
       </div>
     );
   }
-  
+
   // --- 3. CÁC TRANG DÀNH CHO KHÁCH HÀNG ---
-  
+
   const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
   if (productDetailMatch) {
     return <ProductDetail productId={productDetailMatch[1]} />;
