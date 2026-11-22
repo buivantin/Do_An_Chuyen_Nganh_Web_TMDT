@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
+
+// Pages & Components
 import Home from './pages/Home';
 import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
-import UserManagement from './pages/Admin/UserManagement'; 
+// ⚠️ SỬA LỖI: Thống nhất tên thư mục là 'admin' (chữ thường). 
+// Bạn hãy kiểm tra lại trên VS Code xem thư mục thực tế tên là 'Admin' hay 'admin' để sửa cho đúng nhé.
+import UserManagement from './pages/admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
 import Account from './pages/Account'; 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import MainLayout from './layouts/MainLayout';
 
 function getStoredUser() {
   try {
@@ -21,8 +26,10 @@ function getStoredUser() {
 }
 
 function App() {
+  // Lấy đường dẫn hiện tại trên thanh địa chỉ (ví dụ: /account, /admin/users)
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
   
+  // --- 1. CÁC TRANG ĐỘC LẬP KHÔNG DÙNG MAINLAYOUT ---
   if (pathname === '/cart') {
     return <Cart />;
   }
@@ -34,6 +41,7 @@ function App() {
   const token = localStorage.getItem('token');
   const user = getStoredUser();
 
+  // --- 2. XỬ LÝ KHU VỰC ADMIN ---
   const [adminStatus, setAdminStatus] = useState(() => {
     if (!pathname.startsWith('/admin')) return 'not-admin-route';
     if (!token || !user) return 'unauthenticated';
@@ -128,19 +136,29 @@ function App() {
     );
   }
   
+  // --- 3. CÁC TRANG DÀNH CHO KHÁCH HÀNG ---
+  
+  // Trang chi tiết sản phẩm (VD: /products/1)
   const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
   if (productDetailMatch) {
     return <ProductDetail productId={productDetailMatch[1]} />;
   }
 
+  // Trang danh sách sản phẩm
   if (pathname.startsWith('/products')) {
     return <ProductList />;
   }
 
-  if (pathname === '/account') {
-    return <Account />;
+  // TRANG HỒ SƠ CÁ NHÂN (Bọc MainLayout)
+  if (pathname === '/account' || pathname === '/profile') {
+    return (
+      <MainLayout>
+        <Account />
+      </MainLayout>
+    );
   }
 
+  // Mặc định là Trang chủ
   return <Home />;
 }
 
