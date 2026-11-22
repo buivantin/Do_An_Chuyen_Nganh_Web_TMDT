@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // TM-06: Đặt hàng (Của TV2)
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::get('/orders', [OrderController::class, 'index']);
 
     // TM-05: Giỏ hàng (Của TV5)
     Route::get('/cart', [CartController::class, 'index']);

@@ -102,6 +102,7 @@ class DatabaseSeeder extends Seeder
         $statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
         for ($i = 1; $i <= 10; $i++) {
             $orderId = DB::table('orders')->insertGetId([
+                'receiver_name' => "Nguyễn Văn $i",
                 'status' => $statuses[array_rand($statuses)],
                 'address' => "$i Đường Nguyễn Huệ, Quận 1, TP.HCM",
                 'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
