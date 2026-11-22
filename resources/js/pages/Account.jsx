@@ -7,7 +7,11 @@ const Account = () => {
     
     // State cho Form
     const [profileForm, setProfileForm] = useState({ username: '', phone: '', address: '' });
-    const [passwordForm, setPasswordForm] = useState({ old_password: '', new_password: '', new_password_confirmation: '' });
+    const [passwordForm, setPasswordForm] = useState({ 
+        old_password: '', 
+        new_password: '', 
+        new_password_confirmation: '' 
+    });
     
     // State cho Địa chỉ (Tỉnh/Quận/Phường)
     const [provinces, setProvinces] = useState([]);
@@ -248,42 +252,73 @@ const Account = () => {
                                     <form onSubmit={handleUpdateProfile} className="max-w-3xl space-y-5">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Email đăng nhập (Không thể đổi)</label>
-                                            <input type="text" value={user.email} disabled className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed" />
+                                            <input 
+                                                type="text" 
+                                                value={user.email} 
+                                                disabled 
+                                                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 cursor-not-allowed" 
+                                            />
                                         </div>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên <span className="text-red-500">*</span></label>
-                                                <input type="text" value={profileForm.username} onChange={(e) => setProfileForm({...profileForm, username: e.target.value})} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+                                                <input 
+                                                    type="text" 
+                                                    value={profileForm.username} 
+                                                    onChange={(e) => setProfileForm({...profileForm, username: e.target.value})} 
+                                                    required 
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+                                                />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
-                                                <input type="text" value={profileForm.phone} onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} placeholder="Chưa cập nhật" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+                                                <input 
+                                                    type="text" 
+                                                    value={profileForm.phone} 
+                                                    onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} 
+                                                    placeholder="Chưa cập nhật" 
+                                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+                                                />
                                             </div>
                                         </div>
 
-                                        {/* PHẦN ĐỊA CHỈ MỚI */}
+                                        {/* PHẦN ĐỊA CHỈ */}
                                         <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-4">
                                             <h4 className="font-semibold text-gray-800 text-sm mb-2">Địa chỉ nhận hàng</h4>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">Tỉnh / Thành phố</label>
-                                                    <select value={selectedProvince} onChange={handleProvinceChange} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white">
+                                                    <select 
+                                                        value={selectedProvince} 
+                                                        onChange={handleProvinceChange} 
+                                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                                                    >
                                                         <option value="">Chọn Tỉnh/Thành</option>
                                                         {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">Quận / Huyện</label>
-                                                    <select value={selectedDistrict} onChange={handleDistrictChange} disabled={!selectedProvince} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white disabled:bg-gray-100">
+                                                    <select 
+                                                        value={selectedDistrict} 
+                                                        onChange={handleDistrictChange} 
+                                                        disabled={!selectedProvince} 
+                                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white disabled:bg-gray-100"
+                                                    >
                                                         <option value="">Chọn Quận/Huyện</option>
                                                         {districts.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-gray-600 mb-1">Phường / Xã</label>
-                                                    <select value={selectedWard} onChange={(e) => setSelectedWard(e.target.value)} disabled={!selectedDistrict} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white disabled:bg-gray-100">
+                                                    <select 
+                                                        value={selectedWard} 
+                                                        onChange={(e) => setSelectedWard(e.target.value)} 
+                                                        disabled={!selectedDistrict} 
+                                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white disabled:bg-gray-100"
+                                                    >
                                                         <option value="">Chọn Phường/Xã</option>
                                                         {wards.map(w => <option key={w.code} value={w.code}>{w.name}</option>)}
                                                     </select>
@@ -292,7 +327,13 @@ const Account = () => {
 
                                             <div>
                                                 <label className="block text-xs font-medium text-gray-600 mb-1">Số nhà, tên đường</label>
-                                                <input type="text" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="VD: 123 Nguyễn Văn Cừ" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm" />
+                                                <input 
+                                                    type="text" 
+                                                    value={streetAddress} 
+                                                    onChange={(e) => setStreetAddress(e.target.value)} 
+                                                    placeholder="VD: 123 Nguyễn Văn Cừ" 
+                                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm" 
+                                                />
                                             </div>
                                             <p className="text-xs text-gray-500 italic mt-2">Địa chỉ hiện tại trên hệ thống: {user.address || 'Chưa có'}</p>
                                         </div>
@@ -311,15 +352,35 @@ const Account = () => {
                                     <form onSubmit={handleChangePassword} className="max-w-2xl space-y-5">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu hiện tại <span className="text-red-500">*</span></label>
-                                            <input type="password" value={passwordForm.old_password} onChange={(e) => setPasswordForm({...passwordForm, old_password: e.target.value})} required className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+                                            <input 
+                                                type="password" 
+                                                value={passwordForm.old_password} 
+                                                onChange={(e) => setPasswordForm({...passwordForm, old_password: e.target.value})} 
+                                                required 
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới (>= 8 ký tự) <span className="text-red-500">*</span></label>
-                                            <input type="password" value={passwordForm.new_password} onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})} required minLength="8" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+                                            <input 
+                                                type="password" 
+                                                value={passwordForm.new_password} 
+                                                onChange={(e) => setPasswordForm({...passwordForm, new_password: e.target.value})} 
+                                                required 
+                                                minLength="8" 
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mật khẩu mới <span className="text-red-500">*</span></label>
-                                            <input type="password" value={passwordForm.new_password_confirmation} onChange={(e) => setPasswordForm({...passwordForm, new_password_confirmation: e.target.value})} required minLength="8" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+                                            <input 
+                                                type="password" 
+                                                value={passwordForm.new_password_confirmation} 
+                                                onChange={(e) => setPasswordForm({...passwordForm, new_password_confirmation: e.target.value})} 
+                                                required 
+                                                minLength="8" 
+                                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none" 
+                                            />
                                         </div>
                                         <button type="submit" disabled={saving} className="px-6 py-3 bg-[#141414] text-white font-semibold rounded-lg hover:bg-stone-800 transition disabled:opacity-50">
                                             {saving ? 'Đang xử lý...' : 'Cập nhật mật khẩu'}

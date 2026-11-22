@@ -48,6 +48,7 @@ export default function Cart() {
     [items]
   );
 
+  // Sửa lại logic tính tiền dựa trên dữ liệu làm phẳng từ ProductService
   const subtotal = useMemo(
     () =>
       items.reduce(
@@ -59,6 +60,8 @@ export default function Cart() {
 
   const handleUpdateQuantity = async (item, nextQty) => {
     if (nextQty < 1 || updatingId === item.id) return;
+    
+    // Sửa lại logic kiểm tra tồn kho
     if (item.stock > 0 && nextQty > item.stock) {
       setErrorMsg(`Sách "${item.name}" chỉ còn ${item.stock} cuốn trong kho.`);
       return;
@@ -108,16 +111,12 @@ export default function Cart() {
       />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Breadcrumb đồng bộ Checkout */}
         <nav className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <a href="/" className="hover:text-[#9A5B13] transition">
-            Trang chủ
-          </a>
+          <a href="/" className="hover:text-[#9A5B13] transition">Trang chủ</a>
           <span>&rsaquo;</span>
           <span className="text-[#9A5B13]">Giỏ ấn phẩm</span>
         </nav>
 
-        {/* Tiêu đề & Thanh tiến trình 3 bước */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-stone-200/80 pb-5">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#9A5B13]">
@@ -131,10 +130,7 @@ export default function Cart() {
             </p>
           </div>
 
-          <CheckoutStepper
-            currentStep={1}
-            canProceedCheckout={items.length > 0}
-          />
+          <CheckoutStepper currentStep={1} canProceedCheckout={items.length > 0} />
         </div>
 
         {errorMsg && (
@@ -150,13 +146,7 @@ export default function Cart() {
         ) : items.length === 0 ? (
           <div className="bg-white border border-stone-200/80 rounded-2xl p-8 sm:p-12 text-center max-w-lg mx-auto space-y-4">
             <div className="w-12 h-12 mx-auto rounded-full bg-[#FAF8F5] border border-stone-200 flex items-center justify-center text-[#9A5B13]">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="w-6 h-6"
-              >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-6 h-6">
                 <path d="M6 7h12l1 13H5L6 7Z" strokeLinejoin="round" />
                 <path d="M9 7V5a3 3 0 0 1 6 0v2" strokeLinecap="round" />
               </svg>
@@ -168,43 +158,31 @@ export default function Cart() {
               Hãy khám phá thêm các đầu sách hay và thêm vào giỏ nhé.
             </p>
             <div className="pt-2">
-              <a
-                href="/products"
-                className="inline-block bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition"
-              >
+              <a href="/products" className="inline-block bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition">
                 Tiếp tục mua sắm
               </a>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Danh sách sản phẩm */}
             <div className="lg:col-span-7 space-y-3.5">
               {items.map((item) => {
                 const cleanName = (item.name || "").normalize("NFC");
                 const isBusy = updatingId === item.id;
+                
+                // Fix đường dẫn ảnh nếu backend trả về đường dẫn tương đối
+                const imageUrl = item.image?.startsWith('http') 
+                    ? item.image 
+                    : `http://127.0.0.1:8000/${item.image}`;
 
                 return (
-                  <div
-                    key={item.id}
-                    className="bg-white border border-stone-200/80 rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 items-center shadow-2xs"
-                  >
-                    <a
-                      href={`/products/${item.product_id}`}
-                      className="w-20 sm:w-24 aspect-[3/4] bg-[#EAEAEA] rounded-xl p-2 flex items-center justify-center shrink-0"
-                    >
-                      <img
-                        src={item.image}
-                        alt={cleanName}
-                        className="h-full object-contain shadow-sm"
-                      />
+                  <div key={item.id} className="bg-white border border-stone-200/80 rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 items-center shadow-2xs">
+                    <a href={`/products/${item.product_id}`} className="w-20 sm:w-24 aspect-[3/4] bg-[#EAEAEA] rounded-xl p-2 flex items-center justify-center shrink-0">
+                      <img src={imageUrl} alt={cleanName} className="h-full object-contain shadow-sm" />
                     </a>
 
                     <div className="flex-1 min-w-0 space-y-1.5">
-                      <a
-                        href={`/products/${item.product_id}`}
-                        className="font-serif text-base sm:text-lg font-bold text-stone-900 hover:text-[#9A5B13] line-clamp-2 block"
-                      >
+                      <a href={`/products/${item.product_id}`} className="font-serif text-base sm:text-lg font-bold text-stone-900 hover:text-[#9A5B13] line-clamp-2 block">
                         {cleanName}
                       </a>
                       <p className="text-xs text-stone-500 truncate">
@@ -214,40 +192,20 @@ export default function Cart() {
                         {Number(item.price || 0).toLocaleString("vi-VN")} ₫
                       </div>
 
-                      {/* Cụm tăng/giảm số lượng & nút xóa */}
                       <div className="pt-1.5 flex flex-wrap items-center justify-between gap-2">
                         <div className="inline-flex items-center border border-stone-200 rounded-lg bg-[#FAF8F5]">
-                          <button
-                            type="button"
-                            disabled={isBusy || item.quantity <= 1}
-                            onClick={() =>
-                              handleUpdateQuantity(item, item.quantity - 1)
-                            }
-                            className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-l-lg cursor-pointer"
-                          >
+                          <button type="button" disabled={isBusy || item.quantity <= 1} onClick={() => handleUpdateQuantity(item, item.quantity - 1)} className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-l-lg cursor-pointer">
                             &minus;
                           </button>
                           <span className="px-3 text-xs sm:text-sm font-semibold text-stone-900">
                             {item.quantity}
                           </span>
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() =>
-                              handleUpdateQuantity(item, item.quantity + 1)
-                            }
-                            className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-r-lg cursor-pointer"
-                          >
+                          <button type="button" disabled={isBusy} onClick={() => handleUpdateQuantity(item, item.quantity + 1)} className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-r-lg cursor-pointer">
                             +
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          disabled={isBusy}
-                          onClick={() => handleRemove(item)}
-                          className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline disabled:opacity-40 cursor-pointer"
-                        >
+                        <button type="button" disabled={isBusy} onClick={() => handleRemove(item)} className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline disabled:opacity-40 cursor-pointer">
                           Xóa
                         </button>
                       </div>
@@ -257,7 +215,6 @@ export default function Cart() {
               })}
             </div>
 
-            {/* Tóm tắt đơn hàng đồng bộ Checkout */}
             <aside className="lg:col-span-5 bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xs lg:sticky lg:top-6">
               <div className="border-b border-stone-100 pb-3">
                 <div className="text-[10px] font-bold uppercase tracking-widest text-[#9A5B13]">
@@ -284,27 +241,18 @@ export default function Cart() {
               <div className="bg-[#F3EFEA] border border-stone-200/70 rounded-2xl p-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-stone-800">
-                    Tổng thanh toán
-                    <br />
-                    tạm tính
+                    Tổng thanh toán<br />tạm tính
                   </div>
-                  <div className="text-[10px] text-stone-500 mt-0.5">
-                    (Đã bao gồm thuế GTGT)
-                  </div>
+                  <div className="text-[10px] text-stone-500 mt-0.5">(Đã bao gồm thuế GTGT)</div>
                 </div>
 
                 <div className="font-serif text-2xl sm:text-3xl font-bold text-[#1A1A1A] tracking-tight text-right">
                   {subtotal.toLocaleString("vi-VN")}
-                  <span className="text-base sm:text-lg font-sans font-bold ml-0.5">
-                    đ
-                  </span>
+                  <span className="text-base sm:text-lg font-sans font-bold ml-0.5">đ</span>
                 </div>
               </div>
 
-              <a
-                href="/checkout"
-                className="w-full bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm"
-              >
+              <a href="/checkout" className="w-full bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm">
                 <span>Tiến hành giao nhận &amp; thanh toán</span>
                 <span>&rarr;</span>
               </a>

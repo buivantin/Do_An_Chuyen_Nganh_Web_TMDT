@@ -8,12 +8,20 @@ use Exception;
 
 class CartService
 {
+    // 1. Lấy danh sách giỏ hàng
+    public function getCart($userId)
+    {
+        return CartItem::with('product')
+                        ->where('user_id', $userId)
+                        ->orderBy('id', 'desc')
+                        ->get();
+    }
+
+    // 2. Thêm vào giỏ
     public function addToCart($userId, $productId, $quantity)
     {
-        // 1. Tìm sản phẩm
         $product = Product::findOrFail($productId);
 
-        // 2. Kiểm tra xem sản phẩm đã có trong giỏ của user này chưa
         $cartItem = CartItem::where('user_id', $userId)
                             ->where('product_id', $productId)
                             ->first();
@@ -21,18 +29,14 @@ class CartService
         $currentQty = $cartItem ? $cartItem->quantity : 0;
         $newQty = $currentQty + $quantity;
 
-        // 3. Kiểm tra tồn kho (Không cho phép vượt quá số lượng trong kho)
         if ($newQty > $product->stock) {
             throw new Exception("Số lượng vượt quá tồn kho. Sản phẩm này chỉ còn {$product->stock} cuốn.");
         }
 
-        // 4. Cập nhật hoặc tạo mới
         if ($cartItem) {
-            // Nếu đã có, cộng dồn số lượng
             $cartItem->quantity = $newQty;
             $cartItem->save();
         } else {
-            // Nếu chưa có, tạo mới
             CartItem::create([
                 'user_id' => $userId,
                 'product_id' => $productId,
@@ -40,6 +44,33 @@ class CartService
             ]);
         }
 
+        return true;
+    }
+
+    // 3. Cập nhật số lượng
+    public function updateQuantity($userId, $cartItemId, $quantity)
+    {
+        $cartItem = CartItem::where('user_id', $userId)->findOrFail($cartItemId);
+        
+        if ($quantity > $cartItem->product->stock) {
+            throw new Exception("Số lượng vượt quá tồn kho.");
+        }
+
+        if ($quantity <= 0) {
+            $cartItem->delete();
+        } else {
+            $cartItem->quantity = $quantity;
+            $cartItem->save();
+        }
+
+        return true;
+    }
+
+    // 4. Xóa sản phẩm khỏi giỏ
+    public function removeFromCart($userId, $cartItemId)
+    {
+        $cartItem = CartItem::where('user_id', $userId)->findOrFail($cartItemId);
+        $cartItem->delete();
         return true;
     }
 }
