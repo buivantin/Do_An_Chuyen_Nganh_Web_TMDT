@@ -14,6 +14,13 @@ export default function ProductCard({ book, onAddToCart }) {
             ? book.category.name
             : book.category || "";
 
+    // THÊM MỚI: Hàm xử lý đường dẫn ảnh để không bị vỡ ảnh
+    const resolveImageUrl = (path) => {
+        if (!path) return 'https://via.placeholder.com/300x400?text=No+Image';
+        if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
+        return path.startsWith("/") ? `http://127.0.0.1:8000${path}` : `http://127.0.0.1:8000/${path}`;
+    };
+
     const handleAddClick = async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -50,8 +57,9 @@ export default function ProductCard({ book, onAddToCart }) {
             <div className="bg-white rounded-2xl p-2.5 sm:p-3 border border-stone-100 shadow-sm hover:shadow-md transition flex flex-col justify-between min-w-0">
                 <a href={`/products/${book.id}`} className="block group">
                     <div className="bg-[#EAEAEA] rounded-xl p-3 sm:p-4 flex items-center justify-center aspect-[4/4.4]">
+                        {/* SỬA LỖI: Dùng resolveImageUrl thay vì book.image */}
                         <img
-                            src={book.image}
+                            src={resolveImageUrl(book.image)}
                             alt={cleanTitle}
                             className="h-full object-contain shadow-md group-hover:scale-[1.02] transition"
                         />

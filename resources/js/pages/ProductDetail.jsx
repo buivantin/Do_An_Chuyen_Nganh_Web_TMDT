@@ -68,6 +68,10 @@ export default function ProductDetail({ productId }) {
 
     try {
       await ProductService.addToCart(targetBook.id, qty);
+      
+      // SỬA LỖI 2: Phát sự kiện để Header tự động cập nhật số lượng giỏ hàng
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+
       setCartNotice({
         type: 'success',
         text: `Đã thêm ${qty} cuốn "${targetBook.title}" vào giỏ hàng.`,
@@ -83,6 +87,13 @@ export default function ProductDetail({ productId }) {
   };
 
   const formatPrice = (value) => `${Number(value || 0).toLocaleString('vi-VN')} ₫`;
+
+  // SỬA LỖI 1: Hàm xử lý đường dẫn ảnh (Ghép domain backend nếu là đường dẫn tương đối)
+  const resolveImageUrl = (path) => {
+    if (!path) return 'https://via.placeholder.com/300x400?text=No+Image';
+    if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
+    return path.startsWith("/") ? `http://127.0.0.1:8000${path}` : `http://127.0.0.1:8000/${path}`;
+  };
 
   return (
     <MainLayout>
@@ -124,7 +135,7 @@ export default function ProductDetail({ productId }) {
                 {/* Cột trái: Ảnh bìa */}
                 <div className="lg:col-span-5 bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-6 sm:p-10 flex items-center justify-center aspect-[4/4.4]">
                   <img
-                    src={book.image}
+                    src={resolveImageUrl(book.image)}
                     alt={book.title}
                     className="max-h-full object-contain rounded-lg shadow-md"
                   />

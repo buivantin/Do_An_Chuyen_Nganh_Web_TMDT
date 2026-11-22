@@ -35,6 +35,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    
+    // TM-07: Khách hàng hủy đơn (Của bạn)
+    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+
+    // Đánh giá sản phẩm (Của TV4)
     Route::post('/reviews', [ReviewController::class, 'store']);
 
     // TM-05: Giỏ hàng (Của TV5)
@@ -70,4 +75,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     // CRUD Quản lý sản phẩm (Của TV4)
     Route::apiResource('products', ProductController::class);
 
+    // TM-13: Quản lý đơn hàng (Của TV5)
+    // 1. Route đếm số lượng đơn chờ (Dành cho Chuông thông báo)
+    Route::get('/orders/pending-count', [OrderController::class, 'getPendingCount']); 
+    
+    // 2. Route lấy danh sách và cập nhật trạng thái
+    Route::get('/orders', [OrderController::class, 'adminIndex']); 
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']); 
 });
