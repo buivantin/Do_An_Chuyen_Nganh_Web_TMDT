@@ -14,6 +14,7 @@ class Order extends Model
         'total_amount',
         'address',
         'phone',
+        'receiver_name',
     ];
 
     public function items()
