@@ -28,7 +28,6 @@ class OrderService
                 ->get()
                 ->keyBy('id');
 
-            // SỬA LỖI 1: Tính tổng tiền bao gồm phí ship
             $subtotal = 0;
             foreach ($cartItems as $item) {
                 $product = $products->get($item->product_id);
@@ -139,12 +138,10 @@ class OrderService
             $order = Order::with('items')->findOrFail($orderId);
             $currentStatus = $order->status;
 
-            // SỬA LỖI 2: Cập nhật lại Máy trạng thái cho khớp với CSDL thực tế (processing, shipped)
+            // Đồng bộ trạng thái với Frontend và Controller
             $allowedTransitions = [
-                'pending'    => ['processing', 'shipped', 'cancelled'], 
-                'processing' => ['shipped', 'cancelled'],               
+                'pending'    => ['shipping', 'cancelled'], 
                 'shipping'   => ['completed', 'cancelled'],             
-                'shipped'    => ['completed', 'cancelled'],             
                 'completed'  => [],
                 'cancelled'  => []
             ];
