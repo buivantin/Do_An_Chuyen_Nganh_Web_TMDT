@@ -10,6 +10,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $now = now();
+
         // 1. Seed 1 Admin & 10 Khách hàng (customer10 bị khóa tài khoản)
         $userAddresses = [
             '120 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
@@ -32,10 +34,13 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
-            'created_at' => now(),
+            'created_at' => $now->copy()->subMonths(6),
+            'updated_at' => $now->copy()->subMonths(6),
         ]);
 
         for ($i = 1; $i <= 10; $i++) {
+            $userCreated = $now->copy()->subDays(rand(30, 150));
+
             DB::table('users')->insert([
                 'username' => "customer$i",
                 'email' => "khachhang$i@gmail.com",
@@ -44,7 +49,8 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
                 'status' => $i === 10 ? 'inactive' : 'active',
-                'created_at' => now(),
+                'created_at' => $userCreated,
+                'updated_at' => $userCreated,
             ]);
         }
 
@@ -169,10 +175,13 @@ class DatabaseSeeder extends Seeder
                 'name' => $categoryName,
                 'description' => "Các đầu sách thuộc thể loại $categoryName",
                 'status' => 'active',
+                'created_at' => $now->copy()->subMonths(6),
+                'updated_at' => $now->copy()->subMonths(6),
             ]);
 
             foreach ($books as [$name, $author, $image]) {
                 $bookIndex++;
+                $productCreated = $now->copy()->subDays(101 - $bookIndex);
 
                 $stock = match ($bookIndex) {
                     1 => 1,         // 1 sản phẩm có số lượng ít (1 cuốn)
@@ -189,11 +198,13 @@ class DatabaseSeeder extends Seeder
                     'category_id' => $categoryId,
                     'image' => $image,
                     'stock' => $stock,
+                    'created_at' => $productCreated,
+                    'updated_at' => $productCreated,
                 ]);
             }
         }
 
-        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái (địa chỉ giao hàng khác nhau)
+        // 4. Seed 10 Đơn hàng theo luồng 4 trạng thái & rải ngày giờ qua 6 tháng
         $orderAddresses = [
             '18 Hai Bà Trưng, Phường Bến Nghé, Quận 1, TP.HCM',
             '210 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội',
@@ -207,24 +218,33 @@ class DatabaseSeeder extends Seeder
             '510 Sư Vạn Hạnh, Phường 9, Quận 10, TP.HCM',
         ];
 
-        $statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
+        // Luồng: pending (Chờ xác nhận) -> shipping (Đang giao) -> completed (Hoàn thành) | cancelled (Đã hủy)
+        $statuses = ['pending', 'shipping', 'completed', 'cancelled'];
+
         for ($i = 1; $i <= 10; $i++) {
+            $status = $statuses[($i - 1) % count($statuses)];
+            $orderCreated = $now->copy()->subMonths(($i - 1) % 6)->subDays(rand(1, 20))->subHours(rand(1, 12));
+            $orderUpdated = $status === 'pending'
+                ? $orderCreated
+                : $orderCreated->copy()->addHours(rand(2, 48));
+
             $orderId = DB::table('orders')->insertGetId([
                 'receiver_name' => "Nguyễn Văn $i",
-                'status' => $statuses[array_rand($statuses)],
+                'status' => $status,
                 'address' => $orderAddresses[$i - 1],
                 'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
-                'user_id' => rand(2, 11),
-                'created_at' => now(),
+                'user_id' => rand(2, 10),
+                'created_at' => $orderCreated,
+                'updated_at' => $orderUpdated,
             ]);
 
             // Mỗi đơn hàng có 1-3 sản phẩm
             $total = 0;
             $itemCount = rand(1, 3);
             for ($j = 0; $j < $itemCount; $j++) {
-                $productId = rand(1, 100);
+                $productId = rand(3, 100);
                 $price = rand(60, 200) * 1000;
                 $qty = rand(1, 2);
                 $total += $price * $qty;
@@ -234,6 +254,8 @@ class DatabaseSeeder extends Seeder
                     'product_id' => $productId,
                     'price' => $price, // Giá snapshot tại thời điểm mua
                     'quantity' => $qty,
+                    'created_at' => $orderCreated,
+                    'updated_at' => $orderCreated,
                 ]);
             }
 
