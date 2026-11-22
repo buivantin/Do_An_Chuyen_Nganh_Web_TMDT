@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import PasswordInput from "./PasswordInput";
 
 export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSwitchToLogin }) {
   const [username, setUsername] = useState('');
@@ -165,15 +166,36 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
             >
               Mật khẩu
             </label>
-            <input
-              id="register-password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
+            <PasswordInput
+              required
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Tối thiểu 8 ký tự"
-              className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
+              autoComplete="new-password"
+            />
+            {fieldErrors.password && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.password[0]}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="register-password"
+              className="block text-xs font-semibold text-stone-700 mb-1"
+            >
+              Mật khẩu
+            </label>
+            <PasswordInput
+              id="register-password"
+              name="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Tối thiểu 8 ký tự"
+              autoComplete="new-password"
+              className="!bg-white"
             />
             {fieldErrors.password && (
               <p className="mt-1 text-xs text-red-600">{fieldErrors.password[0]}</p>
@@ -187,15 +209,16 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
             >
               Xác nhận mật khẩu
             </label>
-            <input
+            <PasswordInput
               id="register-password-confirmation"
               name="password_confirmation"
-              type="password"
-              autoComplete="new-password"
+              required
+              minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Nhập lại mật khẩu"
-              className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
+              autoComplete="new-password"
+              className="!bg-white"
             />
           </div>
 

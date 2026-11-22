@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import PasswordInput from "./PasswordInput";
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess, onSwitchToRegister }) {
   const [email, setEmail] = useState('');
@@ -134,15 +135,12 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess, onSwitchTo
                 Quên mật khẩu?
               </a>
             </div>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
+            <PasswordInput
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:border-[#9A5B13]"
+              placeholder="Nhập mật khẩu"
+              autoComplete="current-password"
             />
             {fieldErrors.password && (
               <p className="mt-1 text-xs text-red-600">{fieldErrors.password[0]}</p>
