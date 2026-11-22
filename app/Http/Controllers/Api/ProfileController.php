@@ -64,4 +64,39 @@ class ProfileController extends Controller
             'message' => 'Đổi mật khẩu thành công'
         ], 200);
     }
+
+    // HÀM MỚI: Cập nhật ảnh đại diện
+    public function updateAvatar(Request $request)
+    {
+        // Validate: Bắt buộc là file ảnh, đúng định dạng, tối đa 2MB (2048 KB)
+        $request->validate([
+            'avatar' => 'required|image|mimes:jpeg,png,jpg|max:2048', 
+        ]);
+
+        $user = $request->user();
+
+        if ($request->hasFile('avatar')) {
+            // 1. Xóa ảnh cũ nếu có (để tránh rác server)
+            if ($user->image_path && file_exists(public_path($user->image_path))) {
+                unlink(public_path($user->image_path));
+            }
+
+            // 2. Lưu ảnh mới vào thư mục public/avatars
+            $file = $request->file('avatar');
+            // Đặt tên file để không bị trùng: thời_gian_tên_gốc
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('avatars'), $filename);
+            
+            // 3. Cập nhật đường dẫn vào CSDL (VD: avatars/12345_anh.jpg)
+            $user->image_path = 'avatars/' . $filename;
+            $user->save();
+
+            return response()->json([
+                'message' => 'Cập nhật ảnh đại diện thành công',
+                'image_path' => $user->image_path
+            ], 200);
+        }
+
+        return response()->json(['message' => 'Không tìm thấy file ảnh'], 400);
+    }
 }
