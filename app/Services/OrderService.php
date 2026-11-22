@@ -28,7 +28,6 @@ class OrderService
                 ->get()
                 ->keyBy('id');
 
-            // SỬA LỖI 1: Tính tổng tiền bao gồm phí ship
             $subtotal = 0;
             foreach ($cartItems as $item) {
                 $product = $products->get($item->product_id);
@@ -84,53 +83,17 @@ class OrderService
 
     public function listForUser(int $userId, int $perPage = 10)
     {
-        $orders = Order::with(['items.product'])
+        return Order::withCount('items')
             ->where('user_id', $userId)
             ->latest()
             ->paginate($perPage);
-
-        $userReviews = \App\Models\Review::where('user_id', $userId)
-            ->get()
-            ->keyBy('product_id');
-
-        $orders->getCollection()->transform(function (Order $order) use ($userReviews) {
-            $order->items->transform(function ($item) use ($userReviews) {
-                $review = $userReviews->get($item->product_id);
-                $item->setAttribute('user_review', $review ? [
-                    'id'      => $review->id,
-                    'rating'  => $review->rating,
-                    'comment' => $review->comment,
-                ] : null);
-                return $item;
-            });
-            return $order;
-        });
-
-        return $orders;
     }
 
     public function findForUser(int $userId, int $orderId): Order
     {
-        $order = Order::with(['items.product'])
+        return Order::with('items')
             ->where('user_id', $userId)
             ->findOrFail($orderId);
-
-        $userReviews = \App\Models\Review::where('user_id', $userId)
-            ->whereIn('product_id', $order->items->pluck('product_id'))
-            ->get()
-            ->keyBy('product_id');
-
-        $order->items->transform(function ($item) use ($userReviews) {
-            $review = $userReviews->get($item->product_id);
-            $item->setAttribute('user_review', $review ? [
-                'id'      => $review->id,
-                'rating'  => $review->rating,
-                'comment' => $review->comment,
-            ] : null);
-            return $item;
-        });
-
-        return $order;
     }
 
     // TM-07: Khách tự hủy đơn
@@ -175,12 +138,10 @@ class OrderService
             $order = Order::with('items')->findOrFail($orderId);
             $currentStatus = $order->status;
 
-            // SỬA LỖI 2: Cập nhật lại Máy trạng thái cho khớp với CSDL thực tế (processing, shipped)
+            // Đồng bộ trạng thái với Frontend và Controller
             $allowedTransitions = [
-                'pending'    => ['processing', 'shipped', 'cancelled'], 
-                'processing' => ['shipped', 'cancelled'],               
+                'pending'    => ['shipping', 'cancelled'], 
                 'shipping'   => ['completed', 'cancelled'],             
-                'shipped'    => ['completed', 'cancelled'],             
                 'completed'  => [],
                 'cancelled'  => []
             ];
