@@ -17,13 +17,12 @@ use App\Http\Controllers\Api\ProfileController;
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
-Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNumber('id');
 
 // Route trang chủ & danh mục (Của TV3 & TV4)
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/home', [HomeController::class, 'index']);
-Route::get('/products', [ProductController::class, 'search']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/products', [ProductController::class, 'search']); // Tìm kiếm sản phẩm
+Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNumber('id'); // Chi tiết sản phẩm
 
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập - Dành cho Khách hàng & Admin) ---
 Route::middleware('auth:sanctum')->group(function () {
@@ -32,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // TM-06: Đặt hàng (Của TV2)
     Route::post('/orders', [OrderController::class, 'store']);
+    Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
 
     // TM-05: Giỏ hàng (Của TV5)
@@ -40,10 +40,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/cart/{id}', [CartController::class, 'update']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
-    // TM-08: Hồ sơ cá nhân (Của TV1) - Đã chuyển ra khỏi nhóm Admin
+    // TM-08: Hồ sơ cá nhân (Của TV1)
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/change-password', [ProfileController::class, 'changePassword']);
+    
+    // Route Upload ảnh đại diện 
+    Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---

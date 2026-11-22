@@ -89,6 +89,49 @@
 - Cách kiểm chứng: Theo gợi ý của tài liệu: đăng nhập tài khoản khách rồi gõ /admin phải ra 403. Test thêm: chưa đăng nhập vào /admin bị chuyển về /login; admin vào được; đăng xuất rồi bấm Back vẫn bị chặn.
 - Tỷ lệ mã AI còn giữ lại (ước lượng): 70%
 - Điều học được: Mọi thay đổi ở middleware phân quyền phải được test lại bằng tài khoản khách, không chỉ tài khoản admin.
+
+### [AI-07] Mã giả
+- Ngày / Người dùng: 16/11/2026 / Võ Trần Đỉnh Sơn
+- Công cụ: Claude
+- Giai đoạn: Thiết kế
+- Task / Commit / PR: [TM-06] Đặt hàng
+- Mục đích: Viết mã giả và chia checklist cho TM-06 theo tài liệu Ngày 6
+- Prompt chính: "Viết mã giả" 
+- Kết quả AI trả về (tóm tắt): Mã giả 6 bước của placeOrder (đọc giỏ, khóa dòng sản phẩm, kiểm tra kho, tạo đơn, trừ kho, xóa giỏ); checklist 4 nhóm: Mã giả, Service + transaction, Form, Kiểm thử đồng thời
+- Đánh giá: Đúng một phần. Checklist đầu tiên AI chia theo mẫu chung, chưa khớp 2 thẻ 06a/06b của nhóm; sau khi gửi ảnh thẻ thật thì AI đối chiếu lại và gợi ý gộp thành 1 thẻ TM-06
+- Đã chỉnh sửa gì: Gộp 06a và 06b thành TM-06; thêm mục "Mã giả" và "Test hai người đặt cùng lúc"; gán phần Form cho TV3
+- Cách kiểm chứng: Đối chiếu với tài liệu Ngày 6 và checklist thực tế trên Trello
+- Tỷ lệ mã AI còn giữ lại (ước lượng): 70%
+- Điều học được: Mã giả mô tả quy trình và điều kiện lỗi, không phụ thuộc cú pháp; chia việc theo người phụ trách để thẻ không dồn hết vào một người
+
+### [AI-08] Khung OrderService()
+- Ngày / Người dùng: 16/11/2026 / Võ Trần Đỉnh Sơn
+- Công cụ: Claude
+- Giai đoạn: Lập trình
+- Task / Commit / PR: [TM-06] / feat(TM-06): khung OrderService / <PR>
+- Mục đích: Viết khung service đặt hàng trong 1 transaction
+- Prompt chính: "Thiết kế OrderService.placeOrder(): đọc giỏ, kiểm tra tồn kho, tạo order + order_items, trừ kho, xóa giỏ – trong 1 transaction" 
+- Kết quả AI trả về (tóm tắt): Code dùng DB::transaction, lockForUpdate() (khóa theo thứ tự id), tính tổng tiền ở server, lưu giá lúc mua vào order_items, trừ kho, xóa giỏ
+- Đánh giá: Thiếu/sai ban đầu: AI đề xuất chạy make:model -m trong khi nhóm đã có migration orders/order_items (sẽ tạo trùng bảng); dùng tên cột total, receiver_name, phone trong khi migration thật là total_amount và chỉ có address. Sau khi nhận migration thật, AI sửa lại cho khớp
+- Đã chỉnh sửa gì: Đổi tên cột theo migration; voucher_id tạm để null; 
+- Cách kiểm chứng: Đối chiếu tên cột với migration products, orders, order_items. Chưa chạy thử vì model Product và CartItem chưa có trong nhánh 
+- Tỷ lệ mã AI còn giữ lại (ước lượng): 50%
+- Điều học được: Gửi migration thật trước khi nhờ AI viết code để tránh sai tên cột; khóa dòng theo thứ tự id để tránh deadlock
+
+### [AI-09] Unit test cho OrderService
+- Ngày / Người dùng: 17/11/2026 / Vo Tran Dinh Son
+- Công cụ: Claude
+- Giai đoạn: Kiểm thử
+- Task / Commit / PR: [TM-06] / test(TM06): dat hang thanh cong, vuot ton kho, rollback / <PR>
+- Mục đích: Viết 2 unit test
+- Prompt chính: <dán prompt> <hoặc link>
+- Kết quả AI trả về : OrderServiceTest.php gồm 3 test: đặt hàng thành công, vượt tồn kho bị từ chối, lỗi giữa chừng thì rollback (ném lỗi bằng sự kiện created của OrderItem);
+- Đánh giá: Đúng. AI đoán tên cột của categories, users, cart_items
+- Đã chỉnh sửa gì: <"không sửa">
+- Cách kiểm chứng: php artisan test --filter=OrderServiceTest: 3 passed (17 assertions). Sau khi chạy, bảng products vẫn còn 30 dòng (test không xóa dữ liệu mẫu). Chưa kiểm tra khóa dòng khi hai người mua cùng lúc
+- Tỷ lệ mã AI còn giữ lại (ước lượng): 80%
+- Điều học được: Test tuần tự chứng minh logic và rollback chứ không chứng minh khóa dòng; kiểm tra phpunit.xml trước khi dùng RefreshDatabase
+
 <!-- Mẫu mục mới: chép khối dưới, đổi mã AI-xx
 
 ### [AI-xx] Tiêu đề ngắn

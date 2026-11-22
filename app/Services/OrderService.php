@@ -48,7 +48,7 @@ class OrderService
 
                 if ($item->quantity < 1 || $product->stock < $item->quantity) {
                     throw ValidationException::withMessages([
-                        'cart' => "Sản phẩm \"{$product->name}\" không đủ hàng.",
+                        'cart' => "Sản phẩm {$product->name} không đủ số lượng.",
                     ]);
                 }
 
@@ -63,6 +63,8 @@ class OrderService
                 'payment_method' => 'cod',
                 'total_amount'   => $total,
                 'address'        => trim($data['address']),
+                'receiver_name' => trim($data['receiver_name']),
+                'phone'         => trim($data['phone']),
             ]);
 
             // 5. Tạo chi tiết đơn và trừ kho
@@ -84,5 +86,19 @@ class OrderService
 
             return $order;
         });
+    }
+    
+    public function listForUser(int $userId, int $perPage = 10)
+    {
+        return Order::withCount('items')
+            ->where('user_id', $userId)
+            ->latest()
+            ->paginate($perPage);   // phân trang phía server (NFR-03)
+    }
+    public function findForUser(int $userId, int $orderId): Order
+    {
+        return Order::with('items')
+            ->where('user_id', $userId)
+            ->findOrFail($orderId);
     }
 }
