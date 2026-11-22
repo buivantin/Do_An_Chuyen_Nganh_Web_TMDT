@@ -10,27 +10,30 @@ const OrderManagement = () => {
     // State lưu số lượng đơn hàng
     const [counts, setCounts] = useState({ all: 0, pending: 0, shipping: 0, completed: 0, cancelled: 0 });
 
+    // State quản lý phân trang
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
+
     const token = localStorage.getItem('token');
     const axiosConfig = { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } };
     const API_URL = 'http://127.0.0.1:8000/api/admin/orders';
 
-    const fetchOrders = async (status = 'all') => {
+    const fetchOrders = async (status = 'all', page = 1) => {
         setLoading(true);
         try {
-            const res = await axios.get(`${API_URL}?status=${status}`, axiosConfig);
+            const res = await axios.get(`${API_URL}?status=${status}&page=${page}`, axiosConfig);
             
             // Xử lý an toàn: Bóc tách dữ liệu dù API trả về mảng hay object phân trang
-            let orderData = [];
-            if (Array.isArray(res.data.data)) {
-                orderData = res.data.data;
-            } else if (res.data.data && Array.isArray(res.data.data.data)) {
-                orderData = res.data.data.data; // Dành cho trường hợp Laravel paginate()
-            } else if (Array.isArray(res.data)) {
-                orderData = res.data;
+            if (res.data.data && Array.isArray(res.data.data.data)) {
+                // Trường hợp Laravel paginate() trả về
+                setOrders(res.data.data.data);
+                setCurrentPage(res.data.data.current_page);
+                setLastPage(res.data.data.last_page);
+            } else if (Array.isArray(res.data.data)) {
+                // Trường hợp API trả về mảng trực tiếp
+                setOrders(res.data.data);
             }
 
-            setOrders(orderData);
-            
             // Cập nhật số lượng đếm nếu Backend có trả về
             if (res.data.counts) {
                 setCounts(res.data.counts);
@@ -44,8 +47,17 @@ const OrderManagement = () => {
     };
 
     useEffect(() => {
-        fetchOrders(statusFilter);
+        // Khi đổi tab (statusFilter), quay về trang 1
+        setCurrentPage(1);
+        fetchOrders(statusFilter, 1);
     }, [statusFilter]);
+
+    // Hàm chuyển trang
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= lastPage) {
+            fetchOrders(statusFilter, newPage);
+        }
+    };
 
     const handleUpdateStatus = async (orderId, newStatus) => {
         if (!window.confirm(`Chuyển trạng thái đơn hàng #${orderId} sang "${newStatus}"?`)) return;
@@ -53,7 +65,8 @@ const OrderManagement = () => {
         try {
             await axios.put(`${API_URL}/${orderId}/status`, { status: newStatus }, axiosConfig);
             setMsg({ type: 'success', text: 'Cập nhật trạng thái thành công!' });
-            fetchOrders(statusFilter); // Tải lại danh sách và số đếm
+            // Tải lại danh sách ở trang hiện tại
+            fetchOrders(statusFilter, currentPage); 
             setTimeout(() => setMsg({ type: '', text: '' }), 3000);
         } catch (error) {
             setMsg({ type: 'error', text: error.response?.data?.message || 'Lỗi cập nhật trạng thái!' });
@@ -114,12 +127,12 @@ const OrderManagement = () => {
                         let buttonClass = "px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition flex items-center gap-2 ";
                         if (isActive) {
                             buttonClass += isPendingHighlight 
-                                ? "bg-orange-600 text-white shadow-md ring-2 ring-orange-300" // Active + Có đơn chờ (Cam đậm)
-                                : "bg-[#141414] text-white shadow-sm"; // Active bình thường (Đen)
+                                ? "bg-orange-600 text-white shadow-md ring-2 ring-orange-300" 
+                                : "bg-[#141414] text-white shadow-sm"; 
                         } else {
                             buttonClass += isPendingHighlight
-                                ? "bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100" // Chưa active + Có đơn chờ (Cam nhạt)
-                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"; // Chưa active bình thường (Xám)
+                                ? "bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100" 
+                                : "bg-stone-100 text-stone-600 hover:bg-stone-200"; 
                         }
 
                         // Cấu hình class cho Badge số lượng
@@ -216,6 +229,31 @@ const OrderManagement = () => {
                     </tbody>
                 </table>
             </div>
+
+            {/* Phần Giao diện Phân trang */}
+            {!loading && orders.length > 0 && (
+                <div className="p-6 border-t border-stone-200 flex justify-between items-center">
+                    <span className="text-sm text-stone-500">
+                        Trang {currentPage} / {lastPage}
+                    </span>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 border border-stone-300 rounded-lg text-sm disabled:opacity-50 hover:bg-stone-50 transition"
+                        >
+                            Trang trước
+                        </button>
+                        <button 
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === lastPage}
+                            className="px-4 py-2 border border-stone-300 rounded-lg text-sm disabled:opacity-50 hover:bg-stone-50 transition"
+                        >
+                            Trang sau
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
