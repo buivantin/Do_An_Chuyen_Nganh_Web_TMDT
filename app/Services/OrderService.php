@@ -32,7 +32,7 @@ class OrderService
             foreach ($cartItems as $item) {
                 $product = $products->get($item->product_id);
 
-                if (!$product || $product->status !== 'active') {
+                if (!$product || $product->status !== 'active' || $product->is_deleted) {
                     throw ValidationException::withMessages([
                         'cart' => 'Có sản phẩm trong giỏ không còn được bán.',
                     ]);

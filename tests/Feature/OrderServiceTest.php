@@ -150,4 +150,30 @@ class OrderServiceTest extends TestCase
         $this->assertSame(5, $this->stockOf($p2));
         $this->assertSame(2, DB::table('cart_items')->where('user_id', $this->userId)->count());
     }
+    public function test_gia_trong_order_items_khong_doi_khi_sua_gia_san_pham(): void
+    {
+        $productId = $this->makeProduct('Sach A', 100000, 5);
+        $this->addToCart($productId, 2);
+
+        $order = $this->service->placeOrder($this->userId, $this->orderData());
+
+        // Admin sửa giá sau khi đã đặt
+        DB::table('products')->where('id', $productId)->update(['price' => 150000]);
+
+        // Dòng chi tiết trong CSDL vẫn là giá cũ
+        $item = OrderItem::where('order_id', $order->id)->first();
+        $this->assertEquals(100000, $item->price);
+
+        // Tổng tiền của đơn cũng không đổi
+        $this->assertEquals(200000, Order::find($order->id)->total_amount);
+
+        // Đọc lại qua hàm xem đơn của khách (đường mà API dùng)
+        $loaded = $this->service->findForUser($this->userId, $order->id);
+        $this->assertEquals(100000, $loaded->items->first()->price);
+
+        // Đơn mới đặt sau khi đổi giá thì dùng giá mới
+        $this->addToCart($productId, 1);
+        $order2 = $this->service->placeOrder($this->userId, $this->orderData());
+        $this->assertEquals(150000, OrderItem::where('order_id', $order2->id)->first()->price);
+    }
 }

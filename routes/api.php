@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\CartController;       
 use App\Http\Controllers\Api\ProfileController; 
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\AdminProductController;
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
@@ -195,8 +196,18 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
+    // TM-12: Quản lý sản phẩm (Admin)
+    Route::get('/products', [AdminProductController::class, 'index']);
+    Route::post('/products', [AdminProductController::class, 'store']);
+    Route::get('/products/{id}', [AdminProductController::class, 'show']);
+    Route::put('/products/{id}', [AdminProductController::class, 'update']);
+    Route::put('/products/{id}/toggle-status', [AdminProductController::class, 'toggleStatus']);
+    Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
+    
     // CRUD Quản lý sản phẩm (Của TV4)
-    Route::apiResource('products', ProductController::class);
+    //  
+
+    
 
     // TM-13: Quản lý đơn hàng (Của TV5)
     // 1. Route đếm số lượng đơn chờ (Dành cho Chuông thông báo)
