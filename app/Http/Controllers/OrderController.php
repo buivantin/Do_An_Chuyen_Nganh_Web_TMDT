@@ -48,12 +48,16 @@ class OrderController extends Controller
     }
 
     // --- DÀNH CHO ADMIN (TM-13) ---
-    public function adminIndex(Request $request)
+        public function adminIndex(Request $request)
     {
+        // Lấy status và page từ URL
         $status = $request->query('status');
+        $page = $request->query('page', 1); 
         
+        // OrderService cần nhận thêm tham số page, hoặc Laravel sẽ tự động xử lý ?page= 
+        // vì hàm paginate() mặc định đọc biến $request->page
         $orders = $this->orders->listAllForAdmin($status);
-
+        
         $counts = [
             'all'       => Order::count(),
             'pending'   => Order::where('status', 'pending')->count(),
