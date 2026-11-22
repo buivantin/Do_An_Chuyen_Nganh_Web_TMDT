@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import MainLayout from '../layouts/MainLayout';
 import ProductCard from '../components/ProductCard';
+import ProductReviews from "../components/ProductReviews";
 import ProductService from '../services/ProductService';
 
 export default function ProductDetail({ productId }) {
@@ -254,6 +255,8 @@ export default function ProductDetail({ productId }) {
                   {book.description || 'Đang cập nhật nội dung mô tả cho tác phẩm này.'}
                 </p>
               </section>
+
+              <ProductReviews productId={book.id} />
 
               {/* Sách cùng danh mục (4 cuốn) */}
               {relatedBooks.length > 0 && (

@@ -505,6 +505,14 @@ const TABS = [
   },
 ];
 
+const RATING_LABELS = {
+  1: "Rất không hài lòng",
+  2: "Chưa hài lòng",
+  3: "Bình thường",
+  4: "Hài lòng",
+  5: "Tuyệt vời",
+};
+
 const PAYMENT_METHOD_LABELS = {
   cod: "Thanh toán khi nhận hàng (COD)",
   vnpay: "Thanh toán qua VNPay",
@@ -693,6 +701,24 @@ function extractOrderItems(order) {
   return Array.isArray(list) ? list : [];
 }
 
+function StarIcon({ filled, className = "w-5 h-5" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      className={className}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+      />
+    </svg>
+  );
+}
+
 export default function Account({ user: propUser = null, orders: propOrders = [] }) {
   const initialUser = useMemo(
     () => normalizeUser(propUser || getStoredUser()),
@@ -727,6 +753,14 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [detailLoadingId, setDetailLoadingId] = useState(null);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
+
+  // State Modal Đánh giá sản phẩm
+  const [reviewTarget, setReviewTarget] = useState(null); // { orderCode, productId, productName, productImage }
+  const [reviewRating, setReviewRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   const [provinceCode, setProvinceCode] = useState(initialAddr.provinceCode);
   const [districtCode, setDistrictCode] = useState(initialAddr.districtCode);
@@ -929,6 +963,109 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     }
   };
 
+  const openReviewModal = (orderCode, item) => {
+    const product = item.product || item;
+    const productId = item.product_id || product.id;
+    const productName = (
+      item.product_name ||
+      product.name ||
+      product.title ||
+      "Ấn phẩm sách"
+    ).normalize("NFC");
+    const productImage = resolveAssetUrl(
+      item.image || product.image || product.image_path
+    );
+
+    setReviewTarget({
+      orderCode,
+      productId,
+      productName,
+      productImage,
+    });
+    setReviewRating(5);
+    setHoverRating(0);
+    setReviewComment("");
+    setReviewError("");
+  };
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewTarget?.productId) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setReviewTarget(null);
+      return setShowLoginModal(true);
+    }
+
+    setReviewSubmitting(true);
+    setReviewError("");
+
+    try {
+      const res = await axios.post(
+        "/api/reviews",
+        {
+          product_id: reviewTarget.productId,
+          rating: reviewRating,
+          comment: reviewComment.trim() || null,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const savedReview = res.data?.review || {
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      };
+
+      // Cập nhật trạng thái đã đánh giá cho tất cả item cùng product_id trong danh sách đơn
+      setOrders((prevOrders) =>
+        prevOrders.map((ord) => {
+          const items = extractOrderItems(ord);
+          if (items.length === 0) return ord;
+          const updatedItems = items.map((it) => {
+            const pid = it.product_id || it.product?.id || it.id;
+            if (Number(pid) === Number(reviewTarget.productId)) {
+              return { ...it, user_review: savedReview };
+            }
+            return it;
+          });
+          return { ...ord, items: updatedItems };
+        })
+      );
+
+      setMsg({
+        type: "success",
+        text:
+          res.data?.message ||
+          `Đã gửi đánh giá ${reviewRating} sao cho "${reviewTarget.productName}"!`,
+      });
+      setReviewTarget(null);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setReviewTarget(null);
+        setShowLoginModal(true);
+      } else {
+        const firstErr = err.response?.data?.errors
+          ? Object.values(err.response.data.errors).flat()[0]
+          : null;
+        setReviewError(
+          firstErr ||
+            err.response?.data?.message ||
+            "Không thể gửi đánh giá. Vui lòng thử lại."
+        );
+      }
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   const currentProvince = useMemo(
     () => VIETNAM_ADDRESSES.find((p) => p.code === provinceCode) || null,
     [provinceCode]
@@ -1113,6 +1250,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   );
   const mapEmbedUrl = `https://maps.google.com/maps?q=${encodedMapQuery}&t=&z=${mapZoom}&ie=UTF8&iwloc=&output=embed`;
   const externalMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedMapQuery}`;
+  const displayRating = hoverRating || reviewRating;
 
   return (
     <div className="bg-[#FAF8F5] min-h-[calc(100vh-200px)]">
@@ -1120,6 +1258,134 @@ export default function Account({ user: propUser = null, orders: propOrders = []
         open={showLoginModal}
         onClose={() => setShowLoginModal(false)}
       />
+
+      {/* MODAL ĐÁNH GIÁ SẢN PHẨM */}
+      {reviewTarget && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-2xs flex items-center justify-center p-4"
+          onClick={() => !reviewSubmitting && setReviewTarget(null)}
+        >
+          <div
+            className="bg-white border border-stone-200 rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-stone-100 pb-3.5">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#9A5B13]">
+                  Đánh giá ấn phẩm &bull; {reviewTarget.orderCode}
+                </span>
+                <h3 className="font-serif text-lg sm:text-xl font-bold text-[#1A1A1A] mt-0.5">
+                  Chia sẻ cảm nhận của bạn
+                </h3>
+              </div>
+              <button
+                type="button"
+                disabled={reviewSubmitting}
+                onClick={() => setReviewTarget(null)}
+                className="w-8 h-8 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 flex items-center justify-center transition cursor-pointer"
+                aria-label="Đóng"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Thông tin sách đang đánh giá */}
+            <div className="flex items-center gap-3 bg-[#FAF8F5] border border-stone-200/80 rounded-xl p-3">
+              {reviewTarget.productImage ? (
+                <img
+                  src={reviewTarget.productImage}
+                  alt={reviewTarget.productName}
+                  className="w-11 h-15 object-contain rounded bg-white p-0.5 border border-stone-200/60 shrink-0"
+                />
+              ) : (
+                <div className="w-11 h-15 rounded bg-stone-200 text-stone-500 flex items-center justify-center text-[10px] font-bold shrink-0">
+                  SÁCH
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="text-[11px] text-stone-500">Sản phẩm đã mua</div>
+                <div className="font-serif text-sm font-bold text-stone-900 line-clamp-2">
+                  {reviewTarget.productName}
+                </div>
+              </div>
+            </div>
+
+            {reviewError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+                {reviewError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              {/* Chọn số sao */}
+              <div className="text-center space-y-2 py-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-stone-600">
+                  Mức độ hài lòng của bạn
+                </div>
+                <div className="flex items-center justify-center gap-1.5">
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const isFilled = star <= displayRating;
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        onMouseEnter={() => setHoverRating(star)}
+                        onMouseLeave={() => setHoverRating(0)}
+                        onClick={() => setReviewRating(star)}
+                        className={`p-1.5 rounded-lg transition transform hover:scale-110 cursor-pointer ${
+                          isFilled ? "text-amber-500" : "text-stone-300"
+                        }`}
+                        title={`${star} sao`}
+                      >
+                        <StarIcon filled={isFilled} className="w-8 h-8" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="text-xs font-semibold text-[#9A5B13]">
+                  {displayRating} sao &mdash; {RATING_LABELS[displayRating]}
+                </div>
+              </div>
+
+              {/* Nội dung nhận xét */}
+              <div>
+                <label className={UI.label}>
+                  Nhận xét chi tiết (Không bắt buộc)
+                </label>
+                <textarea
+                  rows={3}
+                  maxLength={1000}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Chất lượng giấy in, đóng gói, nội dung cuốn sách thế nào..."
+                  className="w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3.5 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition resize-none"
+                />
+                <div className="text-[11px] text-stone-400 text-right mt-1">
+                  {reviewComment.length}/1000 ký tự
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={reviewSubmitting}
+                  onClick={() => setReviewTarget(null)}
+                  className="px-4 py-2.5 rounded-xl bg-[#FAF8F5] hover:bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-700 transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 disabled:opacity-60 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                >
+                  {reviewSubmitting ? "Đang gửi..." : "Gửi đánh giá"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
         {/* Breadcrumb */}
@@ -1306,7 +1572,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                       </div>
                     </div>
 
-                    {/* ĐỊA CHỈ NHẬN HÀNG: Tự động tách và điền sẵn vào 3 dropdown + ô số nhà */}
                     <div className="bg-[#FAF8F5] p-4 sm:p-5 rounded-2xl border border-stone-200/80 space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-[#9A5B13]">
@@ -1392,7 +1657,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                         />
                       </div>
 
-                      {/* Bản đồ Google Maps xem trước */}
                       <div className="bg-white border border-stone-200/80 rounded-2xl overflow-hidden">
                         <div className="px-3.5 py-2.5 border-b border-stone-200/70 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
@@ -1521,7 +1785,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                         Đơn Hàng Của Tôi
                       </h2>
                       <p className="text-xs text-stone-500 mt-1">
-                        Theo dõi lịch sử đặt mua và trạng thái giao nhận ấn phẩm
+                        Theo dõi lịch sử đặt mua, trạng thái giao nhận và đánh giá ấn phẩm
                       </p>
                     </div>
 
@@ -1593,6 +1857,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                           order.order_code || order.code || `#MS${order.id}`;
                         const orderItems = extractOrderItems(order);
                         const isExpanded = expandedOrderId === order.id;
+                        const isCompleted = statusKey === "completed";
                         const paymentKey = String(
                           order.payment_method || "cod"
                         ).toLowerCase();
@@ -1637,14 +1902,15 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                               </div>
                             </div>
 
-                            {/* Xem trước danh sách sản phẩm trong đơn */}
+                            {/* Danh sách sản phẩm trong đơn */}
                             {orderItems.length > 0 && (
                               <div className="space-y-2.5">
-                                {(isExpanded
+                                {(isExpanded || isCompleted
                                   ? orderItems
                                   : orderItems.slice(0, 2)
                                 ).map((item, idx) => {
                                   const product = item.product || item;
+                                  const productId = item.product_id || product.id;
                                   const itemName = (
                                     item.product_name ||
                                     product.name ||
@@ -1665,13 +1931,14 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                       product.price ||
                                       0
                                   );
+                                  const existingReview = item.user_review;
 
                                   return (
                                     <div
                                       key={item.id || `${order.id}-${idx}`}
-                                      className="flex items-center justify-between gap-3 bg-white border border-stone-200/70 rounded-xl p-2.5"
+                                      className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-white border border-stone-200/70 rounded-xl p-2.5 sm:p-3"
                                     >
-                                      <div className="flex items-center gap-3 min-w-0">
+                                      <div className="flex items-center gap-3 min-w-0 flex-1">
                                         {itemImg ? (
                                           <img
                                             src={itemImg}
@@ -1684,9 +1951,16 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                           </div>
                                         )}
                                         <div className="min-w-0">
-                                          <div className="font-serif text-xs sm:text-sm font-bold text-stone-900 line-clamp-1">
+                                          <a
+                                            href={
+                                              productId
+                                                ? `/products/${productId}`
+                                                : undefined
+                                            }
+                                            className="font-serif text-xs sm:text-sm font-bold text-stone-900 hover:text-[#9A5B13] transition line-clamp-1"
+                                          >
                                             {itemName}
-                                          </div>
+                                          </a>
                                           <div className="text-[11px] text-stone-500 mt-0.5">
                                             Số lượng:{" "}
                                             <strong className="text-stone-800">
@@ -1698,19 +1972,52 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                         </div>
                                       </div>
 
-                                      <div className="text-xs sm:text-sm font-bold text-stone-900 shrink-0">
-                                        {(unitPrice * qty).toLocaleString("vi-VN")}{" "}
-                                        ₫
+                                      <div className="flex items-center gap-3 ml-auto shrink-0">
+                                        <div className="text-xs sm:text-sm font-bold text-stone-900">
+                                          {(unitPrice * qty).toLocaleString("vi-VN")}{" "}
+                                          ₫
+                                        </div>
+
+                                        {/* Nút Đánh giá chỉ hiển thị khi đơn đã Hoàn thành */}
+                                        {isCompleted && productId && (
+                                          existingReview ? (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F5EDE2] border border-[#E5D5BE] text-[11px] font-bold text-[#9A5B13]">
+                                              <StarIcon
+                                                filled
+                                                className="w-3.5 h-3.5 text-amber-500"
+                                              />
+                                              <span>
+                                                Đã đánh giá ({existingReview.rating}★)
+                                              </span>
+                                            </span>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openReviewModal(orderCode, item)
+                                              }
+                                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#FAF6F0] hover:bg-[#F5EDE2] border border-[#E5D5BE] text-xs font-bold text-[#9A5B13] transition cursor-pointer"
+                                            >
+                                              <StarIcon
+                                                filled={false}
+                                                className="w-3.5 h-3.5"
+                                              />
+                                              <span>Đánh giá</span>
+                                            </button>
+                                          )
+                                        )}
                                       </div>
                                     </div>
                                   );
                                 })}
 
-                                {!isExpanded && orderItems.length > 2 && (
-                                  <div className="text-[11px] text-stone-500 italic">
-                                    Và {orderItems.length - 2} ấn phẩm khác...
-                                  </div>
-                                )}
+                                {!isExpanded &&
+                                  !isCompleted &&
+                                  orderItems.length > 2 && (
+                                    <div className="text-[11px] text-stone-500 italic">
+                                      Và {orderItems.length - 2} ấn phẩm khác...
+                                    </div>
+                                  )}
                               </div>
                             )}
 

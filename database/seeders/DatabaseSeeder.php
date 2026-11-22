@@ -262,5 +262,74 @@ class DatabaseSeeder extends Seeder
             // Cập nhật lại tổng tiền đơn hàng
             DB::table('orders')->where('id', $orderId)->update(['total_amount' => $total]);
         }
+
+        // 5. Seed dữ liệu mẫu Đánh giá sản phẩm (reviews)
+        $sampleReviews = [
+            [
+                'user_id' => 2,      // customer1
+                'product_id' => 1,   // Nhà Giả Kim
+                'rating' => 5,
+                'comment' => 'Sách in sắc nét, đóng gói chống sốc rất kỹ. Giao hàng nhanh.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(1),
+                'updated_at' => $now->copy()->subDays(1),
+            ],
+            [
+                'user_id' => 3,      // customer2
+                'product_id' => 3,   // Tôi Thấy Hoa Vàng Trên Cỏ Xanh
+                'rating' => 5,
+                'comment' => 'Truyện nhẹ nhàng, sâu lắng, bìa sách rất đẹp.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(2),
+                'updated_at' => $now->copy()->subDays(2),
+            ],
+            [
+                'user_id' => 4,      // customer3
+                'product_id' => 39,  // Đắc Nhân Tâm
+                'rating' => 4,
+                'comment' => 'Nội dung kinh điển, giao hàng đúng hẹn.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(4),
+                'updated_at' => $now->copy()->subDays(4),
+            ],
+            [
+                'user_id' => 5,      // customer4
+                'product_id' => 62,  // Tối Ưu Hóa CSDL Với MySQL
+                'rating' => 5,
+                'comment' => 'Kiến thức về index và tối ưu truy vấn rất thực tế, dễ áp dụng.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(5),
+                'updated_at' => $now->copy()->subDays(5),
+            ],
+            [
+                'user_id' => 6,      // customer5
+                'product_id' => 63,  // Lập Trình Web Với Laravel
+                'rating' => 4,
+                'comment' => 'Tài liệu chi tiết, phù hợp làm đồ án web thương mại điện tử.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(7),
+                'updated_at' => $now->copy()->subDays(7),
+            ],
+            [
+                'user_id' => 7,      // customer6
+                'product_id' => 83,  // Dế Mèn Phiêu Lưu Ký
+                'rating' => 5,
+                'comment' => 'Tranh minh họa sinh động, bé nhà mình rất thích.',
+                'status' => 'visible',
+                'created_at' => $now->copy()->subDays(9),
+                'updated_at' => $now->copy()->subDays(9),
+            ],
+            [
+                'user_id' => 8,      // customer7
+                'product_id' => 1,   // Nhà Giả Kim
+                'rating' => 2,
+                'comment' => 'Đơn vị vận chuyển giao trễ hơn dự kiến 1 ngày.',
+                'status' => 'hidden',
+                'created_at' => $now->copy()->subDays(12),
+                'updated_at' => $now->copy()->subDays(11),
+            ],
+        ];
+
+        DB::table('reviews')->insert($sampleReviews);
     }
 }

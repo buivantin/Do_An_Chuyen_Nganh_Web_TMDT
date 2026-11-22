@@ -7,10 +7,11 @@ import Home from './pages/Home';
 import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
 
-// SỬA LẠI ĐƯỜNG DẪN TỪ admin (thường) THÀNH Admin (Hoa)
+// Sử dụng chung thư mục Admin (viết hoa) để tránh lỗi
 import UserManagement from './pages/Admin/UserManagement'; 
 import CategoryManagement from './pages/Admin/CategoryManagement'; 
 import OrderManagement from './pages/Admin/OrderManagement'; 
+import Dashboard from './pages/Admin/Dashboard'; // Của TV4
 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
@@ -30,6 +31,7 @@ function getStoredUser() {
 function App() {
   const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
   
+  // --- 1. CÁC TRANG ĐỘC LẬP ---
   if (pathname === '/cart') {
     return <Cart />;
   }
@@ -41,7 +43,7 @@ function App() {
   const token = localStorage.getItem('token');
   const user = getStoredUser();
 
-  // --- XỬ LÝ KHU VỰC ADMIN ---
+  // --- 2. XỬ LÝ KHU VỰC ADMIN ---
   const [adminStatus, setAdminStatus] = useState(() => {
     if (!pathname.startsWith('/admin')) return 'not-admin-route';
     if (!token || !user) return 'unauthenticated';
@@ -49,7 +51,7 @@ function App() {
     return 'checking';
   });
 
-  // --- STATE CHO CHUÔNG THÔNG BÁO ---
+  // --- STATE CHO CHUÔNG THÔNG BÁO (Của bạn) ---
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -117,6 +119,7 @@ function App() {
     return (
       <div className="min-h-screen bg-[#FAF8F5] p-6 md:p-8">
         <div className="max-w-6xl mx-auto space-y-6">
+          {/* HEADER ADMIN */}
           <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="text-xs font-bold uppercase tracking-widest text-[#9A5B13]">
@@ -127,6 +130,7 @@ function App() {
               </h1>
             </div>
 
+            {/* THANH MENU ĐIỀU HƯỚNG */}
             <div className="flex flex-wrap items-center gap-2">
               <a href="/admin" className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${pathname === '/admin' ? 'bg-[#9A5B13] text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
                 Tổng quan
@@ -138,7 +142,7 @@ function App() {
                 Quản lý danh mục
               </a>
               
-              {/* NÚT QUẢN LÝ ĐƠN HÀNG CÓ CHUÔNG THÔNG BÁO */}
+              {/* NÚT QUẢN LÝ ĐƠN HÀNG CÓ CHUÔNG THÔNG BÁO CỦA BẠN */}
               <a href="/admin/orders" className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${pathname === '/admin/orders' ? 'bg-[#9A5B13] text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}>
                 <span className={pendingCount > 0 ? "animate-pulse text-sm" : "text-sm"}>
                   🔔
@@ -157,25 +161,19 @@ function App() {
             </div>
           </div>
 
+          {/* NỘI DUNG RENDER THEO ĐƯỜNG DẪN */}
           <div className="max-w-6xl mx-auto">
-            {pathname === '/admin/orders' && <OrderManagement />}
+            {pathname === '/admin' && <Dashboard />} {/* Của TV4 */}
+            {pathname === '/admin/orders' && <OrderManagement />} {/* Của bạn */}
             {pathname === '/admin/users' && <UserManagement />}
             {pathname === '/admin/categories' && <CategoryManagement />}
-            
-            {pathname === '/admin' && (
-              <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
-                <p className="text-sm text-stone-600 mb-4">
-                  Xin chào quản trị viên. Chọn chức năng bên trên để bắt đầu quản lý hệ thống:
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
     );
   }
   
-  // --- CÁC TRANG DÀNH CHO KHÁCH HÀNG ---
+  // --- 3. CÁC TRANG DÀNH CHO KHÁCH HÀNG ---
   
   const productDetailMatch = pathname.match(/^\/products\/(\d+)$/);
   if (productDetailMatch) {
