@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Seed 1 Admin & 10 Khách hàng (mỗi người một địa chỉ riêng)
+        // 1. Seed 1 Admin & 10 Khách hàng (customer10 bị khóa tài khoản)
         $userAddresses = [
             '120 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
             '45 Nguyễn Trãi, Phường Thượng Đình, Quận Thanh Xuân, Hà Nội',
@@ -43,12 +43,12 @@ class DatabaseSeeder extends Seeder
                 'address' => $userAddresses[$i - 1],
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
-                'status' => 'active',
+                'status' => $i === 10 ? 'inactive' : 'active',
                 'created_at' => now(),
             ]);
         }
 
-        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (30 cũ + 70 mới)
+        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (sách 1 còn 1 cuốn, sách 2 hết hàng = 0)
         $catalog = [
             'Văn học' => [
                 ['Nhà Giả Kim', 'Paulo Coelho', '/imgs/nha-gia-kim.jpg'],
@@ -162,6 +162,8 @@ class DatabaseSeeder extends Seeder
             ],
         ];
 
+        $bookIndex = 0;
+
         foreach ($catalog as $categoryName => $books) {
             $categoryId = DB::table('categories')->insertGetId([
                 'name' => $categoryName,
@@ -170,6 +172,14 @@ class DatabaseSeeder extends Seeder
             ]);
 
             foreach ($books as [$name, $author, $image]) {
+                $bookIndex++;
+
+                $stock = match ($bookIndex) {
+                    1 => 1,         // 1 sản phẩm có số lượng ít (1 cuốn)
+                    2 => 0,         // 1 sản phẩm hết hàng (0 cuốn)
+                    default => rand(10, 100),
+                };
+
                 DB::table('products')->insert([
                     'name' => $name,
                     'author' => $author,
@@ -178,7 +188,7 @@ class DatabaseSeeder extends Seeder
                     'price' => rand(50, 350) * 1000,
                     'category_id' => $categoryId,
                     'image' => $image,
-                    'stock' => rand(10, 100),
+                    'stock' => $stock,
                 ]);
             }
         }
