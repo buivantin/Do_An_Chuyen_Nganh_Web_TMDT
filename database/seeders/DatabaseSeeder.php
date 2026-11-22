@@ -12,20 +12,81 @@ class DatabaseSeeder extends Seeder
     {
         $now = now();
 
-        // 1. Seed 1 Admin & 10 Khách hàng (customer10 bị khóa tài khoản)
-        $userAddresses = [
-            '120 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
-            '45 Nguyễn Trãi, Phường Thượng Đình, Quận Thanh Xuân, Hà Nội',
-            '88 Trần Phú, Phường Hải Châu 1, Quận Hải Châu, Đà Nẵng',
-            '215 Cách Mạng Tháng 8, Phường 4, Quận 3, TP.HCM',
-            '19 Phan Đình Phùng, Phường Quán Thánh, Quận Ba Đình, Hà Nội',
-            '302 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP.HCM',
-            '74 Nguyễn Văn Linh, Phường Hưng Lợi, Quận Ninh Kiều, Cần Thơ',
-            '56 Lý Thường Kiệt, Phường Trần Hưng Đạo, Quận Hoàn Kiếm, Hà Nội',
-            '142 Hoàng Diệu, Phường Bình Thuận, Quận Hải Châu, Đà Nẵng',
-            '95 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM',
+        // 1. Danh sách khách hàng dùng chung đồng nhất cho cả bảng users, orders và reviews
+        $customers = [
+            [
+                'name' => 'Nguyễn Minh Anh',
+                'email' => 'khachhang1@gmail.com',
+                'phone' => '0901234501',
+                'address' => '120 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Trần Quốc Bảo',
+                'email' => 'khachhang2@gmail.com',
+                'phone' => '0901234502',
+                'address' => '45 Nguyễn Trãi, Phường Thượng Đình, Quận Thanh Xuân, Hà Nội',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Lê Thị Thu Hà',
+                'email' => 'khachhang3@gmail.com',
+                'phone' => '0901234503',
+                'address' => '88 Trần Phú, Phường Hải Châu 1, Quận Hải Châu, Đà Nẵng',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Phạm Hoàng Nam',
+                'email' => 'khachhang4@gmail.com',
+                'phone' => '0901234504',
+                'address' => '215 Cách Mạng Tháng 8, Phường 4, Quận 3, TP.HCM',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Võ Thị Thanh Thảo',
+                'email' => 'khachhang5@gmail.com',
+                'phone' => '0901234505',
+                'address' => '19 Phan Đình Phùng, Phường Quán Thánh, Quận Ba Đình, Hà Nội',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Đặng Minh Quân',
+                'email' => 'khachhang6@gmail.com',
+                'phone' => '0901234506',
+                'address' => '302 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP.HCM',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Bùi Ngọc Ánh',
+                'email' => 'khachhang7@gmail.com',
+                'phone' => '0901234507',
+                'address' => '74 Nguyễn Văn Linh, Phường Hưng Lợi, Quận Ninh Kiều, Cần Thơ',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Hoàng Gia Huy',
+                'email' => 'khachhang8@gmail.com',
+                'phone' => '0901234508',
+                'address' => '56 Lý Thường Kiệt, Phường Trần Hưng Đạo, Quận Hoàn Kiếm, Hà Nội',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Đỗ Thị Mai Linh',
+                'email' => 'khachhang9@gmail.com',
+                'phone' => '0901234509',
+                'address' => '142 Hoàng Diệu, Phường Bình Thuận, Quận Hải Châu, Đà Nẵng',
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Ngô Quang Khải',
+                'email' => 'khachhang10@gmail.com',
+                'phone' => '0901234510',
+                'address' => '95 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM',
+                'status' => 'inactive',
+            ],
         ];
 
+        // Tài khoản Admin (id = 1)
         DB::table('users')->insert([
             'username' => 'admin',
             'email' => 'admin@bookstore.com',
@@ -34,27 +95,28 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
-            'created_at' => $now->copy()->subMonths(6),
-            'updated_at' => $now->copy()->subMonths(6),
+            'created_at' => $now->copy()->subYears(5),
+            'updated_at' => $now->copy()->subYears(5),
         ]);
 
-        for ($i = 1; $i <= 10; $i++) {
-            $userCreated = $now->copy()->subDays(rand(30, 150));
+        // 10 Tài khoản Khách hàng (id = 2..11)
+        foreach ($customers as $customer) {
+            $userCreated = $now->copy()->subYears(4)->subMonths(rand(1, 10))->subDays(rand(1, 20));
 
             DB::table('users')->insert([
-                'username' => "customer$i",
-                'email' => "khachhang$i@gmail.com",
-                'phone' => '09010000' . str_pad($i, 2, '0', STR_PAD_LEFT),
-                'address' => $userAddresses[$i - 1],
+                'username' => $customer['name'],
+                'email' => $customer['email'],
+                'phone' => $customer['phone'],
+                'address' => $customer['address'],
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
-                'status' => $i === 10 ? 'inactive' : 'active',
+                'status' => $customer['status'],
                 'created_at' => $userCreated,
                 'updated_at' => $userCreated,
             ]);
         }
 
-        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (sách 1 còn 1 cuốn, sách 2 hết hàng = 0)
+        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (rải đều 20 đầu sách mỗi năm 2022–2026)
         $catalog = [
             'Văn học' => [
                 ['Nhà Giả Kim', 'Paulo Coelho', '/imgs/nha-gia-kim.jpg'],
@@ -175,16 +237,20 @@ class DatabaseSeeder extends Seeder
                 'name' => $categoryName,
                 'description' => "Các đầu sách thuộc thể loại $categoryName",
                 'status' => 'active',
-                'created_at' => $now->copy()->subMonths(6),
-                'updated_at' => $now->copy()->subMonths(6),
+                'created_at' => $now->copy()->subYears(5),
+                'updated_at' => $now->copy()->subYears(5),
             ]);
 
             foreach ($books as [$name, $author, $image]) {
                 $bookIndex++;
-                $productCreated = $now->copy()->subDays(101 - $bookIndex);
+                $prodYearOffset = ($bookIndex - 1) % 5; // 0 => 2026, 1 => 2025, 2 => 2024, 3 => 2023, 4 => 2022
+                $productCreated = $now->copy()
+                    ->subYears($prodYearOffset)
+                    ->subMonths(rand(0, 9))
+                    ->subDays(rand(1, 20));
 
                 $stock = match ($bookIndex) {
-                    1 => 1,         // 1 sản phẩm có số lượng ít (1 cuốn)
+                    1 => 1,         // 1 sản phẩm sắp hết (1 cuốn)
                     2 => 0,         // 1 sản phẩm hết hàng (0 cuốn)
                     default => rand(10, 100),
                 };
@@ -204,47 +270,77 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 4. Seed 10 Đơn hàng theo luồng 4 trạng thái & rải ngày giờ qua 6 tháng
-        $orderAddresses = [
-            '18 Hai Bà Trưng, Phường Bến Nghé, Quận 1, TP.HCM',
-            '210 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội',
-            '64 Bạch Đằng, Phường Thạch Thang, Quận Hải Châu, Đà Nẵng',
-            '412 Nguyễn Thị Minh Khai, Phường 5, Quận 3, TP.HCM',
-            '89 Giảng Võ, Phường Cát Linh, Quận Đống Đa, Hà Nội',
-            '155 Điện Biên Phủ, Phường 15, Quận Bình Thạnh, TP.HCM',
-            '33 Hòa Bình, Phường An Cư, Quận Ninh Kiều, Cần Thơ',
-            '102 Phố Huế, Phường Ngô Thì Nhậm, Quận Hai Bà Trưng, Hà Nội',
-            '27 Lê Duẩn, Phường Hải Châu 1, Quận Hải Châu, Đà Nẵng',
-            '510 Sư Vạn Hạnh, Phường 9, Quận 10, TP.HCM',
+        // 4. Seed 25 Đơn hàng rải đều 2022–2026 (khớp đúng tên, SĐT, địa chỉ & sách của người đánh giá)
+        $reviewedBooksByOrder = [
+            1 => 1,   // Nguyễn Minh Anh (user_id = 2) mua Nhà Giả Kim (product_id = 1)
+            2 => 3,   // Trần Quốc Bảo (user_id = 3) mua Tôi Thấy Hoa Vàng Trên Cỏ Xanh (product_id = 3)
+            3 => 39,  // Lê Thị Thu Hà (user_id = 4) mua Đắc Nhân Tâm (product_id = 39)
+            4 => 62,  // Phạm Hoàng Nam (user_id = 5) mua Tối Ưu Hóa CSDL Với MySQL (product_id = 62)
+            5 => 63,  // Võ Thị Thanh Thảo (user_id = 6) mua Lập Trình Web Với Laravel (product_id = 63)
+            6 => 83,  // Đặng Minh Quân (user_id = 7) mua Dế Mèn Phiêu Lưu Ký (product_id = 83)
+            7 => 1,   // Bùi Ngọc Ánh (user_id = 8) mua Nhà Giả Kim (product_id = 1)
         ];
 
-        // Luồng: pending (Chờ xác nhận) -> shipping (Đang giao) -> completed (Hoàn thành) | cancelled (Đã hủy)
-        $statuses = ['pending', 'shipping', 'completed', 'cancelled'];
+        for ($i = 1; $i <= 25; $i++) {
+            $yearOffset = ($i - 1) % 5; // 0 => 2026, 1 => 2025, 2 => 2024, 3 => 2023, 4 => 2022
+            $customerIdx = ($i - 1) % count($customers); // 0..9
+            $customer = $customers[$customerIdx];
+            $userId = $customerIdx + 2; // user_id = 2..11
 
-        for ($i = 1; $i <= 10; $i++) {
-            $status = $statuses[($i - 1) % count($statuses)];
-            $orderCreated = $now->copy()->subMonths(($i - 1) % 6)->subDays(rand(1, 20))->subHours(rand(1, 12));
+            if ($i <= 7) {
+                // 7 đơn đầu tiên là đơn đã hoàn thành của 7 khách hàng có đánh giá sản phẩm
+                $status = 'completed';
+            } elseif ($yearOffset === 0) {
+                // Các đơn còn lại của năm 2026 có đủ Chờ xác nhận, Đang giao và Đã hủy
+                $status = match ($i) {
+                    11 => 'pending',
+                    16 => 'shipping',
+                    default => 'cancelled',
+                };
+            } else {
+                $status = ($i % 3 === 0) ? 'cancelled' : 'completed';
+            }
+
+            if ($yearOffset === 0) {
+                // Rải đơn năm 2026 qua các tháng 04, 07, 11 để biểu đồ tháng trực quan
+                $orderCreated = match ($i) {
+                    1  => $now->copy()->subDays(10),                  // Tháng 11/2026 (completed)
+                    6  => $now->copy()->subMonths(4)->subDays(5),    // Tháng 07/2026 (completed)
+                    11 => $now->copy()->subDays(2),                   // Tháng 11/2026 (pending)
+                    16 => $now->copy()->subDays(4),                   // Tháng 11/2026 (shipping)
+                    default => $now->copy()->subMonths(7)->subDays(8), // Tháng 04/2026 (cancelled)
+                };
+            } else {
+                $orderCreated = $now->copy()
+                    ->subYears($yearOffset)
+                    ->subMonths(rand(0, 9))
+                    ->subDays(rand(1, 20))
+                    ->subHours(rand(1, 12));
+            }
+
             $orderUpdated = $status === 'pending'
                 ? $orderCreated
                 : $orderCreated->copy()->addHours(rand(2, 48));
 
             $orderId = DB::table('orders')->insertGetId([
-                'receiver_name' => "Nguyễn Văn $i",
+                'receiver_name' => $customer['name'],
                 'status' => $status,
-                'address' => $orderAddresses[$i - 1],
-                'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
+                'address' => $customer['address'],
+                'phone' => $customer['phone'],
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
-                'user_id' => rand(2, 10),
+                'user_id' => $userId,
                 'created_at' => $orderCreated,
                 'updated_at' => $orderUpdated,
             ]);
 
-            // Mỗi đơn hàng có 1-3 sản phẩm
             $total = 0;
             $itemCount = rand(1, 3);
             for ($j = 0; $j < $itemCount; $j++) {
-                $productId = rand(3, 100);
+                $productId = ($j === 0 && isset($reviewedBooksByOrder[$i]))
+                    ? $reviewedBooksByOrder[$i]
+                    : rand(1, 100);
+
                 $price = rand(60, 200) * 1000;
                 $qty = rand(1, 2);
                 $total += $price * $qty;
@@ -252,21 +348,20 @@ class DatabaseSeeder extends Seeder
                 DB::table('order_items')->insert([
                     'order_id' => $orderId,
                     'product_id' => $productId,
-                    'price' => $price, // Giá snapshot tại thời điểm mua
+                    'price' => $price,
                     'quantity' => $qty,
                     'created_at' => $orderCreated,
                     'updated_at' => $orderCreated,
                 ]);
             }
 
-            // Cập nhật lại tổng tiền đơn hàng
             DB::table('orders')->where('id', $orderId)->update(['total_amount' => $total]);
         }
 
-        // 5. Seed dữ liệu mẫu Đánh giá sản phẩm (reviews)
+        // 5. Seed 7 Đánh giá sản phẩm khớp đúng 7 khách hàng đã mua sách ở trên
         $sampleReviews = [
             [
-                'user_id' => 2,      // customer1
+                'user_id' => 2,      // Nguyễn Minh Anh
                 'product_id' => 1,   // Nhà Giả Kim
                 'rating' => 5,
                 'comment' => 'Sách in sắc nét, đóng gói chống sốc rất kỹ. Giao hàng nhanh.',
@@ -275,58 +370,58 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => $now->copy()->subDays(1),
             ],
             [
-                'user_id' => 3,      // customer2
+                'user_id' => 3,      // Trần Quốc Bảo
                 'product_id' => 3,   // Tôi Thấy Hoa Vàng Trên Cỏ Xanh
                 'rating' => 5,
                 'comment' => 'Truyện nhẹ nhàng, sâu lắng, bìa sách rất đẹp.',
                 'status' => 'visible',
-                'created_at' => $now->copy()->subDays(2),
-                'updated_at' => $now->copy()->subDays(2),
+                'created_at' => $now->copy()->subMonths(4),
+                'updated_at' => $now->copy()->subMonths(4),
             ],
             [
-                'user_id' => 4,      // customer3
+                'user_id' => 4,      // Lê Thị Thu Hà
                 'product_id' => 39,  // Đắc Nhân Tâm
                 'rating' => 4,
                 'comment' => 'Nội dung kinh điển, giao hàng đúng hẹn.',
                 'status' => 'visible',
-                'created_at' => $now->copy()->subDays(4),
-                'updated_at' => $now->copy()->subDays(4),
+                'created_at' => $now->copy()->subYear()->subMonths(2),
+                'updated_at' => $now->copy()->subYear()->subMonths(2),
             ],
             [
-                'user_id' => 5,      // customer4
+                'user_id' => 5,      // Phạm Hoàng Nam
                 'product_id' => 62,  // Tối Ưu Hóa CSDL Với MySQL
                 'rating' => 5,
                 'comment' => 'Kiến thức về index và tối ưu truy vấn rất thực tế, dễ áp dụng.',
                 'status' => 'visible',
-                'created_at' => $now->copy()->subDays(5),
-                'updated_at' => $now->copy()->subDays(5),
+                'created_at' => $now->copy()->subYears(2)->subMonths(3),
+                'updated_at' => $now->copy()->subYears(2)->subMonths(3),
             ],
             [
-                'user_id' => 6,      // customer5
+                'user_id' => 6,      // Võ Thị Thanh Thảo
                 'product_id' => 63,  // Lập Trình Web Với Laravel
                 'rating' => 4,
                 'comment' => 'Tài liệu chi tiết, phù hợp làm đồ án web thương mại điện tử.',
                 'status' => 'visible',
-                'created_at' => $now->copy()->subDays(7),
-                'updated_at' => $now->copy()->subDays(7),
+                'created_at' => $now->copy()->subYears(3)->subMonths(4),
+                'updated_at' => $now->copy()->subYears(3)->subMonths(4),
             ],
             [
-                'user_id' => 7,      // customer6
+                'user_id' => 7,      // Đặng Minh Quân
                 'product_id' => 83,  // Dế Mèn Phiêu Lưu Ký
                 'rating' => 5,
                 'comment' => 'Tranh minh họa sinh động, bé nhà mình rất thích.',
                 'status' => 'visible',
-                'created_at' => $now->copy()->subDays(9),
-                'updated_at' => $now->copy()->subDays(9),
+                'created_at' => $now->copy()->subYears(4)->subMonths(2),
+                'updated_at' => $now->copy()->subYears(4)->subMonths(2),
             ],
             [
-                'user_id' => 8,      // customer7
+                'user_id' => 8,      // Bùi Ngọc Ánh
                 'product_id' => 1,   // Nhà Giả Kim
                 'rating' => 2,
                 'comment' => 'Đơn vị vận chuyển giao trễ hơn dự kiến 1 ngày.',
                 'status' => 'hidden',
-                'created_at' => $now->copy()->subDays(12),
-                'updated_at' => $now->copy()->subDays(11),
+                'created_at' => $now->copy()->subYears(4)->subMonths(6),
+                'updated_at' => $now->copy()->subYears(4)->subMonths(5),
             ],
         ];
 

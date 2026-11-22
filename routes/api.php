@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
@@ -27,7 +28,7 @@ Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNum
 // --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập - Dành cho Khách hàng & Admin) ---
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
-    Route::get('/me', fn (Request $request) => $request->user());
+    Route::get('/me', fn (Request $request) =>$request->user());
 
     // TM-06: Đặt hàng (Của TV2)
     Route::post('/orders', [OrderController::class, 'store']);
@@ -53,6 +54,128 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
     
     Route::get('/', fn () => response()->json(['message' => 'Chào mừng Admin']));
+
+    // Thống kê Dashboard & Quản lý đánh giá (Của TV4)
+    Route::get('/dashboard', function (Request $request) {
+        $startDate =$request->query('start_date');
+        $endDate =$request->query('end_date');
+
+        $productsQuery = DB::table('products')
+            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
+                $query->whereDate('created_at', '>=',$startDate)
+                      ->whereDate('created_at', '<=', $endDate);
+            });
+
+        $booksSummary = [
+            'total' => (clone $productsQuery)->count(),
+            'low_stock' => (clone $productsQuery)->where('stock', 1)->count(),
+            'out_of_stock' => (clone $productsQuery)->where('stock', 0)->count(),
+        ];
+
+        $orders = DB::table('orders')
+            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
+                $query->whereDate('created_at', '>=',$startDate)
+                      ->whereDate('created_at', '<=', $endDate);
+            })
+            ->select(
+                'id',
+                'receiver_name as receiver',
+                'phone',
+                'payment_method as method',
+                'total_amount as total',
+                'status',
+                DB::raw('DATE(created_at) as created_at')
+            )
+            ->orderByDesc('created_at')
+            ->get();
+
+        $revenues = DB::table('orders')
+            ->where('status', 'completed')
+            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
+                $query->whereDate('created_at', '>=',$startDate)
+                      ->whereDate('created_at', '<=', $endDate);
+            })
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('SUM(total_amount) as revenue')
+            )
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get();
+
+        $topProducts = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('orders.status', 'completed')
+            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
+                $query->whereDate('orders.created_at', '>=',$startDate)
+                      ->whereDate('orders.created_at', '<=', $endDate);
+            })
+            ->select(
+                'products.id',
+                'products.name',
+                'products.author',
+                'products.price',
+                'products.stock',
+                DB::raw('SUM(order_items.quantity) as sold')
+            )
+            ->groupBy('products.id', 'products.name', 'products.author', 'products.price', 'products.stock')
+            ->orderByDesc('sold')
+            ->limit(5)
+            ->get()
+            ->values()
+            ->map(function ($item,$index) {
+                $item->rank =$index + 1;
+                return $item;
+            });
+
+        $reviews = DB::table('reviews')
+            ->join('users', 'reviews.user_id', '=', 'users.id')
+            ->join('products', 'reviews.product_id', '=', 'products.id')
+            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
+                $query->whereDate('reviews.created_at', '>=',$startDate)
+                      ->whereDate('reviews.created_at', '<=', $endDate);
+            })
+            ->select(
+                'reviews.id',
+                'users.username as customer',
+                'products.name as book',
+                'reviews.rating',
+                'reviews.comment',
+                'reviews.status',
+                DB::raw("DATE_FORMAT(reviews.created_at, '%d/%m/%Y %H:%i') as created_at")
+            )
+            ->orderByDesc('reviews.created_at')
+            ->get();
+
+        return response()->json([
+            'books_summary' => $booksSummary,
+            'orders' => $orders,
+            'revenues' => $revenues,
+            'top_products' => $topProducts,
+            'reviews' => $reviews,
+        ]);
+    });
+
+    Route::patch('/reviews/{id}/toggle', function ($id) {
+        $review = DB::table('reviews')->where('id',$id)->first();
+        if (!$review) {
+            return response()->json(['message' => 'Không tìm thấy đánh giá'], 404);
+        }
+
+        $newStatus =$review->status === 'visible' ? 'hidden' : 'visible';
+        DB::table('reviews')->where('id', $id)->update([
+            'status' => $newStatus,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['status' => $newStatus]);
+    });
+
+    Route::delete('/reviews/{id}', function ($id) {
+        DB::table('reviews')->where('id', $id)->delete();
+        return response()->json(['message' => 'Đã xóa đánh giá']);
+    });
 
     // TM-14: Quản lý người dùng (Của TV1)
     Route::get('/users', [UserController::class, 'index']);
