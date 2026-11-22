@@ -6,14 +6,12 @@ import axios from 'axios';
 import Home from './pages/Home';
 import ProductList from './pages/ProductList';
 import Forbidden from './pages/Forbidden';
-// ⚠️ SỬA LỖI: Thống nhất tên thư mục là 'admin' (chữ thường). 
-// Bạn hãy kiểm tra lại trên VS Code xem thư mục thực tế tên là 'Admin' hay 'admin' để sửa cho đúng nhé.
 import UserManagement from './pages/admin/UserManagement'; 
 import CategoryManagement from './pages/admin/CategoryManagement'; 
-import Account from './pages/Account'; 
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
+import Account from './pages/Account'; 
 import MainLayout from './layouts/MainLayout';
 
 function getStoredUser() {
