@@ -124,13 +124,41 @@
 - Giai đoạn: Kiểm thử
 - Task / Commit / PR: [TM-06] / test(TM06): dat hang thanh cong, vuot ton kho, rollback / <PR>
 - Mục đích: Viết 2 unit test
-- Prompt chính: <dán prompt> <hoặc link>
+- Prompt chính: Viet Unit test cho OrderService
 - Kết quả AI trả về : OrderServiceTest.php gồm 3 test: đặt hàng thành công, vượt tồn kho bị từ chối, lỗi giữa chừng thì rollback (ném lỗi bằng sự kiện created của OrderItem);
 - Đánh giá: Đúng. AI đoán tên cột của categories, users, cart_items
 - Đã chỉnh sửa gì: <"không sửa">
 - Cách kiểm chứng: php artisan test --filter=OrderServiceTest: 3 passed (17 assertions). Sau khi chạy, bảng products vẫn còn 30 dòng (test không xóa dữ liệu mẫu). Chưa kiểm tra khóa dòng khi hai người mua cùng lúc
 - Tỷ lệ mã AI còn giữ lại (ước lượng): 80%
 - Điều học được: Test tuần tự chứng minh logic và rollback chứ không chứng minh khóa dòng; kiểm tra phpunit.xml trước khi dùng RefreshDatabase
+
+### [AI-10] Giải thích cơ chế khóa CSDL chống bán vượt tồn kho
+- Ngày / Người dùng:22/11/2026 / Vo Tran Dinh Son
+- Công cụ: Gemini
+- Giai đoạn: Kiểm thử
+- Task / Commit / PR: [TM-06] / nhánh fix/TM-06-dong-thoi / commit fix (TM-06): chong ban vuot ton kho
+- Mục đích: Hiểu rõ cơ chế khóa giao dịch đồng thời trong CSDL để kiểm thử và đảm bảo chức năng đặt hàng COD (TM-06) không bị âm tồn kho khi hai khách cùng mua cuốn sách cuối cùng
+- Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): giải thích cơ chế khóa trong CSDL
+- Kết quả AI trả về (tóm tắt): Giải thích nguyên nhân gây tranh chấp dữ liệu (Race Condition) khi 2 phiên cùng đọc tồn kho và phân tích 2 giải pháp trong SQL transaction: Khóa bi quan (SELECT ... FOR UPDATE) và Cập nhật nguyên tử có điều kiện (UPDATE products SET stock = stock - qty WHERE id = ? AND stock >= qty)
+- Đánh giá: Đúng / Giải thích rõ bản chất khóa dòng và cập nhật có điều kiện trong transaction, nhưng cần tự đối chiếu lại với cấu trúc bảng products và mã nguồn OrderService thực tế của nhóm
+- Đã chỉnh sửa gì: Không chèn thêm code mới từ AI do đã rà soát lại transaction trong OrderService và xác nhận điều kiện trừ tồn kho đã chặn được giao dịch trùng
+- Cách kiểm chứng: Chỉnh tồn kho cuốn Nhà Giả Kim về 1, mở 2 trình duyệt đăng nhập 2 tài khoản rồi bấm đặt hàng đồng thời. Kết quả chỉ 1 đơn tạo thành công phiên của customer1 bị chặn và hiển thị đúng thông báo "Sản phẩm Nhà Giả Kim không đủ số lượng."
+- Tỷ lệ mã AI còn giữ lại (ước lượng): 0%
+- Điều học được: Nắm được cách ngăn chặn lỗi Race Condition bằng transaction kết hợp điều kiện kiểm tra tồn kho tại thời điểm ghi để tồn kho không bao giờ bị âm.
+
+### [AI-11] Unit Test cho AuthService
+- Ngày / Người dùng: 22/11/2026
+- Công cụ: Gemini
+- Giai đoạn: Kiểm thử
+- Task / Commit / PR: TM-04, TM-06 / nhánh test/TM-04-TM-06 / commit test (TM-04): them unit test cho AuthService va OrderService
+- Mục đích: Tạo khung kiểm thử đơn vị cho AuthService để kiểm chứng việc từ chối đăng ký email trùng và chặn đăng nhập tài khoản bị khóa.
+- Prompt chính (nguyên văn hoặc link chia sẻ hội thoại): Khung UnitTest cho AuthServiceTest
+- Kết quả AI trả về (tóm tắt): Hướng dẫn tạo khung Unit Test và hướng dẫn chi tiết cho nội dung khung
+- Đánh giá: Thiếu – Đoạn mã gợi ý ban đầu chưa biết hàm khởi tạo UserRepository::__construct(User $model) và tệp phpunit.xml đang trỏ về CSDL trống sqlite :memory: nên phát sinh lỗi ArgumentCountError và no such table: users. Sau khi gửi log lỗi và đối chiếu với OrderServiceTest.php, AI đã hướng dẫn sửa lại chính xác.
+- Đã chỉnh sửa gì: chuyển từ DatabaseTransactions sang RefreshDatabase để tự chạy migration trên SQLite :memory:, sửa các trường dữ liệu mẫu (username, status => 'locked') khớp với bảng users của dự án
+- Cách kiểm chứng: Chạy lệnh php artisan test --filter AuthServiceTest và php artisan test trên terminal, xác nhận toàn bộ các ca kiểm thử của AuthServiceTest và OrderServiceTest đều báo PASS màu xanh
+- Tỷ lệ mã AI còn giữ lại (ước lượng): 75%
+- Điều học được: Cách sử dụng trait RefreshDatabase và Service Container (app(...)) trong Laravel để viết Unit Test độc lập, chạy được trên mọi máy sạch mà không làm ảnh hưởng dữ liệu demo.
 
 <!-- Mẫu mục mới: chép khối dưới, đổi mã AI-xx
 
