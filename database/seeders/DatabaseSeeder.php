@@ -10,11 +10,25 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Seed 1 Admin & 10 Khách hàng (kèm số điện thoại)
+        // 1. Seed 1 Admin & 10 Khách hàng (mỗi người một địa chỉ riêng)
+        $userAddresses = [
+            '120 Lê Lợi, Phường Bến Thành, Quận 1, TP.HCM',
+            '45 Nguyễn Trãi, Phường Thượng Đình, Quận Thanh Xuân, Hà Nội',
+            '88 Trần Phú, Phường Hải Châu 1, Quận Hải Châu, Đà Nẵng',
+            '215 Cách Mạng Tháng 8, Phường 4, Quận 3, TP.HCM',
+            '19 Phan Đình Phùng, Phường Quán Thánh, Quận Ba Đình, Hà Nội',
+            '302 Võ Văn Ngân, Phường Bình Thọ, TP. Thủ Đức, TP.HCM',
+            '74 Nguyễn Văn Linh, Phường Hưng Lợi, Quận Ninh Kiều, Cần Thơ',
+            '56 Lý Thường Kiệt, Phường Trần Hưng Đạo, Quận Hoàn Kiếm, Hà Nội',
+            '142 Hoàng Diệu, Phường Bình Thuận, Quận Hải Châu, Đà Nẵng',
+            '95 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM',
+        ];
+
         DB::table('users')->insert([
             'username' => 'admin',
             'email' => 'admin@bookstore.com',
             'phone' => '0901000000',
+            'address' => '01 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM',
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
@@ -26,6 +40,7 @@ class DatabaseSeeder extends Seeder
                 'username' => "customer$i",
                 'email' => "khachhang$i@gmail.com",
                 'phone' => '09010000' . str_pad($i, 2, '0', STR_PAD_LEFT),
+                'address' => $userAddresses[$i - 1],
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
                 'status' => 'active',
@@ -168,13 +183,26 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái (kèm tên người nhận & SĐT)
+        // 4. Seed 10 Đơn hàng mẫu nhiều trạng thái (địa chỉ giao hàng khác nhau)
+        $orderAddresses = [
+            '18 Hai Bà Trưng, Phường Bến Nghé, Quận 1, TP.HCM',
+            '210 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội',
+            '64 Bạch Đằng, Phường Thạch Thang, Quận Hải Châu, Đà Nẵng',
+            '412 Nguyễn Thị Minh Khai, Phường 5, Quận 3, TP.HCM',
+            '89 Giảng Võ, Phường Cát Linh, Quận Đống Đa, Hà Nội',
+            '155 Điện Biên Phủ, Phường 15, Quận Bình Thạnh, TP.HCM',
+            '33 Hòa Bình, Phường An Cư, Quận Ninh Kiều, Cần Thơ',
+            '102 Phố Huế, Phường Ngô Thì Nhậm, Quận Hai Bà Trưng, Hà Nội',
+            '27 Lê Duẩn, Phường Hải Châu 1, Quận Hải Châu, Đà Nẵng',
+            '510 Sư Vạn Hạnh, Phường 9, Quận 10, TP.HCM',
+        ];
+
         $statuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
         for ($i = 1; $i <= 10; $i++) {
             $orderId = DB::table('orders')->insertGetId([
                 'receiver_name' => "Nguyễn Văn $i",
                 'status' => $statuses[array_rand($statuses)],
-                'address' => "$i Đường Nguyễn Huệ, Quận 1, TP.HCM",
+                'address' => $orderAddresses[$i - 1],
                 'phone' => '09876543' . str_pad($i, 2, '0', STR_PAD_LEFT),
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
                 'total_amount' => 0,
