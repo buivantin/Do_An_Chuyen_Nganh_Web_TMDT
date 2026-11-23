@@ -262,7 +262,6 @@ export default function ProductList({
               onChange={(e) => updateFilter({ sort: e.target.value })}
               className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-stone-800 focus:outline-none focus:border-[#9A5B13] cursor-pointer"
             >
-              <option value="bestseller">Bán chạy nhất</option>
               <option value="newest">Mới nhất</option>
               <option value="price_asc">Giá: Thấp đến Cao</option>
               <option value="price_desc">Giá: Cao đến Thấp</option>

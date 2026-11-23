@@ -4,6 +4,101 @@ import LoginRequiredModal from "../components/LoginRequiredModal";
 import CheckoutStepper from "../components/CheckoutStepper";
 import ProductService from "../services/ProductService";
 
+function resolveProductImage(item) {
+  const raw =
+    item?.image ||
+    item?.image_path ||
+    item?.image_url ||
+    item?.thumbnail ||
+    item?.product?.image ||
+    item?.product?.image_path ||
+    item?.product?.thumbnail ||
+    "";
+
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+
+  if (
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
+  }
+
+  const clean = trimmed.replace(/^\/+/, "");
+  if (clean.startsWith("public/")) {
+    return `/storage/${clean.slice(7)}`;
+  }
+  if (
+    clean.startsWith("storage/") ||
+    clean.startsWith("images/") ||
+    clean.startsWith("img/") ||
+    clean.startsWith("uploads/") ||
+    clean.startsWith("assets/")
+  ) {
+    return `/${clean}`;
+  }
+
+  // Mặc định đường dẫn từ Laravel Storage disk('public') như "products/abc.jpg"
+  return `/storage/${clean}`;
+}
+
+function getFallbackImageUrl(url) {
+  if (!url || /^https?:\/\//i.test(url) || url.startsWith("data:")) return null;
+  if (url.startsWith("/storage/")) return `/${url.slice(9)}`;
+  if (url.startsWith("/")) return `/storage${url}`;
+  return null;
+}
+
+function CartBookImage({ item, alt }) {
+  const initialUrl = resolveProductImage(item);
+  const [src, setSrc] = useState(initialUrl);
+  const [retried, setRetried] = useState(false);
+
+  useEffect(() => {
+    setSrc(resolveProductImage(item));
+    setRetried(false);
+  }, [item]);
+
+  if (!src) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 text-[10px] font-bold uppercase tracking-wider select-none">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          className="w-6 h-6 mb-1 text-[#9A5B13]/70"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+        <span>Sách</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => {
+        if (!retried) {
+          const altUrl = getFallbackImageUrl(src);
+          if (altUrl && altUrl !== src) {
+            setRetried(true);
+            setSrc(altUrl);
+            return;
+          }
+        }
+        setSrc(null);
+      }}
+      className="h-full object-contain shadow-sm"
+    />
+  );
+}
+
 export default function Cart() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +143,6 @@ export default function Cart() {
     [items]
   );
 
-  // Sửa lại logic tính tiền dựa trên dữ liệu làm phẳng từ ProductService
   const subtotal = useMemo(
     () =>
       items.reduce(
@@ -60,8 +154,7 @@ export default function Cart() {
 
   const handleUpdateQuantity = async (item, nextQty) => {
     if (nextQty < 1 || updatingId === item.id) return;
-    
-    // Sửa lại logic kiểm tra tồn kho
+
     if (item.stock > 0 && nextQty > item.stock) {
       setErrorMsg(`Sách "${item.name}" chỉ còn ${item.stock} cuốn trong kho.`);
       return;
@@ -167,26 +260,23 @@ export default function Cart() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-7 space-y-3.5">
               {items.map((item) => {
-                const cleanName = (item.name || "").normalize("NFC");
+                const cleanName = (item.name || item.product?.name || "").normalize("NFC");
+                const authorName = (item.author || item.product?.author || "").normalize("NFC");
+                const productId = item.product_id || item.product?.id;
                 const isBusy = updatingId === item.id;
-                
-                // Fix đường dẫn ảnh nếu backend trả về đường dẫn tương đối
-                const imageUrl = item.image?.startsWith('http') 
-                    ? item.image 
-                    : `http://127.0.0.1:8000/${item.image}`;
 
                 return (
                   <div key={item.id} className="bg-white border border-stone-200/80 rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 items-center shadow-2xs">
-                    <a href={`/products/${item.product_id}`} className="w-20 sm:w-24 aspect-[3/4] bg-[#EAEAEA] rounded-xl p-2 flex items-center justify-center shrink-0">
-                      <img src={imageUrl} alt={cleanName} className="h-full object-contain shadow-sm" />
+                    <a href={productId ? `/products/${productId}` : undefined} className="w-20 sm:w-24 aspect-[3/4] bg-[#EAEAEA] rounded-xl p-2 flex items-center justify-center shrink-0 overflow-hidden">
+                      <CartBookImage item={item} alt={cleanName} />
                     </a>
 
                     <div className="flex-1 min-w-0 space-y-1.5">
-                      <a href={`/products/${item.product_id}`} className="font-serif text-base sm:text-lg font-bold text-stone-900 hover:text-[#9A5B13] line-clamp-2 block">
+                      <a href={productId ? `/products/${productId}` : undefined} className="font-serif text-base sm:text-lg font-bold text-stone-900 hover:text-[#9A5B13] line-clamp-2 block">
                         {cleanName}
                       </a>
                       <p className="text-xs text-stone-500 truncate">
-                        {item.author?.normalize("NFC")}
+                        {authorName}
                       </p>
                       <div className="text-sm sm:text-base font-bold text-[#9A5B13]">
                         {Number(item.price || 0).toLocaleString("vi-VN")} ₫
