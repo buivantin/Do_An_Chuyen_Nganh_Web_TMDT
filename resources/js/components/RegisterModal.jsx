@@ -167,26 +167,6 @@ export default function RegisterModal({ isOpen, onClose, onRegisterSuccess, onSw
               Mật khẩu
             </label>
             <PasswordInput
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Tối thiểu 8 ký tự"
-              autoComplete="new-password"
-            />
-            {fieldErrors.password && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.password[0]}</p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="register-password"
-              className="block text-xs font-semibold text-stone-700 mb-1"
-            >
-              Mật khẩu
-            </label>
-            <PasswordInput
               id="register-password"
               name="password"
               required
