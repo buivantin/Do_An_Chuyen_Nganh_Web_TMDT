@@ -4,465 +4,9 @@ import MainLayout from "../layouts/MainLayout";
 import LoginRequiredModal from "../components/LoginRequiredModal";
 import ProductService from "../services/ProductService";
 import CheckoutStepper from "../components/CheckoutStepper";
-
-const VIETNAM_ADDRESSES = [
-  {
-    code: "79",
-    name: "TP. Hồ Chí Minh",
-    districts: [
-      {
-        code: "760",
-        name: "Quận 1",
-        wards: [
-          "Phường Bến Nghé",
-          "Phường Bến Thành",
-          "Phường Cầu Kho",
-          "Phường Cầu Ông Lãnh",
-          "Phường Cô Giang",
-          "Phường Đa Kao",
-          "Phường Nguyễn Cư Trinh",
-          "Phường Nguyễn Thái Bình",
-          "Phường Phạm Ngũ Lão",
-          "Phường Tân Định",
-        ],
-      },
-      {
-        code: "770",
-        name: "Quận 3",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường Võ Thị Sáu",
-        ],
-      },
-      {
-        code: "774",
-        name: "Quận 5",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 4",
-          "Phường 5",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-        ],
-      },
-      {
-        code: "776",
-        name: "Quận 7",
-        wards: [
-          "Phường Bình Thuận",
-          "Phường Phú Mỹ",
-          "Phường Phú Thuận",
-          "Phường Tân Hưng",
-          "Phường Tân Kiểng",
-          "Phường Tân Phong",
-          "Phường Tân Phú",
-          "Phường Tân Quy",
-          "Phường Tân Thuận Đông",
-          "Phường Tân Thuận Tây",
-        ],
-      },
-      {
-        code: "771",
-        name: "Quận 10",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-        ],
-      },
-      {
-        code: "765",
-        name: "Quận Bình Thạnh",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 17",
-          "Phường 19",
-          "Phường 21",
-          "Phường 22",
-          "Phường 24",
-          "Phường 25",
-          "Phường 26",
-          "Phường 27",
-          "Phường 28",
-        ],
-      },
-      {
-        code: "764",
-        name: "Quận Gò Vấp",
-        wards: [
-          "Phường 1",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-          "Phường 16",
-          "Phường 17",
-        ],
-      },
-      {
-        code: "766",
-        name: "Quận Tân Bình",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-        ],
-      },
-      {
-        code: "769",
-        name: "TP. Thủ Đức",
-        wards: [
-          "Phường An Khánh",
-          "Phường An Lợi Đông",
-          "Phường An Phú",
-          "Phường Bình Chiểu",
-          "Phường Bình Thọ",
-          "Phường Cát Lái",
-          "Phường Hiệp Bình Chánh",
-          "Phường Hiệp Bình Phước",
-          "Phường Hiệp Phú",
-          "Phường Linh Chiểu",
-          "Phường Linh Đông",
-          "Phường Linh Tây",
-          "Phường Linh Trung",
-          "Phường Linh Xuân",
-          "Phường Long Bình",
-          "Phường Long Thạnh Mỹ",
-          "Phường Phước Bình",
-          "Phường Phước Long A",
-          "Phường Phước Long B",
-          "Phường Tăng Nhơn Phú A",
-          "Phường Tăng Nhơn Phú B",
-          "Phường Thảo Điền",
-          "Phường Thủ Thiêm",
-          "Phường Trường Thọ",
-        ],
-      },
-    ],
-  },
-  {
-    code: "01",
-    name: "Hà Nội",
-    districts: [
-      {
-        code: "001",
-        name: "Quận Ba Đình",
-        wards: [
-          "Phường Cống Vị",
-          "Phường Điện Biên",
-          "Phường Đội Cấn",
-          "Phường Giảng Võ",
-          "Phường Kim Mã",
-          "Phường Liễu Giai",
-          "Phường Ngọc Hà",
-          "Phường Ngọc Khánh",
-          "Phường Nguyễn Trung Trực",
-          "Phường Phúc Xá",
-          "Phường Quán Thánh",
-          "Phường Thành Công",
-          "Phường Trúc Bạch",
-          "Phường Vĩnh Phúc",
-        ],
-      },
-      {
-        code: "002",
-        name: "Quận Hoàn Kiếm",
-        wards: [
-          "Phường Chương Dương",
-          "Phường Cửa Đông",
-          "Phường Cửa Nam",
-          "Phường Đồng Xuân",
-          "Phường Hàng Bạc",
-          "Phường Hàng Bài",
-          "Phường Hàng Bồ",
-          "Phường Hàng Bông",
-          "Phường Hàng Buồm",
-          "Phường Hàng Đào",
-          "Phường Hàng Gai",
-          "Phường Hàng Mã",
-          "Phường Hàng Trống",
-          "Phường Lý Thái Tổ",
-          "Phường Phan Chu Trinh",
-          "Phường Phúc Tân",
-          "Phường Tràng Tiền",
-          "Phường Trần Hưng Đạo",
-        ],
-      },
-      {
-        code: "005",
-        name: "Quận Cầu Giấy",
-        wards: [
-          "Phường Dịch Vọng",
-          "Phường Dịch Vọng Hậu",
-          "Phường Mai Dịch",
-          "Phường Nghĩa Đô",
-          "Phường Nghĩa Tân",
-          "Phường Quan Hoa",
-          "Phường Trung Hòa",
-          "Phường Yên Hòa",
-        ],
-      },
-      {
-        code: "006",
-        name: "Quận Đống Đa",
-        wards: [
-          "Phường Cát Linh",
-          "Phường Hàng Bột",
-          "Phường Khâm Thiên",
-          "Phường Khương Thượng",
-          "Phường Kim Liên",
-          "Phường Láng Hạ",
-          "Phường Láng Thượng",
-          "Phường Nam Đồng",
-          "Phường Ngã Tư Sở",
-          "Phường Ô Chợ Dừa",
-          "Phường Phương Liên",
-          "Phường Phương Mai",
-          "Phường Quang Trung",
-          "Phường Quốc Tử Giám",
-          "Phường Thịnh Quang",
-          "Phường Thổ Quan",
-          "Phường Trung Liệt",
-          "Phường Trung Phụng",
-          "Phường Trung Tự",
-          "Phường Văn Chương",
-          "Phường Văn Miếu",
-        ],
-      },
-      {
-        code: "009",
-        name: "Quận Thanh Xuân",
-        wards: [
-          "Phường Hạ Đình",
-          "Phường Khương Đình",
-          "Phường Khương Mai",
-          "Phường Khương Trung",
-          "Phường Kim Giang",
-          "Phường Nhân Chính",
-          "Phường Phương Liệt",
-          "Phường Thanh Xuân Bắc",
-          "Phường Thanh Xuân Nam",
-          "Phường Thanh Xuân Trung",
-          "Phường Thượng Đình",
-        ],
-      },
-    ],
-  },
-  {
-    code: "48",
-    name: "Đà Nẵng",
-    districts: [
-      {
-        code: "492",
-        name: "Quận Hải Châu",
-        wards: [
-          "Phường Bình Hiên",
-          "Phường Bình Thuận",
-          "Phường Hải Châu I",
-          "Phường Hải Châu II",
-          "Phường Hòa Cường Bắc",
-          "Phường Hòa Cường Nam",
-          "Phường Hòa Thuận Đông",
-          "Phường Hòa Thuận Tây",
-          "Phường Nam Dương",
-          "Phường Phước Ninh",
-          "Phường Thạch Thang",
-          "Phường Thanh Bình",
-          "Phường Thuận Phước",
-        ],
-      },
-      {
-        code: "493",
-        name: "Quận Sơn Trà",
-        wards: [
-          "Phường An Hải Bắc",
-          "Phường An Hải Đông",
-          "Phường An Hải Tây",
-          "Phường Mân Thái",
-          "Phường Nại Hiên Đông",
-          "Phường Phước Mỹ",
-          "Phường Thọ Quang",
-        ],
-      },
-      {
-        code: "490",
-        name: "Quận Liên Chiểu",
-        wards: [
-          "Phường Hòa Hiệp Bắc",
-          "Phường Hòa Hiệp Nam",
-          "Phường Hòa Khánh Bắc",
-          "Phường Hòa Khánh Nam",
-          "Phường Hòa Minh",
-        ],
-      },
-    ],
-  },
-  {
-    code: "92",
-    name: "Cần Thơ",
-    districts: [
-      {
-        code: "916",
-        name: "Quận Ninh Kiều",
-        wards: [
-          "Phường An Bình",
-          "Phường An Cư",
-          "Phường An Hòa",
-          "Phường An Khánh",
-          "Phường An Nghiệp",
-          "Phường An Phú",
-          "Phường Cái Khế",
-          "Phường Hưng Lợi",
-          "Phường Tân An",
-          "Phường Thới Bình",
-          "Phường Xuân Khánh",
-        ],
-      },
-      {
-        code: "918",
-        name: "Quận Cái Răng",
-        wards: [
-          "Phường Ba Láng",
-          "Phường Hưng Phú",
-          "Phường Hưng Thạnh",
-          "Phường Lê Bình",
-          "Phường Phú Thứ",
-          "Phường Tân Phú",
-          "Phường Thường Thạnh",
-        ],
-      },
-    ],
-  },
-  {
-    code: "74",
-    name: "Bình Dương",
-    districts: [
-      {
-        code: "718",
-        name: "TP. Thủ Dầu Một",
-        wards: [
-          "Phường Chánh Mỹ",
-          "Phường Chánh Nghĩa",
-          "Phường Định Hòa",
-          "Phường Hiệp An",
-          "Phường Hiệp Thành",
-          "Phường Hòa Phú",
-          "Phường Phú Cường",
-          "Phường Phú Hòa",
-          "Phường Phú Lợi",
-          "Phường Phú Mỹ",
-          "Phường Phú Tân",
-          "Phường Phú Thọ",
-          "Phường Tân An",
-          "Phường Tương Bình Hiệp",
-        ],
-      },
-      {
-        code: "724",
-        name: "TP. Dĩ An",
-        wards: [
-          "Phường An Bình",
-          "Phường Bình An",
-          "Phường Bình Thắng",
-          "Phường Dĩ An",
-          "Phường Đông Hòa",
-          "Phường Tân Bình",
-          "Phường Tân Đông Hiệp",
-        ],
-      },
-    ],
-  },
-  {
-    code: "75",
-    name: "Đồng Nai",
-    districts: [
-      {
-        code: "731",
-        name: "TP. Biên Hòa",
-        wards: [
-          "Phường An Bình",
-          "Phường Bình Đa",
-          "Phường Bửu Hòa",
-          "Phường Bửu Long",
-          "Phường Hố Nai",
-          "Phường Long Bình",
-          "Phường Long Bình Tân",
-          "Phường Quang Vinh",
-          "Phường Quyết Thắng",
-          "Phường Tam Hiệp",
-          "Phường Tam Hòa",
-          "Phường Tân Biên",
-          "Phường Tân Hiệp",
-          "Phường Tân Hòa",
-          "Phường Tân Mai",
-          "Phường Tân Phong",
-          "Phường Tân Tiến",
-          "Phường Tân Vạn",
-          "Phường Thanh Bình",
-          "Phường Thống Nhất",
-          "Phường Trảng Dài",
-          "Phường Trung Dũng",
-        ],
-      },
-    ],
-  },
-];
+import VietnamAddressSelector, {
+  formatVietnamAddress,
+} from "../components/VietnamAddressSelector";
 
 const PAYMENT_METHODS = [
   {
@@ -533,7 +77,6 @@ export default function Checkout() {
   const [districtCode, setDistrictCode] = useState("");
   const [wardName, setWardName] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
-  const [debouncedMapQuery, setDebouncedMapQuery] = useState("TP. Hồ Chí Minh, Việt Nam");
 
   const [saveAsDefault, setSaveAsDefault] = useState(true);
   const [note, setNote] = useState("");
@@ -623,44 +166,16 @@ export default function Checkout() {
     }
   };
 
-  const currentProvince = useMemo(
-    () => VIETNAM_ADDRESSES.find((p) => p.code === provinceCode) || null,
-    [provinceCode]
+  const newAddressString = useMemo(
+    () =>
+      formatVietnamAddress({
+        provinceCode,
+        districtCode,
+        wardName,
+        streetAddress,
+      }),
+    [provinceCode, districtCode, wardName, streetAddress]
   );
-
-  const availableDistricts = useMemo(
-    () => currentProvince?.districts || [],
-    [currentProvince]
-  );
-
-  const currentDistrict = useMemo(
-    () => availableDistricts.find((d) => d.code === districtCode) || null,
-    [availableDistricts, districtCode]
-  );
-
-  const availableWards = useMemo(
-    () => currentDistrict?.wards || [],
-    [currentDistrict]
-  );
-
-  const newAddressString = useMemo(() => {
-    return [
-      streetAddress.trim(),
-      wardName,
-      currentDistrict?.name || "",
-      currentProvince?.name || "",
-    ]
-      .filter(Boolean)
-      .join(", ");
-  }, [streetAddress, wardName, currentDistrict, currentProvince]);
-
-  useEffect(() => {
-    if (addressMode !== "new") return;
-    const timer = setTimeout(() => {
-      setDebouncedMapQuery(newAddressString || "TP. Hồ Chí Minh, Việt Nam");
-    }, 450);
-    return () => clearTimeout(timer);
-  }, [addressMode, newAddressString]);
 
   const totalBooks = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
@@ -831,14 +346,6 @@ export default function Checkout() {
   };
 
   const currentStep = orderSuccess ? 3 : 2;
-  const mapZoom = streetAddress.trim() ? 16 : wardName ? 14 : currentDistrict ? 13 : 12;
-  const encodedMapQuery = encodeURIComponent(
-    debouncedMapQuery.includes("Việt Nam")
-      ? debouncedMapQuery
-      : `${debouncedMapQuery}, Việt Nam`
-  );
-  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodedMapQuery}&t=&z=${mapZoom}&ie=UTF8&iwloc=&output=embed`;
-  const externalMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedMapQuery}`;
 
   return (
     <MainLayout>
@@ -1202,130 +709,33 @@ export default function Checkout() {
                       )}
                     </div>
                   ) : (
-                    /* CHẾ ĐỘ 2: Giao tới địa chỉ mới */
-                    <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 space-y-3.5">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                            Tỉnh / Thành phố <span className="text-[#9A5B13]">*</span>
-                          </label>
-                          <select
-                            value={provinceCode}
-                            onChange={(e) => {
-                              setProvinceCode(e.target.value);
-                              setDistrictCode("");
-                              setWardName("");
-                            }}
-                            className="w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 focus:outline-none transition cursor-pointer"
-                          >
-                            <option value="">-- Chọn Tỉnh / Thành --</option>
-                            {VIETNAM_ADDRESSES.map((p) => (
-                              <option key={p.code} value={p.code}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                            Quận / Huyện
-                          </label>
-                          <select
-                            value={districtCode}
-                            disabled={!provinceCode}
-                            onChange={(e) => {
-                              setDistrictCode(e.target.value);
-                              setWardName("");
-                            }}
-                            className="w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] disabled:bg-stone-100 disabled:text-stone-400 rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 focus:outline-none transition cursor-pointer"
-                          >
-                            <option value="">-- Chọn Quận / Huyện --</option>
-                            {availableDistricts.map((d) => (
-                              <option key={d.code} value={d.code}>
-                                {d.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                            Phường / Xã
-                          </label>
-                          <select
-                            value={wardName}
-                            disabled={!districtCode}
-                            onChange={(e) => setWardName(e.target.value)}
-                            className="w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] disabled:bg-stone-100 disabled:text-stone-400 rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 focus:outline-none transition cursor-pointer"
-                          >
-                            <option value="">-- Chọn Phường / Xã --</option>
-                            {availableWards.map((w) => (
-                              <option key={w} value={w}>
-                                {w}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                          Địa chỉ cụ thể (Số nhà, tên phố, tòa nhà){" "}
-                          <span className="text-[#9A5B13]">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={streetAddress}
-                          onChange={(e) => setStreetAddress(e.target.value)}
-                          placeholder="Số nhà, tên đường..."
-                          className="w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition"
-                        />
-                      </div>
-
-                      {/* Bản đồ xác nhận vị trí */}
-                      <div className="bg-white border border-stone-200/80 rounded-xl overflow-hidden">
-                        <div className="px-3 py-2 border-b border-stone-200/70 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2 h-2 rounded-full bg-[#9A5B13] shrink-0" />
-                            <span className="text-[11px] text-stone-600 truncate">
-                              Vị trí giao:{" "}
-                              <strong className="text-stone-900">
-                                {newAddressString || "Chưa chọn địa chỉ"}
-                              </strong>
-                            </span>
-                          </div>
-                          <a
-                            href={externalMapUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] font-bold text-[#9A5B13] hover:underline shrink-0"
-                          >
-                            Mở Google Maps
-                          </a>
-                        </div>
-                        <div className="w-full h-44 sm:h-52 bg-stone-200/60">
-                          <iframe
-                            title="Bản đồ địa chỉ giao hàng mới"
-                            src={mapEmbedUrl}
-                            className="w-full h-full border-0"
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
+                    /* CHẾ ĐỘ 2: Giao tới địa chỉ mới (dùng chung component với Account) */
+                    <VietnamAddressSelector
+                      provinceCode={provinceCode}
+                      onProvinceChange={setProvinceCode}
+                      districtCode={districtCode}
+                      onDistrictChange={setDistrictCode}
+                      wardName={wardName}
+                      onWardChange={setWardName}
+                      streetAddress={streetAddress}
+                      onStreetChange={setStreetAddress}
+                      streetRequired
+                      mapLabel="Vị trí giao:"
+                      mapHeightClass="h-44 sm:h-52"
+                      footer={
+                        <label className="inline-flex items-center gap-2 text-xs text-stone-600 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={saveAsDefault}
+                            onChange={(e) => setSaveAsDefault(e.target.checked)}
+                            className="w-4 h-4 rounded accent-[#9A5B13] cursor-pointer"
                           />
-                        </div>
-                      </div>
-
-                      <label className="inline-flex items-center gap-2 text-xs text-stone-600 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={saveAsDefault}
-                          onChange={(e) => setSaveAsDefault(e.target.checked)}
-                          className="w-4 h-4 rounded accent-[#9A5B13] cursor-pointer"
-                        />
-                        <span>Lưu làm địa chỉ giao nhận mặc định cho lần đặt sau</span>
-                      </label>
-                    </div>
+                          <span>
+                            Lưu làm địa chỉ giao nhận mặc định cho lần đặt sau
+                          </span>
+                        </label>
+                      }
+                    />
                   )}
 
                   <div>
@@ -1360,7 +770,6 @@ export default function Checkout() {
                 </div>
 
                 <div className="space-y-3">
-                  {/* Giao tiêu chuẩn */}
                   <button
                     type="button"
                     onClick={() => setShippingMethod("standard")}
@@ -1405,7 +814,6 @@ export default function Checkout() {
                     </p>
                   </button>
 
-                  {/* Giao hỏa tốc */}
                   <button
                     type="button"
                     onClick={() => setShippingMethod("express")}
@@ -1449,7 +857,7 @@ export default function Checkout() {
                 </div>
               </section>
 
-              {/* KHỐI 3: Phương Thức Thanh Toán (COD, VNPay, MoMo) */}
+              {/* KHỐI 3: Phương Thức Thanh Toán */}
               <section className="bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xs">
                 <div className="flex items-start gap-3">
                   <span className="w-7 h-7 rounded-lg bg-[#141414] text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
@@ -1515,7 +923,6 @@ export default function Checkout() {
 
             {/* CỘT PHẢI: Tóm tắt đơn hàng */}
             <aside className="lg:col-span-5 bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-5 shadow-2xs lg:sticky lg:top-6">
-              {/* Header Đơn hàng */}
               <div className="flex items-end justify-between gap-2 border-b border-stone-100 pb-3.5">
                 <div>
                   <h2 className="font-serif text-xl font-bold text-[#1A1A1A] mt-0.5">
@@ -1532,7 +939,6 @@ export default function Checkout() {
                 </a>
               </div>
 
-              {/* Danh sách sách trong đơn */}
               <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
                 {items.map((item) => {
                   const cleanName = (item.name || "").normalize("NFC");
@@ -1584,7 +990,6 @@ export default function Checkout() {
                 })}
               </div>
 
-              {/* Quà tặng đính kèm */}
               <div className="bg-[#FAF5EE] border border-[#EADBC8] rounded-xl p-3 space-y-1.5">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-[#9A5B13] flex items-center gap-1.5">
                   <span>&#127873;</span>
@@ -1598,7 +1003,6 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Mã ưu đãi độc giả */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-500">
                   Phiếu ưu đãi độc giả / Thẻ quà tặng
@@ -1624,7 +1028,6 @@ export default function Checkout() {
                 )}
               </div>
 
-              {/* Chi tiết tính tiền */}
               <div className="border-t border-stone-100 pt-3.5 space-y-2 text-xs">
                 <div className="flex justify-between text-stone-600">
                   <span>Tạm tính ({totalBooks} cuốn)</span>
@@ -1647,7 +1050,6 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Khung Tổng Thanh Toán Toàn Bộ */}
               <div className="bg-[#F3EFEA] border border-stone-200/70 rounded-2xl p-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-stone-800">
@@ -1666,7 +1068,6 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Nút Xác Nhận Đặt Hàng */}
               <button
                 type="submit"
                 disabled={submitting}
@@ -1680,7 +1081,6 @@ export default function Checkout() {
                 {!submitting && <span>&rarr;</span>}
               </button>
 
-              {/* Cam kết dịch vụ bên dưới */}
               <ul className="space-y-2.5 pt-1 text-[11px] text-stone-500">
                 <li className="flex items-start gap-2.5">
                   <span className="text-[#9A5B13] mt-0.5 shrink-0">&#128737;</span>

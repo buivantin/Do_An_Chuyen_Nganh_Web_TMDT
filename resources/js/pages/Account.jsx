@@ -2,473 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import LoginRequiredModal from "../components/LoginRequiredModal";
 import PasswordInput from "../components/PasswordInput";
-
-const VIETNAM_ADDRESSES = [
-  {
-    code: "79",
-    name: "TP. Hồ Chí Minh",
-    districts: [
-      {
-        code: "760",
-        name: "Quận 1",
-        wards: [
-          "Phường Bến Nghé",
-          "Phường Bến Thành",
-          "Phường Cầu Kho",
-          "Phường Cầu Ông Lãnh",
-          "Phường Cô Giang",
-          "Phường Đa Kao",
-          "Phường Nguyễn Cư Trinh",
-          "Phường Nguyễn Thái Bình",
-          "Phường Phạm Ngũ Lão",
-          "Phường Tân Định",
-        ],
-      },
-      {
-        code: "770",
-        name: "Quận 3",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường Võ Thị Sáu",
-        ],
-      },
-      {
-        code: "774",
-        name: "Quận 5",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 4",
-          "Phường 5",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-        ],
-      },
-      {
-        code: "776",
-        name: "Quận 7",
-        wards: [
-          "Phường Bình Thuận",
-          "Phường Phú Mỹ",
-          "Phường Phú Thuận",
-          "Phường Tân Hưng",
-          "Phường Tân Kiểng",
-          "Phường Tân Phong",
-          "Phường Tân Phú",
-          "Phường Tân Quy",
-          "Phường Tân Thuận Đông",
-          "Phường Tân Thuận Tây",
-        ],
-      },
-      {
-        code: "771",
-        name: "Quận 10",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-        ],
-      },
-      {
-        code: "765",
-        name: "Quận Bình Thạnh",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 17",
-          "Phường 19",
-          "Phường 21",
-          "Phường 22",
-          "Phường 24",
-          "Phường 25",
-          "Phường 26",
-          "Phường 27",
-          "Phường 28",
-        ],
-      },
-      {
-        code: "764",
-        name: "Quận Gò Vấp",
-        wards: [
-          "Phường 1",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-          "Phường 16",
-          "Phường 17",
-        ],
-      },
-      {
-        code: "766",
-        name: "Quận Tân Bình",
-        wards: [
-          "Phường 1",
-          "Phường 2",
-          "Phường 3",
-          "Phường 4",
-          "Phường 5",
-          "Phường 6",
-          "Phường 7",
-          "Phường 8",
-          "Phường 9",
-          "Phường 10",
-          "Phường 11",
-          "Phường 12",
-          "Phường 13",
-          "Phường 14",
-          "Phường 15",
-        ],
-      },
-      {
-        code: "769",
-        name: "TP. Thủ Đức",
-        wards: [
-          "Phường An Khánh",
-          "Phường An Lợi Đông",
-          "Phường An Phú",
-          "Phường Bình Chiểu",
-          "Phường Bình Thọ",
-          "Phường Cát Lái",
-          "Phường Hiệp Bình Chánh",
-          "Phường Hiệp Bình Phước",
-          "Phường Hiệp Phú",
-          "Phường Linh Chiểu",
-          "Phường Linh Đông",
-          "Phường Linh Tây",
-          "Phường Linh Trung",
-          "Phường Linh Xuân",
-          "Phường Long Bình",
-          "Phường Long Thạnh Mỹ",
-          "Phường Phước Bình",
-          "Phường Phước Long A",
-          "Phường Phước Long B",
-          "Phường Tăng Nhơn Phú A",
-          "Phường Tăng Nhơn Phú B",
-          "Phường Thảo Điền",
-          "Phường Thủ Thiêm",
-          "Phường Trường Thọ",
-        ],
-      },
-    ],
-  },
-  {
-    code: "01",
-    name: "Hà Nội",
-    districts: [
-      {
-        code: "001",
-        name: "Quận Ba Đình",
-        wards: [
-          "Phường Cống Vị",
-          "Phường Điện Biên",
-          "Phường Đội Cấn",
-          "Phường Giảng Võ",
-          "Phường Kim Mã",
-          "Phường Liễu Giai",
-          "Phường Ngọc Hà",
-          "Phường Ngọc Khánh",
-          "Phường Nguyễn Trung Trực",
-          "Phường Phúc Xá",
-          "Phường Quán Thánh",
-          "Phường Thành Công",
-          "Phường Trúc Bạch",
-          "Phường Vĩnh Phúc",
-        ],
-      },
-      {
-        code: "002",
-        name: "Quận Hoàn Kiếm",
-        wards: [
-          "Phường Chương Dương",
-          "Phường Cửa Đông",
-          "Phường Cửa Nam",
-          "Phường Đồng Xuân",
-          "Phường Hàng Bạc",
-          "Phường Hàng Bài",
-          "Phường Hàng Bồ",
-          "Phường Hàng Bông",
-          "Phường Hàng Buồm",
-          "Phường Hàng Đào",
-          "Phường Hàng Gai",
-          "Phường Hàng Mã",
-          "Phường Hàng Trống",
-          "Phường Lý Thái Tổ",
-          "Phường Phan Chu Trinh",
-          "Phường Phúc Tân",
-          "Phường Tràng Tiền",
-          "Phường Trần Hưng Đạo",
-        ],
-      },
-      {
-        code: "005",
-        name: "Quận Cầu Giấy",
-        wards: [
-          "Phường Dịch Vọng",
-          "Phường Dịch Vọng Hậu",
-          "Phường Mai Dịch",
-          "Phường Nghĩa Đô",
-          "Phường Nghĩa Tân",
-          "Phường Quan Hoa",
-          "Phường Trung Hòa",
-          "Phường Yên Hòa",
-        ],
-      },
-      {
-        code: "006",
-        name: "Quận Đống Đa",
-        wards: [
-          "Phường Cát Linh",
-          "Phường Hàng Bột",
-          "Phường Khâm Thiên",
-          "Phường Khương Thượng",
-          "Phường Kim Liên",
-          "Phường Láng Hạ",
-          "Phường Láng Thượng",
-          "Phường Nam Đồng",
-          "Phường Ngã Tư Sở",
-          "Phường Ô Chợ Dừa",
-          "Phường Phương Liên",
-          "Phường Phương Mai",
-          "Phường Quang Trung",
-          "Phường Quốc Tử Giám",
-          "Phường Thịnh Quang",
-          "Phường Thổ Quan",
-          "Phường Trung Liệt",
-          "Phường Trung Phụng",
-          "Phường Trung Tự",
-          "Phường Văn Chương",
-          "Phường Văn Miếu",
-        ],
-      },
-      {
-        code: "009",
-        name: "Quận Thanh Xuân",
-        wards: [
-          "Phường Hạ Đình",
-          "Phường Khương Đình",
-          "Phường Khương Mai",
-          "Phường Khương Trung",
-          "Phường Kim Giang",
-          "Phường Nhân Chính",
-          "Phường Phương Liệt",
-          "Phường Thanh Xuân Bắc",
-          "Phường Thanh Xuân Nam",
-          "Phường Thanh Xuân Trung",
-          "Phường Thượng Đình",
-        ],
-      },
-    ],
-  },
-  {
-    code: "48",
-    name: "Đà Nẵng",
-    districts: [
-      {
-        code: "492",
-        name: "Quận Hải Châu",
-        wards: [
-          "Phường Bình Hiên",
-          "Phường Bình Thuận",
-          "Phường Hải Châu I",
-          "Phường Hải Châu II",
-          "Phường Hòa Cường Bắc",
-          "Phường Hòa Cường Nam",
-          "Phường Hòa Thuận Đông",
-          "Phường Hòa Thuận Tây",
-          "Phường Nam Dương",
-          "Phường Phước Ninh",
-          "Phường Thạch Thang",
-          "Phường Thanh Bình",
-          "Phường Thuận Phước",
-        ],
-      },
-      {
-        code: "493",
-        name: "Quận Sơn Trà",
-        wards: [
-          "Phường An Hải Bắc",
-          "Phường An Hải Đông",
-          "Phường An Hải Tây",
-          "Phường Mân Thái",
-          "Phường Nại Hiên Đông",
-          "Phường Phước Mỹ",
-          "Phường Thọ Quang",
-        ],
-      },
-      {
-        code: "490",
-        name: "Quận Liên Chiểu",
-        wards: [
-          "Phường Hòa Hiệp Bắc",
-          "Phường Hòa Hiệp Nam",
-          "Phường Hòa Khánh Bắc",
-          "Phường Hòa Khánh Nam",
-          "Phường Hòa Minh",
-        ],
-      },
-    ],
-  },
-  {
-    code: "92",
-    name: "Cần Thơ",
-    districts: [
-      {
-        code: "916",
-        name: "Quận Ninh Kiều",
-        wards: [
-          "Phường An Bình",
-          "Phường An Cư",
-          "Phường An Hòa",
-          "Phường An Khánh",
-          "Phường An Nghiệp",
-          "Phường An Phú",
-          "Phường Cái Khế",
-          "Phường Hưng Lợi",
-          "Phường Tân An",
-          "Phường Thới Bình",
-          "Phường Xuân Khánh",
-        ],
-      },
-      {
-        code: "918",
-        name: "Quận Cái Răng",
-        wards: [
-          "Phường Ba Láng",
-          "Phường Hưng Phú",
-          "Phường Hưng Thạnh",
-          "Phường Lê Bình",
-          "Phường Phú Thứ",
-          "Phường Tân Phú",
-          "Phường Thường Thạnh",
-        ],
-      },
-    ],
-  },
-  {
-    code: "74",
-    name: "Bình Dương",
-    districts: [
-      {
-        code: "718",
-        name: "TP. Thủ Dầu Một",
-        wards: [
-          "Phường Chánh Mỹ",
-          "Phường Chánh Nghĩa",
-          "Phường Định Hòa",
-          "Phường Hiệp An",
-          "Phường Hiệp Thành",
-          "Phường Hòa Phú",
-          "Phường Phú Cường",
-          "Phường Phú Hòa",
-          "Phường Phú Lợi",
-          "Phường Phú Mỹ",
-          "Phường Phú Tân",
-          "Phường Phú Thọ",
-          "Phường Tân An",
-          "Phường Tương Bình Hiệp",
-        ],
-      },
-      {
-        code: "724",
-        name: "TP. Dĩ An",
-        wards: [
-          "Phường An Bình",
-          "Phường Bình An",
-          "Phường Bình Thắng",
-          "Phường Dĩ An",
-          "Phường Đông Hòa",
-          "Phường Tân Bình",
-          "Phường Tân Đông Hiệp",
-        ],
-      },
-    ],
-  },
-  {
-    code: "75",
-    name: "Đồng Nai",
-    districts: [
-      {
-        code: "731",
-        name: "TP. Biên Hòa",
-        wards: [
-          "Phường An Bình",
-          "Phường Bình Đa",
-          "Phường Bửu Hòa",
-          "Phường Bửu Long",
-          "Phường Hố Nai",
-          "Phường Long Bình",
-          "Phường Long Bình Tân",
-          "Phường Quang Vinh",
-          "Phường Quyết Thắng",
-          "Phường Tam Hiệp",
-          "Phường Tam Hòa",
-          "Phường Tân Biên",
-          "Phường Tân Hiệp",
-          "Phường Tân Hòa",
-          "Phường Tân Mai",
-          "Phường Tân Phong",
-          "Phường Tân Tiến",
-          "Phường Tân Vạn",
-          "Phường Thanh Bình",
-          "Phường Thống Nhất",
-          "Phường Trảng Dài",
-          "Phường Trung Dũng",
-        ],
-      },
-    ],
-  },
-];
+import VietnamAddressSelector, {
+  formatVietnamAddress,
+  parseAddressParts,
+} from "../components/VietnamAddressSelector";
 
 const UI = {
   card: "bg-white border border-stone-200/80 rounded-2xl shadow-2xs",
   label: "block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5",
   input:
     "w-full bg-[#F5F2EE] border border-stone-200/80 focus:border-[#9A5B13] focus:bg-white rounded-xl py-2.5 px-3.5 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition",
-  select:
-    "w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] disabled:bg-stone-100 disabled:text-stone-400 rounded-xl py-2.5 px-3 text-xs sm:text-sm text-stone-900 focus:outline-none transition cursor-pointer",
   btnPrimary:
     "w-full sm:w-auto px-6 py-3 bg-[#141414] hover:bg-stone-800 disabled:opacity-60 text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition cursor-pointer shadow-xs",
 };
@@ -579,101 +122,44 @@ function normalizeUser(raw) {
   };
 }
 
-function normalizeAdminText(text = "") {
-  const cleaned = String(text)
-    .normalize("NFC")
-    .toLowerCase()
-    .replace(
-      /^(thành phố|tp\.?|tỉnh|quận|q\.?|huyện|h\.?|thị xã|tx\.?|phường|p\.?|xã|x\.?|thị trấn|tt\.?)\s+/i,
-      ""
-    )
-    .replace(/\b0+(\d+)\b/g, "$1")
-    .trim();
-
-  if (cleaned === "hcm" || cleaned === "tp hcm" || cleaned === "tphcm") {
-    return "hồ chí minh";
-  }
-  return cleaned;
-}
-
-function parseAddressParts(rawAddress = "") {
-  const raw = String(rawAddress || "").normalize("NFC").trim();
-  if (!raw) {
-    return { provinceCode: "", districtCode: "", wardName: "", street: "" };
-  }
-
-  const parts = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const lastPart = parts[parts.length - 1] || "";
-  const matchedProvince = VIETNAM_ADDRESSES.find(
-    (p) => normalizeAdminText(p.name) === normalizeAdminText(lastPart)
-  );
-
-  if (!matchedProvince) {
-    return { provinceCode: "", districtCode: "", wardName: "", street: raw };
-  }
-
-  if (parts.length === 1) {
-    return {
-      provinceCode: matchedProvince.code,
-      districtCode: "",
-      wardName: "",
-      street: "",
-    };
-  }
-
-  const distPart = parts[parts.length - 2] || "";
-  const matchedDistrict = matchedProvince.districts.find(
-    (d) => normalizeAdminText(d.name) === normalizeAdminText(distPart)
-  );
-
-  if (!matchedDistrict) {
-    return {
-      provinceCode: matchedProvince.code,
-      districtCode: "",
-      wardName: "",
-      street: parts.slice(0, parts.length - 1).join(", "),
-    };
-  }
-
-  if (parts.length === 2) {
-    return {
-      provinceCode: matchedProvince.code,
-      districtCode: matchedDistrict.code,
-      wardName: "",
-      street: "",
-    };
-  }
-
-  const wardPart = parts[parts.length - 3] || "";
-  const matchedWard = matchedDistrict.wards.find(
-    (w) => normalizeAdminText(w) === normalizeAdminText(wardPart)
-  );
-
-  if (!matchedWard) {
-    return {
-      provinceCode: matchedProvince.code,
-      districtCode: matchedDistrict.code,
-      wardName: "",
-      street: parts.slice(0, parts.length - 2).join(", "),
-    };
-  }
-
-  return {
-    provinceCode: matchedProvince.code,
-    districtCode: matchedDistrict.code,
-    wardName: matchedWard,
-    street: parts.slice(0, parts.length - 3).join(", "),
-  };
-}
-
 function resolveAssetUrl(path) {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path) || path.startsWith("data:")) return path;
-  return path.startsWith("/") ? path : `/${path}`;
+  const raw = String(path).trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:") || raw.startsWith("blob:")) {
+    return raw;
+  }
+  const clean = raw.replace(/^\/+/, "");
+  if (clean.startsWith("public/")) {
+    return `/storage/${clean.slice(7)}`;
+  }
+  if (
+    clean.startsWith("storage/") ||
+    clean.startsWith("images/") ||
+    clean.startsWith("img/") ||
+    clean.startsWith("uploads/") ||
+    clean.startsWith("assets/")
+  ) {
+    return `/${clean}`;
+  }
+  // Mặc định Laravel Storage::disk('public') lưu dạng "products/abc.jpg" hoặc "avatars/xyz.png"
+  if (clean.includes("/")) {
+    return `/storage/${clean}`;
+  }
+  return `/${clean}`;
+}
+
+function getAlternateAssetUrl(currentUrl) {
+  if (!currentUrl || /^https?:\/\//i.test(currentUrl) || currentUrl.startsWith("data:")) {
+    return null;
+  }
+  if (currentUrl.startsWith("/storage/")) {
+    return `/${currentUrl.slice(9)}`;
+  }
+  if (currentUrl.startsWith("/")) {
+    return `/storage${currentUrl}`;
+  }
+  return null;
 }
 
 function formatDateTime(value) {
@@ -697,9 +183,127 @@ function extractOrderItems(order) {
     order.orderItems ||
     order.order_details ||
     order.orderDetails ||
+    order.details ||
     order.products ||
+    order.lines ||
     [];
   return Array.isArray(list) ? list : [];
+}
+
+function extractItemProductInfo(item, productMap = {}) {
+  const nested =
+    (item && typeof item.product === "object" && item.product) ||
+    (item && typeof item.book === "object" && item.book) ||
+    (item && typeof item.item === "object" && item.item) ||
+    {};
+
+  const productId =
+    item?.product_id ||
+    item?.book_id ||
+    nested.id ||
+    (item?.pivot ? item.id : null);
+
+  const cached = productId ? productMap[String(productId)] || {} : {};
+  const merged = { ...cached, ...nested };
+
+  const rawName =
+    item?.product_name ||
+    item?.book_name ||
+    item?.book_title ||
+    item?.name ||
+    item?.title ||
+    merged.name ||
+    merged.title ||
+    merged.book_name ||
+    merged.ten_sach ||
+    merged.ten_san_pham ||
+    "";
+
+  const firstGalleryImg = Array.isArray(merged.images)
+    ? merged.images[0]?.url ||
+      merged.images[0]?.image_path ||
+      merged.images[0]?.path ||
+      (typeof merged.images[0] === "string" ? merged.images[0] : "")
+    : "";
+
+  const rawImage =
+    item?.image ||
+    item?.image_url ||
+    item?.image_path ||
+    item?.product_image ||
+    item?.thumbnail ||
+    merged.image ||
+    merged.image_path ||
+    merged.image_url ||
+    merged.thumbnail ||
+    merged.cover ||
+    merged.cover_image ||
+    merged.anh ||
+    firstGalleryImg ||
+    "";
+
+  const name = rawName
+    ? String(rawName).normalize("NFC").trim()
+    : productId
+    ? `Ấn phẩm sách #${productId}`
+    : "Ấn phẩm sách";
+
+  return {
+    productId,
+    name,
+    hasResolvedName: Boolean(String(rawName).trim()),
+    imageUrl: resolveAssetUrl(rawImage),
+    hasResolvedImage: Boolean(String(rawImage).trim()),
+  };
+}
+
+function ProductThumbnail({ src, alt, className = "w-11 h-15" }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [triedAlt, setTriedAlt] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setTriedAlt(false);
+  }, [src]);
+
+  if (!currentSrc) {
+    return (
+      <div
+        className={`${className} rounded-lg bg-[#F5EDE2] border border-[#E5D5BE] text-[#9A5B13] flex flex-col items-center justify-center text-[9px] font-bold uppercase tracking-wider shrink-0 select-none`}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="w-4 h-4 mb-0.5"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+        <span>SÁCH</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      onError={() => {
+        if (!triedAlt) {
+          const altUrl = getAlternateAssetUrl(currentSrc);
+          if (altUrl && altUrl !== currentSrc) {
+            setTriedAlt(true);
+            setCurrentSrc(altUrl);
+            return;
+          }
+        }
+        setCurrentSrc(null);
+      }}
+      className={`${className} object-contain rounded-lg bg-stone-100 p-0.5 border border-stone-200/70 shrink-0`}
+    />
+  );
 }
 
 function StarIcon({ filled, className = "w-5 h-5" }) {
@@ -720,10 +324,11 @@ function StarIcon({ filled, className = "w-5 h-5" }) {
   );
 }
 
-export default function Account({ user: propUser = null, orders: propOrders = [] }) {
+export default function Account({ user: propUser = null, orders: propOrders = null }) {
   const initialUser = useMemo(
     () => normalizeUser(propUser || getStoredUser()),
-    [propUser]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
   const initialAddr = useMemo(
     () => parseAddressParts(initialUser.address),
@@ -746,8 +351,9 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     new_password_confirmation: "",
   });
 
-  // State đơn hàng của user
+  // State đơn hàng & cache thông tin sản phẩm
   const [orders, setOrders] = useState(Array.isArray(propOrders) ? propOrders : []);
+  const [productMap, setProductMap] = useState({});
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
@@ -756,100 +362,262 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
 
   // State Modal Đánh giá sản phẩm
-  const [reviewTarget, setReviewTarget] = useState(null); // { orderCode, productId, productName, productImage }
+  const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState("");
 
+  // State địa chỉ nhận hàng mặc định
   const [provinceCode, setProvinceCode] = useState(initialAddr.provinceCode);
   const [districtCode, setDistrictCode] = useState(initialAddr.districtCode);
   const [wardName, setWardName] = useState(initialAddr.wardName);
   const [streetAddress, setStreetAddress] = useState(initialAddr.street);
-  const [debouncedMapQuery, setDebouncedMapQuery] = useState(
-    initialUser.address || "TP. Hồ Chí Minh, Việt Nam"
-  );
 
   const [loading, setLoading] = useState(!propUser && !getStoredUser());
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [showLoginModal, setShowLoginModal] = useState(false);
+
   const fileInputRef = useRef(null);
+  const isProfileDirtyRef = useRef(false);
+  const isAddressDirtyRef = useRef(false);
+  const savedAddressRef = useRef(initialUser.address || "");
+  const syncedPropUserSigRef = useRef("");
+  const hydratedOrderIdsRef = useRef(new Set());
+  const fetchedProductIdsRef = useRef(new Set());
+  const propUserRef = useRef(propUser);
+  const propOrdersRef = useRef(propOrders);
+  propUserRef.current = propUser;
+  propOrdersRef.current = propOrders;
 
-  const syncUserState = useCallback((rawUser) => {
+  const applyUserToState = useCallback((rawUser, { forceReset = false } = {}) => {
     const normalized = normalizeUser(rawUser);
-    const parsedAddr = parseAddressParts(normalized.address);
-
+    savedAddressRef.current = normalized.address || "";
     setUser(normalized);
-    setProfileForm({
-      username: normalized.username,
-      phone: normalized.phone,
-    });
-    setProvinceCode(parsedAddr.provinceCode);
-    setDistrictCode(parsedAddr.districtCode);
-    setWardName(parsedAddr.wardName);
-    setStreetAddress(parsedAddr.street);
+
+    if (forceReset || !isProfileDirtyRef.current) {
+      setProfileForm({
+        username: normalized.username,
+        phone: normalized.phone,
+      });
+    }
+
+    if (forceReset || !isAddressDirtyRef.current) {
+      const parsedAddr = parseAddressParts(normalized.address);
+      setProvinceCode(parsedAddr.provinceCode);
+      setDistrictCode(parsedAddr.districtCode);
+      setWardName(parsedAddr.wardName);
+      setStreetAddress(parsedAddr.street);
+    }
 
     localStorage.setItem("user", JSON.stringify(normalized));
     window.dispatchEvent(new CustomEvent("user-updated", { detail: normalized }));
   }, []);
 
-  const fetchUserOrders = useCallback(async (signal) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+  // Chỉ tách lại địa chỉ DB sau khi dataset 63 tỉnh tải xong nếu người dùng CHƯA chỉnh sửa
+  const handleDatasetLoaded = useCallback((fullProvinces) => {
+    if (isAddressDirtyRef.current || !savedAddressRef.current) return;
+    const parsed = parseAddressParts(savedAddressRef.current, fullProvinces);
+    setProvinceCode(parsed.provinceCode);
+    setDistrictCode(parsed.districtCode);
+    setWardName(parsed.wardName);
+    setStreetAddress(parsed.street);
+  }, []);
 
-    setOrdersLoading(true);
-    setOrdersError("");
-    try {
-      const res = await axios.get("/api/orders", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        signal,
-      });
+  const handleProvinceChange = useCallback((val) => {
+    isAddressDirtyRef.current = true;
+    setProvinceCode(val);
+  }, []);
 
-      const raw = res.data?.orders ?? res.data?.data ?? res.data;
-      const list = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.data)
-        ? raw.data
-        : [];
-      setOrders(list);
-    } catch (err) {
-      if (axios.isCancel(err)) return;
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setShowLoginModal(true);
-      } else {
-        setOrdersError(
-          err.response?.data?.message || "Không thể tải danh sách đơn hàng."
-        );
+  const handleDistrictChange = useCallback((val) => {
+    isAddressDirtyRef.current = true;
+    setDistrictCode(val);
+  }, []);
+
+  const handleWardChange = useCallback((val) => {
+    isAddressDirtyRef.current = true;
+    setWardName(val);
+  }, []);
+
+  const handleStreetChange = useCallback((val) => {
+    isAddressDirtyRef.current = true;
+    setStreetAddress(val);
+  }, []);
+
+  // Tự động bổ sung tên/ảnh sản phẩm cho các item chỉ có product_id
+  const hydrateMissingProducts = useCallback(async (orderList, token) => {
+    const missingIds = new Set();
+    for (const order of orderList) {
+      for (const item of extractOrderItems(order)) {
+        const info = extractItemProductInfo(item);
+        if (
+          info.productId &&
+          (!info.hasResolvedName || !info.hasResolvedImage) &&
+          !fetchedProductIdsRef.current.has(String(info.productId))
+        ) {
+          missingIds.add(String(info.productId));
+        }
       }
-    } finally {
-      setOrdersLoading(false);
+    }
+
+    if (missingIds.size === 0) return;
+
+    const idsToFetch = Array.from(missingIds);
+    idsToFetch.forEach((id) => fetchedProductIdsRef.current.add(id));
+
+    const headers = token
+      ? { Authorization: `Bearer ${token}`, Accept: "application/json" }
+      : { Accept: "application/json" };
+
+    const results = await Promise.allSettled(
+      idsToFetch.map(async (pid) => {
+        try {
+          const res = await axios.get(`/api/products/${pid}`, { headers });
+          return [pid, res.data?.product || res.data?.data || res.data];
+        } catch {
+          const res = await axios.get(`/api/books/${pid}`, { headers });
+          return [pid, res.data?.book || res.data?.product || res.data?.data || res.data];
+        }
+      })
+    );
+
+    const updates = {};
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value?.[1]) {
+        updates[r.value[0]] = r.value[1];
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setProductMap((prev) => ({ ...prev, ...updates }));
     }
   }, []);
 
+  // Tự động tải chi tiết đơn hàng nếu endpoint /api/orders chưa kèm danh sách items
+  const hydrateOrderDetails = useCallback(
+    async (orderList, token) => {
+      if (!token || !Array.isArray(orderList) || orderList.length === 0) return;
+
+      const ordersNeedingItems = orderList.filter(
+        (ord) =>
+          ord?.id &&
+          extractOrderItems(ord).length === 0 &&
+          !hydratedOrderIdsRef.current.has(ord.id)
+      );
+
+      if (ordersNeedingItems.length === 0) {
+        await hydrateMissingProducts(orderList, token);
+        return;
+      }
+
+      ordersNeedingItems.forEach((ord) => hydratedOrderIdsRef.current.add(ord.id));
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      };
+
+      const detailedMap = {};
+      await Promise.allSettled(
+        ordersNeedingItems.map(async (ord) => {
+          const res = await axios.get(`/api/orders/${ord.id}`, { headers });
+          const detail = res.data?.order || res.data?.data || res.data;
+          if (detail && typeof detail === "object") {
+            detailedMap[ord.id] = detail;
+          }
+        })
+      );
+
+      let mergedList = orderList;
+      if (Object.keys(detailedMap).length > 0) {
+        mergedList = orderList.map((ord) =>
+          detailedMap[ord.id] ? { ...ord, ...detailedMap[ord.id] } : ord
+        );
+        setOrders(mergedList);
+      }
+
+      await hydrateMissingProducts(mergedList, token);
+    },
+    [hydrateMissingProducts]
+  );
+
+  const fetchUserOrders = useCallback(
+    async (signal, { forceRehydrate = false } = {}) => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      if (forceRehydrate) {
+        hydratedOrderIdsRef.current.clear();
+      }
+
+      setOrdersLoading(true);
+      setOrdersError("");
+      try {
+        const res = await axios.get("/api/orders", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+          signal,
+        });
+
+        const raw = res.data?.orders ?? res.data?.data ?? res.data;
+        const list = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+        setOrders(list);
+        hydrateOrderDetails(list, token);
+      } catch (err) {
+        if (axios.isCancel(err)) return;
+        if (err.response?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setShowLoginModal(true);
+        } else {
+          setOrdersError(
+            err.response?.data?.message || "Không thể tải danh sách đơn hàng."
+          );
+        }
+      } finally {
+        setOrdersLoading(false);
+      }
+    },
+    [hydrateOrderDetails]
+  );
+
+  // Chỉ đồng bộ propUser khi dữ liệu thực sự thay đổi và người dùng chưa chỉnh sửa
   useEffect(() => {
     if (!propUser) return;
-    syncUserState(propUser);
-    setLoading(false);
-  }, [propUser, syncUserState]);
+    const sig = JSON.stringify({
+      id: propUser.id,
+      username: propUser.username || propUser.name,
+      phone: propUser.phone,
+      address: propUser.address,
+      image_path: propUser.image_path || propUser.avatar,
+    });
+    if (syncedPropUserSigRef.current === sig) return;
+    syncedPropUserSigRef.current = sig;
 
+    applyUserToState(propUser, { forceReset: false });
+    setLoading(false);
+  }, [propUser, applyUserToState]);
+
+  // Tải thông tin profile & danh sách đơn hàng đúng 1 lần khi mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       setLoading(false);
-      if (!propUser) setShowLoginModal(true);
+      if (!propUserRef.current) setShowLoginModal(true);
       return;
     }
 
     const controller = new AbortController();
 
-    if (!propUser) {
+    if (!propUserRef.current) {
       axios
         .get("/api/profile", {
           headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
@@ -857,9 +625,10 @@ export default function Account({ user: propUser = null, orders: propOrders = []
         })
         .then((res) => {
           const rawUser = res.data?.user || res.data?.data || res.data;
-          syncUserState(rawUser);
+          applyUserToState(rawUser, { forceReset: false });
           if (Array.isArray(res.data?.orders) && res.data.orders.length > 0) {
             setOrders(res.data.orders);
+            hydrateOrderDetails(res.data.orders, token);
           }
         })
         .catch((err) => {
@@ -878,12 +647,14 @@ export default function Account({ user: propUser = null, orders: propOrders = []
         .finally(() => setLoading(false));
     }
 
-    if (!Array.isArray(propOrders) || propOrders.length === 0) {
+    if (!Array.isArray(propOrdersRef.current) || propOrdersRef.current.length === 0) {
       fetchUserOrders(controller.signal);
+    } else {
+      hydrateOrderDetails(propOrdersRef.current, token);
     }
 
     return () => controller.abort();
-  }, [propUser, propOrders, syncUserState, fetchUserOrders]);
+  }, [applyUserToState, fetchUserOrders, hydrateOrderDetails]);
 
   const handleToggleOrderDetail = async (order) => {
     if (expandedOrderId === order.id) {
@@ -892,8 +663,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     }
 
     setExpandedOrderId(order.id);
-    if (extractOrderItems(order).length > 0) return;
-
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -907,12 +676,14 @@ export default function Account({ user: propUser = null, orders: propOrders = []
       });
       const detail = res.data?.order || res.data?.data || res.data;
       if (detail && typeof detail === "object") {
+        const mergedOrder = { ...order, ...detail };
         setOrders((prev) =>
-          prev.map((item) => (item.id === order.id ? { ...item, ...detail } : item))
+          prev.map((item) => (item.id === order.id ? mergedOrder : item))
         );
+        hydrateMissingProducts([mergedOrder], token);
       }
     } catch {
-      // Giữ nguyên dữ liệu hiện có nếu API chi tiết chưa trả về items
+      // Giữ nguyên dữ liệu hiện có nếu API chi tiết lỗi
     } finally {
       setDetailLoadingId(null);
     }
@@ -965,23 +736,13 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   };
 
   const openReviewModal = (orderCode, item) => {
-    const product = item.product || item;
-    const productId = item.product_id || product.id;
-    const productName = (
-      item.product_name ||
-      product.name ||
-      product.title ||
-      "Ấn phẩm sách"
-    ).normalize("NFC");
-    const productImage = resolveAssetUrl(
-      item.image || product.image || product.image_path
-    );
+    const info = extractItemProductInfo(item, productMap);
 
     setReviewTarget({
       orderCode,
-      productId,
-      productName,
-      productImage,
+      productId: info.productId,
+      productName: info.name,
+      productImage: info.imageUrl,
     });
     setReviewRating(5);
     setHoverRating(0);
@@ -1023,14 +784,13 @@ export default function Account({ user: propUser = null, orders: propOrders = []
         comment: reviewComment.trim(),
       };
 
-      // Cập nhật trạng thái đã đánh giá cho tất cả item cùng product_id trong danh sách đơn
       setOrders((prevOrders) =>
         prevOrders.map((ord) => {
           const items = extractOrderItems(ord);
           if (items.length === 0) return ord;
           const updatedItems = items.map((it) => {
-            const pid = it.product_id || it.product?.id || it.id;
-            if (Number(pid) === Number(reviewTarget.productId)) {
+            const info = extractItemProductInfo(it, productMap);
+            if (Number(info.productId) === Number(reviewTarget.productId)) {
               return { ...it, user_review: savedReview };
             }
             return it;
@@ -1067,43 +827,16 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     }
   };
 
-  const currentProvince = useMemo(
-    () => VIETNAM_ADDRESSES.find((p) => p.code === provinceCode) || null,
-    [provinceCode]
+  const fullAddress = useMemo(
+    () =>
+      formatVietnamAddress({
+        provinceCode,
+        districtCode,
+        wardName,
+        streetAddress,
+      }),
+    [provinceCode, districtCode, wardName, streetAddress]
   );
-
-  const availableDistricts = useMemo(
-    () => currentProvince?.districts || [],
-    [currentProvince]
-  );
-
-  const currentDistrict = useMemo(
-    () => availableDistricts.find((d) => d.code === districtCode) || null,
-    [availableDistricts, districtCode]
-  );
-
-  const availableWards = useMemo(
-    () => currentDistrict?.wards || [],
-    [currentDistrict]
-  );
-
-  const fullAddress = useMemo(() => {
-    return [
-      streetAddress.trim(),
-      wardName,
-      currentDistrict?.name || "",
-      currentProvince?.name || "",
-    ]
-      .filter(Boolean)
-      .join(", ");
-  }, [streetAddress, wardName, currentDistrict, currentProvince]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedMapQuery(fullAddress || "TP. Hồ Chí Minh, Việt Nam");
-    }, 450);
-    return () => clearTimeout(timer);
-  }, [fullAddress]);
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
@@ -1128,7 +861,11 @@ export default function Account({ user: propUser = null, orders: propOrders = []
 
       const nextPath =
         res.data?.image_path || res.data?.data?.image_path || user.image_path;
-      syncUserState({ ...user, image_path: nextPath });
+      const nextUser = { ...user, image_path: nextPath };
+      setUser(nextUser);
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      window.dispatchEvent(new CustomEvent("user-updated", { detail: nextUser }));
+
       setMsg({
         type: "success",
         text: res.data?.message || "Cập nhật ảnh đại diện thành công!",
@@ -1149,6 +886,17 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     const token = localStorage.getItem("token");
     if (!token) return setShowLoginModal(true);
 
+    const hasAnyAddressInput = Boolean(
+      provinceCode || districtCode || wardName || streetAddress.trim()
+    );
+    if (hasAnyAddressInput && (!provinceCode || !streetAddress.trim())) {
+      setMsg({
+        type: "error",
+        text: "Vui lòng chọn Tỉnh/Thành phố và nhập Địa chỉ cụ thể (số nhà, tên đường).",
+      });
+      return;
+    }
+
     setSaving(true);
     setMsg({ type: "", text: "" });
 
@@ -1156,14 +904,16 @@ export default function Account({ user: propUser = null, orders: propOrders = []
       username: profileForm.username.trim(),
       name: profileForm.username.trim(),
       phone: profileForm.phone.trim(),
-      address: fullAddress,
+      address: hasAnyAddressInput ? fullAddress : "",
     };
 
     try {
       const res = await axios.put("/api/profile", payload, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       });
-      syncUserState({ ...user, ...payload });
+      isProfileDirtyRef.current = false;
+      isAddressDirtyRef.current = false;
+      applyUserToState({ ...user, ...payload }, { forceReset: true });
       setMsg({
         type: "success",
         text: res.data?.message || "Cập nhật hồ sơ thành công!",
@@ -1221,8 +971,13 @@ export default function Account({ user: propUser = null, orders: propOrders = []
   const switchTab = (tabId) => {
     setActiveTab(tabId);
     setMsg({ type: "", text: "" });
-    if (tabId === "orders" && orders.length === 0 && !ordersLoading) {
-      fetchUserOrders();
+    if (tabId === "orders") {
+      if (orders.length === 0 && !ordersLoading) {
+        fetchUserOrders();
+      } else {
+        const token = localStorage.getItem("token");
+        if (token) hydrateOrderDetails(orders, token);
+      }
     }
   };
 
@@ -1242,15 +997,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
     .trim()
     .charAt(0)
     .toUpperCase();
-
-  const mapZoom = streetAddress.trim() ? 16 : wardName ? 14 : currentDistrict ? 13 : 12;
-  const encodedMapQuery = encodeURIComponent(
-    debouncedMapQuery.includes("Việt Nam")
-      ? debouncedMapQuery
-      : `${debouncedMapQuery}, Việt Nam`
-  );
-  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodedMapQuery}&t=&z=${mapZoom}&ie=UTF8&iwloc=&output=embed`;
-  const externalMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodedMapQuery}`;
   const displayRating = hoverRating || reviewRating;
 
   return (
@@ -1290,19 +1036,12 @@ export default function Account({ user: propUser = null, orders: propOrders = []
               </button>
             </div>
 
-            {/* Thông tin sách đang đánh giá */}
             <div className="flex items-center gap-3 bg-[#FAF8F5] border border-stone-200/80 rounded-xl p-3">
-              {reviewTarget.productImage ? (
-                <img
-                  src={reviewTarget.productImage}
-                  alt={reviewTarget.productName}
-                  className="w-11 h-15 object-contain rounded bg-white p-0.5 border border-stone-200/60 shrink-0"
-                />
-              ) : (
-                <div className="w-11 h-15 rounded bg-stone-200 text-stone-500 flex items-center justify-center text-[10px] font-bold shrink-0">
-                  SÁCH
-                </div>
-              )}
+              <ProductThumbnail
+                src={reviewTarget.productImage}
+                alt={reviewTarget.productName}
+                className="w-11 h-15"
+              />
               <div className="min-w-0">
                 <div className="text-[11px] text-stone-500">Sản phẩm đã mua</div>
                 <div className="font-serif text-sm font-bold text-stone-900 line-clamp-2">
@@ -1318,7 +1057,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
             )}
 
             <form onSubmit={handleSubmitReview} className="space-y-4">
-              {/* Chọn số sao */}
               <div className="text-center space-y-2 py-1">
                 <div className="text-xs font-bold uppercase tracking-wider text-stone-600">
                   Mức độ hài lòng của bạn
@@ -1348,7 +1086,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                 </div>
               </div>
 
-              {/* Nội dung nhận xét */}
               <div>
                 <label className={UI.label}>
                   Nhận xét chi tiết (Không bắt buộc)
@@ -1551,9 +1288,10 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                           type="text"
                           required
                           value={profileForm.username}
-                          onChange={(e) =>
-                            setProfileForm({ ...profileForm, username: e.target.value })
-                          }
+                          onChange={(e) => {
+                            isProfileDirtyRef.current = true;
+                            setProfileForm({ ...profileForm, username: e.target.value });
+                          }}
                           placeholder="Nhập họ và tên"
                           className={UI.input}
                         />
@@ -1564,133 +1302,44 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                         <input
                           type="tel"
                           value={profileForm.phone}
-                          onChange={(e) =>
-                            setProfileForm({ ...profileForm, phone: e.target.value })
-                          }
+                          onChange={(e) => {
+                            isProfileDirtyRef.current = true;
+                            setProfileForm({ ...profileForm, phone: e.target.value });
+                          }}
                           placeholder="Ví dụ: 0988 123 456"
                           className={UI.input}
                         />
                       </div>
                     </div>
 
-                    <div className="bg-[#FAF8F5] p-4 sm:p-5 rounded-2xl border border-stone-200/80 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-[#9A5B13]">
-                          Địa chỉ nhận hàng mặc định
-                        </h3>
-                        {user.address && (
-                          <span className="text-[11px] text-stone-500 truncate max-w-full sm:max-w-[65%]">
-                            Đã lưu:{" "}
-                            <strong className="text-stone-700">{user.address}</strong>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className={UI.label}>Tỉnh / Thành phố</label>
-                          <select
-                            value={provinceCode}
-                            onChange={(e) => {
-                              setProvinceCode(e.target.value);
-                              setDistrictCode("");
-                              setWardName("");
-                            }}
-                            className={UI.select}
-                          >
-                            <option value="">-- Chọn Tỉnh / Thành --</option>
-                            {VIETNAM_ADDRESSES.map((p) => (
-                              <option key={p.code} value={p.code}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className={UI.label}>Quận / Huyện</label>
-                          <select
-                            value={districtCode}
-                            disabled={!provinceCode}
-                            onChange={(e) => {
-                              setDistrictCode(e.target.value);
-                              setWardName("");
-                            }}
-                            className={UI.select}
-                          >
-                            <option value="">-- Chọn Quận / Huyện --</option>
-                            {availableDistricts.map((d) => (
-                              <option key={d.code} value={d.code}>
-                                {d.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className={UI.label}>Phường / Xã</label>
-                          <select
-                            value={wardName}
-                            disabled={!districtCode}
-                            onChange={(e) => setWardName(e.target.value)}
-                            className={UI.select}
-                          >
-                            <option value="">-- Chọn Phường / Xã --</option>
-                            {availableWards.map((w) => (
-                              <option key={w} value={w}>
-                                {w}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className={UI.label}>
-                          Số nhà, tên đường (Địa chỉ cụ thể)
-                        </label>
-                        <input
-                          type="text"
-                          value={streetAddress}
-                          onChange={(e) => setStreetAddress(e.target.value)}
-                          placeholder="Ví dụ: 123 Nguyễn Văn Cừ"
-                          className="w-full bg-white border border-stone-200/80 focus:border-[#9A5B13] rounded-xl py-2.5 px-3.5 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none transition"
-                        />
-                      </div>
-
-                      <div className="bg-white border border-stone-200/80 rounded-2xl overflow-hidden">
-                        <div className="px-3.5 py-2.5 border-b border-stone-200/70 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2 h-2 rounded-full bg-[#9A5B13] shrink-0" />
-                            <span className="text-[11px] text-stone-600 truncate">
-                              Vị trí trên bản đồ:{" "}
-                              <strong className="text-stone-900">
-                                {fullAddress || "Chưa chọn địa chỉ"}
+                    <VietnamAddressSelector
+                      provinceCode={provinceCode}
+                      onProvinceChange={handleProvinceChange}
+                      districtCode={districtCode}
+                      onDistrictChange={handleDistrictChange}
+                      wardName={wardName}
+                      onWardChange={handleWardChange}
+                      streetAddress={streetAddress}
+                      onStreetChange={handleStreetChange}
+                      onDatasetLoaded={handleDatasetLoaded}
+                      mapLabel="Vị trí trên bản đồ:"
+                      mapHeightClass="h-56 sm:h-64"
+                      header={
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-[#9A5B13]">
+                            Địa chỉ nhận hàng mặc định
+                          </h3>
+                          {user.address && (
+                            <span className="text-[11px] text-stone-500 truncate max-w-full sm:max-w-[65%]">
+                              Đã lưu:{" "}
+                              <strong className="text-stone-700">
+                                {user.address}
                               </strong>
                             </span>
-                          </div>
-
-                          <a
-                            href={externalMapUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[11px] font-bold text-[#9A5B13] hover:underline shrink-0"
-                          >
-                            Mở Google Maps
-                          </a>
+                          )}
                         </div>
-
-                        <div className="w-full h-56 sm:h-64 bg-stone-200/60">
-                          <iframe
-                            title="Bản đồ địa chỉ nhận hàng"
-                            src={mapEmbedUrl}
-                            className="w-full h-full border-0"
-                            loading="lazy"
-                            referrerPolicy="no-referrer-when-downgrade"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      }
+                    />
 
                     <div className="pt-1">
                       <button type="submit" disabled={saving} className={UI.btnPrimary}>
@@ -1789,7 +1438,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
 
                     <button
                       type="button"
-                      onClick={() => fetchUserOrders()}
+                      onClick={() => fetchUserOrders(undefined, { forceRehydrate: true })}
                       disabled={ordersLoading}
                       className="px-3.5 py-2 rounded-xl bg-[#FAF8F5] hover:bg-stone-100 border border-stone-200 text-xs font-semibold text-stone-700 transition cursor-pointer disabled:opacity-50"
                     >
@@ -1797,7 +1446,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                     </button>
                   </div>
 
-                  {/* Thanh lọc trạng thái đơn hàng */}
                   {orders.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {ORDER_FILTERS.map((filter) => {
@@ -1869,7 +1517,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                             key={order.id}
                             className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 sm:p-5 space-y-3.5"
                           >
-                            {/* Hàng tiêu đề đơn hàng */}
                             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-200/70 pb-3">
                               <div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -1900,33 +1547,20 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                               </div>
                             </div>
 
-                            {/* Danh sách sản phẩm trong đơn */}
-                            {orderItems.length > 0 && (
+                            {orderItems.length > 0 ? (
                               <div className="space-y-2.5">
                                 {(isExpanded || isCompleted
                                   ? orderItems
                                   : orderItems.slice(0, 2)
                                 ).map((item, idx) => {
-                                  const product = item.product || item;
-                                  const productId = item.product_id || product.id;
-                                  const itemName = (
-                                    item.product_name ||
-                                    product.name ||
-                                    product.title ||
-                                    "Ấn phẩm sách"
-                                  ).normalize("NFC");
-                                  const itemImg = resolveAssetUrl(
-                                    item.image ||
-                                      product.image ||
-                                      product.image_path
-                                  );
+                                  const info = extractItemProductInfo(item, productMap);
                                   const qty = Number(
                                     item.quantity || item.pivot?.quantity || 1
                                   );
                                   const unitPrice = Number(
                                     item.price ||
                                       item.pivot?.price ||
-                                      product.price ||
+                                      item.product?.price ||
                                       0
                                   );
                                   const existingReview = item.user_review;
@@ -1937,27 +1571,21 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                       className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-white border border-stone-200/70 rounded-xl p-2.5 sm:p-3"
                                     >
                                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        {itemImg ? (
-                                          <img
-                                            src={itemImg}
-                                            alt={itemName}
-                                            className="w-10 h-14 object-contain rounded bg-stone-100 p-0.5 shrink-0"
-                                          />
-                                        ) : (
-                                          <div className="w-10 h-14 rounded bg-stone-100 text-stone-400 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                            SÁCH
-                                          </div>
-                                        )}
+                                        <ProductThumbnail
+                                          src={info.imageUrl}
+                                          alt={info.name}
+                                          className="w-11 h-15"
+                                        />
                                         <div className="min-w-0">
                                           <a
                                             href={
-                                              productId
-                                                ? `/products/${productId}`
+                                              info.productId
+                                                ? `/products/${info.productId}`
                                                 : undefined
                                             }
                                             className="font-serif text-xs sm:text-sm font-bold text-stone-900 hover:text-[#9A5B13] transition line-clamp-1"
                                           >
-                                            {itemName}
+                                            {info.name}
                                           </a>
                                           <div className="text-[11px] text-stone-500 mt-0.5">
                                             Số lượng:{" "}
@@ -1976,8 +1604,7 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                           ₫
                                         </div>
 
-                                        {/* Nút Đánh giá chỉ hiển thị khi đơn đã Hoàn thành */}
-                                        {isCompleted && productId && (
+                                        {isCompleted && info.productId && (
                                           existingReview ? (
                                             <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F5EDE2] border border-[#E5D5BE] text-[11px] font-bold text-[#9A5B13]">
                                               <StarIcon
@@ -2017,9 +1644,12 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                                     </div>
                                   )}
                               </div>
+                            ) : (
+                              <div className="text-xs text-stone-500 italic bg-white/70 border border-stone-200/60 rounded-xl px-3 py-2.5">
+                                Nhấn &ldquo;Xem chi tiết&rdquo; để xem danh sách ấn phẩm trong đơn hàng.
+                              </div>
                             )}
 
-                            {/* Chi tiết giao nhận khi bấm Xem chi tiết */}
                             {isExpanded && (
                               <div className="bg-white border border-stone-200/80 rounded-xl p-3.5 text-xs space-y-1.5 text-stone-600">
                                 {detailLoadingId === order.id ? (
@@ -2073,7 +1703,6 @@ export default function Account({ user: propUser = null, orders: propOrders = []
                               </div>
                             )}
 
-                            {/* Nút hành động */}
                             <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
                               <button
                                 type="button"
