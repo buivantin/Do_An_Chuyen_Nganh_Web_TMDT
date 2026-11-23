@@ -39,7 +39,7 @@
 - Ngày / Người dùng: \10/11/2026 / Bùi Văn Tín 
 - Công cụ: Gemini/ChatGPT  
 - Giai đoạn: Lập kế hoạch  
-- Task / Commit / PR: Tạo file .gitignore /  / PR #2  
+- Task / Commit / PR: Tạo file .gitignore / 04de709 / PR #2  
 - Mục đích: Viết file .gitignore để tránh commit nhầm các file rác (vendor, node_modules, .env) khi kết hợp Laravel và React.
 - Prompt chính: "Viết file .gitignore cho dự án kết hợp Laravel 10+ (backend) và React (frontend). Giải thích từng mục."
 - Kết quả AI trả về: Cung cấp đầy đủ các file cần ignore cho cả PHP và Node.js, kèm chú thích rõ ràng.
@@ -68,7 +68,7 @@
 - Ngày / Người dùng: 12/11/2026 / Bùi Văn Tín
 - Công cụ: Gemini
 - Giai đoạn: Thiết kế hệ thống
-- Task / Commit / PR: Tạo file sequence-dat-hang.md / [Mã commit] / PR #...
+- Task / Commit / PR: Tạo file sequence-dat-hang.md / 497f33/ PR #...
 - Mục đích: Vẽ sơ đồ tuần tự mô tả quá trình đặt hàng, đảm bảo thể hiện rõ Transaction và xử lý lỗi (Rollback).
 - Prompt chính: "Viết code PlantUML vẽ sequence diagram cho luồng đặt hàng của website thương mại điện tử. Có các thành phần: Khách hàng, Giao diện, Controller, OrderService, CSDL. Phải có bước kiểm tra tồn kho, tạo đơn, trừ kho, xóa giỏ hàng trong một Transaction và có nhánh Rollback nếu lỗi."
 - Kết quả AI trả về: Đoạn code PlantUML mô tả chi tiết các bước từ lúc khách nhấn đặt hàng đến khi COMMIT hoặc ROLLBACK.
@@ -82,24 +82,29 @@
 - Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
 - Công cụ: ChatGPT
 - Giai đoạn: Gỡ lỗi Frontend (TM-08)
-- Mục đích: Trang Account liên tục báo "Phiên đăng nhập không tồn tại" dù đã đăng nhập thành công.
+- Task / Commit / PR: Sửa lỗi xác thực trang Profile (`MainLayout.jsx`, `Account.jsx`) / [Mã commit] / PR #...
+- Mục đích: Khắc phục tình trạng trang Account liên tục báo lỗi "Phiên đăng nhập không tồn tại" (401 Unauthorized) dù người dùng đã đăng nhập thành công.
 - Prompt chính: "Tôi dùng React gọi API qua axios, đã lưu user vào localStorage nhưng khi vào trang Profile lại bị lỗi 401 Unauthorized. Nguyên nhân do đâu?"
-- Kết quả AI trả về: AI chỉ ra rằng hàm xử lý đăng nhập (handleAuthSuccess) chỉ lưu `user` mà quên lưu `token` vào localStorage. Đồng thời hướng dẫn cấu hình Axios interceptor để tự động đính kèm Bearer Token.
-- Đánh giá: Đúng trọng tâm. AI phát hiện chính xác lỗ hổng logic trong luồng đăng nhập.
-- Đã chỉnh sửa gì: Cập nhật lại hàm `handleAuthSuccess` trong `MainLayout.jsx` để lưu cả `token`. Cấu hình lại `axiosConfig` trong `Account.jsx` để đính kèm token vào headers.
-- Cách kiểm chứng: Đăng nhập lại, mở F12 -> Network kiểm tra request `/api/profile` thấy có header Authorization và trả về status 200.
+- Kết quả AI trả về: AI chỉ ra lỗ hổng ở hàm xử lý đăng nhập (`handleAuthSuccess`) chỉ lưu thông tin `user` mà quên lưu `token` vào `localStorage`, đồng thời hướng dẫn cấu hình Axios interceptor để tự động đính kèm Bearer Token vào request.
+- Đánh giá: Rất chính xác và đi thẳng vào trọng tâm. AI phát hiện đúng nguyên nhân gốc rễ trong luồng xử lý xác thực.
+- Đã chỉnh sửa gì: Cập nhật hàm `handleAuthSuccess` trong `MainLayout.jsx` để lưu đồng thời cả `user` và `token`. Cấu hình lại `axiosConfig` trong `Account.jsx` để tự động gắn token vào headers.
+- Cách kiểm chứng: Thực hiện đăng nhập lại, mở DevTools (F12) -> tab Network để kiểm tra request `/api/profile`, xác nhận đã có header `Authorization` và API trả về status `200 OK`.
 - Tỷ lệ nội dung AI còn giữ lại: 80%
+- Điều học được: AI rất mạnh trong việc khoanh vùng các lỗi logic phổ biến về quản lý phiên đăng nhập (state/storage), giúp rút ngắn đáng kể thời gian debug thủ công.
+
 
 ### [AI-06] Xây dựng tính năng chọn địa chỉ 3 cấp (Tỉnh/Quận/Phường)
 - Ngày / Người dùng: 17/11/2026 / Bùi Văn Tín
 - Công cụ: Gemini
 - Giai đoạn: Lập trình Frontend (TM-08)
-- Mục đích: Tạo dropdown chọn địa chỉ 3 cấp tự động load dữ liệu và ghép thành chuỗi lưu vào database.
+- Task / Commit / PR: Tích hợp API địa giới hành chính 3 cấp / [Mã commit] / PR #...
+- Mục đích: Xây dựng cụm dropdown chọn địa chỉ 3 cấp (Tỉnh/Thành - Quận/Huyện - Phường/Xã) tự động tải dữ liệu theo cấp bậc và ghép thành chuỗi địa chỉ hoàn chỉnh để lưu vào CSDL.
 - Prompt chính: "Viết code React sử dụng axios để call API provinces.open-api.vn. Xử lý sự kiện khi chọn Tỉnh thì load Quận, chọn Quận thì load Phường. Viết hàm ghép nối Tỉnh/Quận/Phường và số nhà thành một chuỗi địa chỉ hoàn chỉnh."
-- Kết quả AI trả về: Cung cấp đoạn code useState, useEffect và các hàm handleChange. Có sẵn logic ghép chuỗi `finalAddress`.
-- Đánh giá: Rất hữu ích và chạy được ngay, tuy nhiên AI chưa xử lý việc disable dropdown (không cho chọn Quận khi chưa chọn Tỉnh).
-- Đã chỉnh sửa gì: Tự bổ sung prop `disabled={!selectedProvince}` vào thẻ `<select>` của Quận/Huyện và Phường/Xã.
-- Cách kiểm chứng: Thao tác chọn địa chỉ trên UI, lưu thành công, kiểm tra lại trong MySQL thấy chuỗi địa chỉ được lưu đúng định dạng.
+- Kết quả AI trả về: Đoạn mã React hoàn chỉnh sử dụng `useState`, `useEffect` để gọi API theo từng cấp và hàm `handleChange` xử lý ghép chuỗi `finalAddress`.
+- Đánh giá: Code chạy tốt ngay từ lần đầu và tiết kiệm thời gian xử lý bất đồng bộ, tuy nhiên AI còn thiếu phần ràng buộc UX (chưa khóa dropdown cấp dưới khi chưa chọn cấp trên).
+- Đã chỉnh sửa gì: Bổ sung thêm thuộc tính `disabled={!selectedProvince}` và `disabled={!selectedDistrict}` vào các thẻ `<select>` tương ứng để tránh lỗi người dùng thao tác sai thứ tự.
+- Cách kiểm chứng: Thao tác chọn địa chỉ thực tế trên giao diện, bấm lưu và kiểm tra trực tiếp dữ liệu trong bảng MySQL để đảm bảo chuỗi địa chỉ được lưu đúng định dạng.
 - Tỷ lệ nội dung AI còn giữ lại: 70%
+- Điều học được: Dùng AI tạo khung logic gọi API lồng nhau rất nhanh, nhưng lập trình viên vẫn cần kiểm tra kỹ các trường hợp biên về trải nghiệm người dùng (UI/UX edge cases) để hoàn thiện sản phẩm.
 
 -->
