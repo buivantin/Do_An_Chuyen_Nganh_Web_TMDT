@@ -2,26 +2,34 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    use HasFactory;
-
     protected $table = 'products';
 
     protected $fillable = [
-    'name',
-    'author',
-    'description',
-    'status',
-    'price',
-    'category_id',
-    'image',
-    'stock',
-    'is_deleted',
-];
+        'name',
+        'author',
+        'publisher',
+        'published_year',
+        'page_count',
+        'description',
+        'status',
+        'price',
+        'category_id',
+        'image',
+        'stock',
+        'is_deleted',
+    ];
+
+    protected $casts = [
+        'published_year' => 'integer',
+        'page_count' => 'integer',
+        'price' => 'decimal:2',
+        'stock' => 'integer',
+        'is_deleted' => 'boolean',
+    ];
 
     public function category()
     {
