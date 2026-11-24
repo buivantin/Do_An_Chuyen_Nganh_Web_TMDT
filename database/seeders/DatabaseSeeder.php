@@ -95,6 +95,8 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password123'),
             'role' => 'admin',
             'status' => 'active',
+            'total_spent' => 0,
+            'membership_tier' => 1,
             'created_at' => $now->copy()->subYears(5),
             'updated_at' => $now->copy()->subYears(5),
         ]);
@@ -111,12 +113,22 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'role' => 'customer',
                 'status' => $customer['status'],
+                'total_spent' => 0,
+                'membership_tier' => 1,
                 'created_at' => $userCreated,
                 'updated_at' => $userCreated,
             ]);
         }
 
-        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (rải đều 20 đầu sách mỗi năm 2022–2026)
+        // 2 & 3. Seed 5 Danh mục kèm đúng 100 Đầu sách (đầy đủ NXB, năm XB, số trang)
+        $publishersByCategory = [
+            'Văn học' => ['NXB Hội Nhà Văn', 'NXB Trẻ', 'NXB Văn Học', 'Nhã Nam'],
+            'Kinh tế & Quản lý' => ['NXB Trẻ', 'NXB Tổng Hợp TP.HCM', 'NXB Thế Giới', 'Alpha Books'],
+            'Kỹ năng sống' => ['NXB Tổng Hợp TP.HCM', 'NXB Trẻ', 'First News - Trí Việt', 'NXB Thế Giới'],
+            'Công nghệ thông tin' => ['NXB Khoa Học & Kỹ Thuật', 'NXB Thông Tin & Truyền Thông', 'NXB Đại Học Quốc Gia', 'O\'Reilly Media'],
+            'Sách thiếu nhi' => ['NXB Kim Đồng', 'NXB Trẻ', 'NXB Phụ Nữ Việt Nam', 'Nhã Nam'],
+        ];
+
         $catalog = [
             'Văn học' => [
                 ['Nhà Giả Kim', 'Paulo Coelho', '/imgs/nha-gia-kim.jpg'],
@@ -241,6 +253,8 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => $now->copy()->subYears(5),
             ]);
 
+            $categoryPublishers = $publishersByCategory[$categoryName];
+
             foreach ($books as [$name, $author, $image]) {
                 $bookIndex++;
                 $prodYearOffset = ($bookIndex - 1) % 5; // 0 => 2026, 1 => 2025, 2 => 2024, 3 => 2023, 4 => 2022
@@ -258,6 +272,9 @@ class DatabaseSeeder extends Seeder
                 DB::table('products')->insert([
                     'name' => $name,
                     'author' => $author,
+                    'publisher' => $categoryPublishers[$bookIndex % count($categoryPublishers)],
+                    'published_year' => rand(2016, 2026),
+                    'page_count' => rand(160, 620),
                     'description' => "Cuốn sách {$name} mang lại nhiều giá trị tri thức và cảm xúc cho người đọc.",
                     'status' => 'active',
                     'price' => rand(50, 350) * 1000,
@@ -270,6 +287,85 @@ class DatabaseSeeder extends Seeder
             }
         }
 
+        // 3.5. Seed danh sách Voucher khớp với 5 cấp bậc thành viên (1..5)
+        DB::table('vouchers')->insert([
+            [
+                'id' => 1,
+                'name' => 'Chào Mầm Sách - Giảm 20K',
+                'code' => 'MAMSACH20',
+                'discount_amount' => 20000,
+                'min_order_value' => 150000,
+                'min_spent' => 0,
+                'membership_tier' => 1, // 01. Mầm Sách (từ 0đ)
+                'status' => 'active',
+                'start_date' => $now->copy()->subMonths(6),
+                'expiration_date' => $now->copy()->addMonths(6),
+                'requirement' => 'Áp dụng cho thành viên từ cấp 01. Mầm Sách trở lên, đơn từ 150.000đ.',
+                'created_at' => $now->copy()->subMonths(6),
+                'updated_at' => $now->copy()->subMonths(6),
+            ],
+            [
+                'id' => 2,
+                'name' => 'Ưu Đãi Người Đọc - Giảm 35K',
+                'code' => 'NGUOIDOC35',
+                'discount_amount' => 35000,
+                'min_order_value' => 200000,
+                'min_spent' => 300000,
+                'membership_tier' => 2, // 02. Người Đọc (từ 300.000đ)
+                'status' => 'active',
+                'start_date' => $now->copy()->subMonths(3),
+                'expiration_date' => $now->copy()->addMonths(6),
+                'requirement' => 'Dành cho cấp 02. Người Đọc trở lên (tích lũy từ 300.000đ), đơn từ 200.000đ.',
+                'created_at' => $now->copy()->subMonths(3),
+                'updated_at' => $now->copy()->subMonths(3),
+            ],
+            [
+                'id' => 3,
+                'name' => 'Đặc Quyền Tri Thức - Giảm 60K',
+                'code' => 'TRITHUC60',
+                'discount_amount' => 60000,
+                'min_order_value' => 300000,
+                'min_spent' => 800000,
+                'membership_tier' => 3, // 03. Tri Thức (từ 800.000đ)
+                'status' => 'active',
+                'start_date' => $now->copy()->subMonths(3),
+                'expiration_date' => $now->copy()->addMonths(6),
+                'requirement' => 'Dành cho cấp 03. Tri Thức trở lên (tích lũy từ 800.000đ), đơn từ 300.000đ.',
+                'created_at' => $now->copy()->subMonths(3),
+                'updated_at' => $now->copy()->subMonths(3),
+            ],
+            [
+                'id' => 4,
+                'name' => 'Ưu Đãi Học Giả - Giảm 100K',
+                'code' => 'HOCGIA100',
+                'discount_amount' => 100000,
+                'min_order_value' => 450000,
+                'min_spent' => 1800000,
+                'membership_tier' => 4, // 04. Học Giả (từ 1.800.000đ)
+                'status' => 'active',
+                'start_date' => $now->copy()->subMonths(3),
+                'expiration_date' => $now->copy()->addMonths(6),
+                'requirement' => 'Dành cho cấp 04. Học Giả trở lên (tích lũy từ 1.800.000đ), đơn từ 450.000đ.',
+                'created_at' => $now->copy()->subMonths(3),
+                'updated_at' => $now->copy()->subMonths(3),
+            ],
+            [
+                'id' => 5,
+                'name' => 'VIP Đại Sứ Tri Thức - Giảm 180K',
+                'code' => 'DAISU180',
+                'discount_amount' => 180000,
+                'min_order_value' => 600000,
+                'min_spent' => 3500000,
+                'membership_tier' => 5, // 05. Đại Sứ Tri Thức (từ 3.500.000đ)
+                'status' => 'active',
+                'start_date' => $now->copy()->subMonths(3),
+                'expiration_date' => $now->copy()->addMonths(6),
+                'requirement' => 'Dành riêng cho cấp 05. Đại Sứ Tri Thức (tích lũy từ 3.500.000đ), đơn từ 600.000đ.',
+                'created_at' => $now->copy()->subMonths(3),
+                'updated_at' => $now->copy()->subMonths(3),
+            ],
+        ]);
+
         // 4. Seed 25 Đơn hàng rải đều 2022–2026 (khớp đúng tên, SĐT, địa chỉ & sách của người đánh giá)
         $reviewedBooksByOrder = [
             1 => 1,   // Nguyễn Minh Anh (user_id = 2) mua Nhà Giả Kim (product_id = 1)
@@ -281,6 +377,14 @@ class DatabaseSeeder extends Seeder
             7 => 1,   // Bùi Ngọc Ánh (user_id = 8) mua Nhà Giả Kim (product_id = 1)
         ];
 
+        $sampleNotes = [
+            'Giao giờ hành chính giúp mình nhé.',
+            'Gọi điện trước khi giao 15 phút.',
+            'Đóng gói chống sốc kỹ giúp mình vì mua làm quà tặng.',
+            null,
+            'Để hàng ở quầy lễ tân tòa nhà nếu mình không nghe máy.',
+        ];
+
         for ($i = 1; $i <= 25; $i++) {
             $yearOffset = ($i - 1) % 5; // 0 => 2026, 1 => 2025, 2 => 2024, 3 => 2023, 4 => 2022
             $customerIdx = ($i - 1) % count($customers); // 0..9
@@ -288,10 +392,8 @@ class DatabaseSeeder extends Seeder
             $userId = $customerIdx + 2; // user_id = 2..11
 
             if ($i <= 7) {
-                // 7 đơn đầu tiên là đơn đã hoàn thành của 7 khách hàng có đánh giá sản phẩm
                 $status = 'completed';
             } elseif ($yearOffset === 0) {
-                // Các đơn còn lại của năm 2026 có đủ Chờ xác nhận, Đang giao và Đã hủy
                 $status = match ($i) {
                     11 => 'pending',
                     16 => 'shipping',
@@ -302,7 +404,6 @@ class DatabaseSeeder extends Seeder
             }
 
             if ($yearOffset === 0) {
-                // Rải đơn năm 2026 qua các tháng 04, 07, 11 để biểu đồ tháng trực quan
                 $orderCreated = match ($i) {
                     1  => $now->copy()->subDays(10),                  // Tháng 11/2026 (completed)
                     6  => $now->copy()->subMonths(4)->subDays(5),    // Tháng 07/2026 (completed)
@@ -322,19 +423,24 @@ class DatabaseSeeder extends Seeder
                 ? $orderCreated
                 : $orderCreated->copy()->addHours(rand(2, 48));
 
+            $shippingFee = ($i % 4 === 0) ? 0 : 30000;
+
             $orderId = DB::table('orders')->insertGetId([
                 'receiver_name' => $customer['name'],
                 'status' => $status,
                 'address' => $customer['address'],
+                'note' => $sampleNotes[$i % count($sampleNotes)],
                 'phone' => $customer['phone'],
                 'payment_method' => $i % 2 == 0 ? 'COD' : 'VNPAY',
+                'shipping_fee' => $shippingFee,
                 'total_amount' => 0,
                 'user_id' => $userId,
+                'voucher_id' => ($i % 5 === 0) ? 1 : null,
                 'created_at' => $orderCreated,
                 'updated_at' => $orderUpdated,
             ]);
 
-            $total = 0;
+            $subtotal = 0;
             $itemCount = rand(1, 3);
             for ($j = 0; $j < $itemCount; $j++) {
                 $productId = ($j === 0 && isset($reviewedBooksByOrder[$i]))
@@ -343,7 +449,7 @@ class DatabaseSeeder extends Seeder
 
                 $price = rand(60, 200) * 1000;
                 $qty = rand(1, 2);
-                $total += $price * $qty;
+                $subtotal += $price * $qty;
 
                 DB::table('order_items')->insert([
                     'order_id' => $orderId,
@@ -355,7 +461,31 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
 
-            DB::table('orders')->where('id', $orderId)->update(['total_amount' => $total]);
+            $voucherDiscount = ($i % 5 === 0) ? 20000 : 0;
+            $finalTotal = max(0, $subtotal - $voucherDiscount) + $shippingFee;
+
+            DB::table('orders')->where('id', $orderId)->update(['total_amount' => $finalTotal]);
+        }
+
+        // 4.5. Tự động tính lại tổng chi tiêu tích lũy (total_spent) và hạng VIP (1..5) cho từng khách hàng
+        for ($uid = 2; $uid <= 11; $uid++) {
+            $spent = (float) DB::table('orders')
+                ->where('user_id', $uid)
+                ->where('status', 'completed')
+                ->sum('total_amount');
+
+            $tier = match (true) {
+                $spent >= 3500000 => 5, // 05. Đại Sứ Tri Thức
+                $spent >= 1800000 => 4, // 04. Học Giả
+                $spent >= 800000  => 3, // 03. Tri Thức
+                $spent >= 300000  => 2, // 02. Người Đọc
+                default           => 1, // 01. Mầm Sách
+            };
+
+            DB::table('users')->where('id', $uid)->update([
+                'total_spent' => $spent,
+                'membership_tier' => $tier,
+            ]);
         }
 
         // 5. Seed 7 Đánh giá sản phẩm khớp đúng 7 khách hàng đã mua sách ở trên
@@ -426,5 +556,45 @@ class DatabaseSeeder extends Seeder
         ];
 
         DB::table('reviews')->insert($sampleReviews);
+
+        // 6. Seed danh sách Hero Banner trang chủ
+        DB::table('banners')->insert([
+            [
+                'badge_text'  => 'TUYỂN CHỌN THÁNG 11',
+                'title'       => 'Mỗi trang sách mở ra một chân trời mới',
+                'description' => 'Khám phá không gian sách tinh tuyển tại Mọt Sách BookHouse – nơi hội tụ những tác phẩm văn học kinh điển, tư duy kinh tế hiện đại và ấn phẩm thiếu nhi đầy cảm hứng.',
+                'image'       => '/imgs/banners/hero-bookstore-1.jpg',
+                'promo_label' => 'SÁCH CỦA TUẦN · GIẢM 20%',
+                'product_id'  => 1, // Nhà Giả Kim - Paulo Coelho
+                'sort_order'  => 1,
+                'status'      => 'active',
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ],
+            [
+                'badge_text'  => 'GÓC TRÍCH DẪN HAY',
+                'title'       => 'Đừng bao giờ đánh giá thấp sức mạnh của sự thấu cảm',
+                'description' => '“Thành công trong giao tiếp đến từ việc chân thành đặt mình vào vị trí của người khác để lắng nghe và sẻ chia.”',
+                'image'       => '/imgs/banners/hero-bookstore-2.jpg',
+                'promo_label' => 'BÁN CHẠY NHẤT · KỸ NĂNG SỐNG',
+                'product_id'  => 39, // Đắc Nhân Tâm - Dale Carnegie
+                'sort_order'  => 2,
+                'status'      => 'active',
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ],
+            [
+                'badge_text'  => 'TỦ SÁCH THIẾU NHI',
+                'title'       => 'Nuôi dưỡng trí tưởng tượng bay bổng cho trẻ thơ',
+                'description' => '“Người lớn ai cũng từng là trẻ con, nhưng rất ít người trong số họ còn nhớ điều đó.”',
+                'image'       => '/imgs/banners/hero-bookstore-3.jpg',
+                'promo_label' => 'GỢI Ý BIÊN TẬP',
+                'product_id'  => 85, // Hoàng Tử Bé - Antoine de Saint-Exupéry
+                'sort_order'  => 3,
+                'status'      => 'active',
+                'created_at'  => $now,
+                'updated_at'  => $now,
+            ],
+        ]);
     }
 }
