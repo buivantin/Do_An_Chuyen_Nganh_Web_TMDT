@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import AdminConfirmModal from '../../components/admin/AdminConfirmModal';
 
 const DEFAULT_START_DATE = '2026-01-01';
 const DEFAULT_END_DATE = '2026-11-23';
 
 const STATUS_META = {
-  pending:   { label: 'Chờ xác nhận',  badge: 'bg-amber-100 text-amber-800',     bar: 'bg-amber-500' },
-  shipping:  { label: 'Đang giao',     badge: 'bg-blue-100 text-blue-800',       bar: 'bg-blue-600' },
-  completed: { label: 'Đã hoàn thành', badge: 'bg-emerald-100 text-emerald-800', bar: 'bg-emerald-600' },
-  cancelled: { label: 'Đã hủy',        badge: 'bg-rose-100 text-rose-800',       bar: 'bg-rose-500' },
+  pending:    { label: 'Chờ xác nhận',  badge: 'bg-amber-100 text-amber-800',     bar: 'bg-amber-500' },
+  processing: { label: 'Chuẩn bị hàng', badge: 'bg-indigo-100 text-indigo-800',   bar: 'bg-indigo-500' },
+  shipping:   { label: 'Đang giao',     badge: 'bg-blue-100 text-blue-800',       bar: 'bg-blue-600' },
+  completed:  { label: 'Đã hoàn thành', badge: 'bg-emerald-100 text-emerald-800', bar: 'bg-emerald-600' },
+  cancelled:  { label: 'Đã hủy',        badge: 'bg-rose-100 text-rose-800',       bar: 'bg-rose-500' },
 };
 
 const formatVND = (amount) => Number(amount || 0).toLocaleString('vi-VN') + ' ₫';
@@ -53,6 +55,21 @@ export default function Dashboard() {
 
   const [isFilterLoading, setIsFilterLoading] = useState(true);
   const [animateBars, setAnimateBars] = useState(false);
+
+  // Thông báo kết quả & Modal xác nhận thao tác
+  const [actionMsg, setActionMsg] = useState({ type: '', text: '' });
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    variant: 'warning',
+    title: '',
+    message: '',
+    detailText: '',
+    detailsList: [],
+    confirmText: 'Xác nhận',
+    cancelText: 'Hủy',
+    action: null,
+  });
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchDashboardByRange = async (startDate, endDate) => {
     setIsFilterLoading(true);
@@ -151,7 +168,7 @@ export default function Dashboard() {
           acc[item.status] = (acc[item.status] || 0) + 1;
           return acc;
         },
-        { pending: 0, shipping: 0, completed: 0, cancelled: 0 }
+        { pending: 0, processing: 0, shipping: 0, completed: 0, cancelled: 0 }
       ),
     [orders]
   );
@@ -253,35 +270,95 @@ export default function Dashboard() {
     return orders.filter((order) => order.status === orderStatusFilter);
   }, [orders, orderStatusFilter]);
 
-  const handleToggleReviewVisibility = async (reviewId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.patch(
-        `/api/admin/reviews/${reviewId}/toggle`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setReviews((prev) =>
-        prev.map((item) =>
-          item.id === reviewId ? { ...item, status: res.data.status } : item
-        )
-      );
-    } catch (err) {
-      alert('Không thể cập nhật trạng thái đánh giá!');
-    }
+  // Gọi Modal thông báo xác nhận trước khi Ẩn / Hiển thị đánh giá
+  const handleToggleReviewVisibility = (review) => {
+    const isHiding = review.status === 'visible';
+    const nextActionText = isHiding ? 'Ẩn' : 'Hiển thị';
+
+    setConfirmState({
+      open: true,
+      variant: 'warning',
+      title: `Xác nhận ${nextActionText.toLowerCase()} đánh giá`,
+      message: `Bạn có chắc chắn muốn ${nextActionText.toLowerCase()} nhận xét của khách hàng "${review.customer}" trên trang sản phẩm?`,
+      detailText: '',
+      detailsList: [
+        { label: 'Khách hàng', value: review.customer },
+        { label: 'Sản phẩm', value: review.book },
+        { label: 'Mức đánh giá', value: `${review.rating} / 5 sao` },
+      ],
+      confirmText: `Xác nhận ${nextActionText}`,
+      cancelText: 'Hủy',
+      action: async () => {
+        setActionLoading(true);
+        setActionMsg({ type: '', text: '' });
+        try {
+          const token = localStorage.getItem('token');
+          const res = await axios.patch(
+            `/api/admin/reviews/${review.id}/toggle`,
+            {},
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setReviews((prev) =>
+            prev.map((item) =>
+              item.id === review.id ? { ...item, status: res.data.status } : item
+            )
+          );
+          setActionMsg({
+            type: 'success',
+            text: `Đã ${nextActionText.toLowerCase()} đánh giá của khách hàng "${review.customer}".`,
+          });
+        } catch {
+          setActionMsg({
+            type: 'error',
+            text: 'Không thể cập nhật trạng thái đánh giá!',
+          });
+        } finally {
+          setActionLoading(false);
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        }
+      },
+    });
   };
 
-  const handleDeleteReview = async (reviewId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa đánh giá này khỏi CSDL không?')) return;
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/api/admin/reviews/${reviewId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setReviews((prev) => prev.filter((item) => item.id !== reviewId));
-    } catch (err) {
-      alert('Không thể xóa đánh giá!');
-    }
+  // Gọi Modal thông báo xác nhận trước khi Xóa đánh giá
+  const handleDeleteReview = (review) => {
+    setConfirmState({
+      open: true,
+      variant: 'danger',
+      title: 'Xác nhận xóa đánh giá',
+      message: 'Bạn có chắc chắn muốn xóa vĩnh viễn đánh giá này khỏi cơ sở dữ liệu? Thao tác này không thể hoàn tác.',
+      detailText: '',
+      detailsList: [
+        { label: 'Khách hàng', value: review.customer },
+        { label: 'Sản phẩm', value: review.book },
+        { label: 'Mức đánh giá', value: `${review.rating} / 5 sao` },
+      ],
+      confirmText: 'Xóa đánh giá',
+      cancelText: 'Hủy',
+      action: async () => {
+        setActionLoading(true);
+        setActionMsg({ type: '', text: '' });
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`/api/admin/reviews/${review.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setReviews((prev) => prev.filter((item) => item.id !== review.id));
+          setActionMsg({
+            type: 'success',
+            text: `Đã xóa đánh giá của khách hàng "${review.customer}".`,
+          });
+        } catch {
+          setActionMsg({
+            type: 'error',
+            text: 'Không thể xóa đánh giá!',
+          });
+        } finally {
+          setActionLoading(false);
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        }
+      },
+    });
   };
 
   const filteredReviews = useMemo(() => {
@@ -296,8 +373,30 @@ export default function Dashboard() {
     return (sum / reviews.length).toFixed(1);
   }, [reviews]);
 
+  // 4 trạng thái chính hiển thị thanh tiến trình tổng quan
+  const overviewStatusKeys = ['pending', 'shipping', 'completed', 'cancelled'];
+
   return (
     <div className="space-y-6">
+      {actionMsg.text && (
+        <div
+          className={`p-3.5 rounded-xl border text-xs sm:text-sm font-medium flex items-center justify-between gap-2 ${
+            actionMsg.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+        >
+          <span>{actionMsg.text}</span>
+          <button
+            type="button"
+            onClick={() => setActionMsg({ type: '', text: '' })}
+            className="text-xs font-bold opacity-70 hover:opacity-100 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 4 Thẻ chỉ số tổng quan (KPI) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
@@ -397,7 +496,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Biểu đồ doanh thu theo lịch & Phân bổ 4 trạng thái đơn hàng */}
+      {/* Biểu đồ doanh thu theo lịch & Phân bổ trạng thái đơn hàng */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white border border-stone-200 rounded-2xl p-6 shadow-sm overflow-hidden">
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-6">
@@ -530,7 +629,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Phân bổ 4 trạng thái đơn */}
+        {/* Phân bổ trạng thái đơn */}
         <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
           <div>
             <h2 className="font-serif text-lg font-bold text-[#1A1A1A]">
@@ -554,7 +653,8 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {Object.entries(STATUS_META).map(([key, meta]) => {
+                {overviewStatusKeys.map((key) => {
+                  const meta = STATUS_META[key];
                   const count = statusCounts[key] || 0;
                   const percent = orders.length
                     ? Math.round((count / orders.length) * 100)
@@ -709,7 +809,10 @@ export default function Dashboard() {
                   </tr>
                 ) : (
                   filteredTableOrders.map((order) => {
-                    const meta = STATUS_META[order.status];
+                    const meta = STATUS_META[order.status] || {
+                      label: order.status,
+                      badge: 'bg-stone-100 text-stone-700',
+                    };
                     return (
                       <tr key={order.id} className="hover:bg-[#FAF8F5]">
                         <td className="py-2.5 pr-2 font-semibold text-xs text-[#1A1A1A] whitespace-nowrap">
@@ -826,14 +929,16 @@ export default function Dashboard() {
                     </td>
                     <td className="py-3.5 pl-3 text-right whitespace-nowrap">
                       <button
-                        onClick={() => handleToggleReviewVisibility(review.id)}
-                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200 transition"
+                        type="button"
+                        onClick={() => handleToggleReviewVisibility(review)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-stone-100 text-stone-700 hover:bg-stone-200 transition cursor-pointer"
                       >
                         {review.status === 'visible' ? 'Ẩn' : 'Hiện'}
                       </button>
                       <button
-                        onClick={() => handleDeleteReview(review.id)}
-                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition ml-1"
+                        type="button"
+                        onClick={() => handleDeleteReview(review)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition ml-1 cursor-pointer"
                       >
                         Xóa
                       </button>
@@ -845,6 +950,24 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Modal thông báo xác nhận ẩn/hiện hoặc xóa đánh giá */}
+      <AdminConfirmModal
+        open={confirmState.open}
+        variant={confirmState.variant}
+        title={confirmState.title}
+        message={confirmState.message}
+        detailText={confirmState.detailText}
+        detailsList={confirmState.detailsList}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        loading={actionLoading}
+        onConfirm={() => confirmState.action?.()}
+        onCancel={() =>
+          !actionLoading &&
+          setConfirmState((prev) => ({ ...prev, open: false }))
+        }
+      />
     </div>
   );
 }

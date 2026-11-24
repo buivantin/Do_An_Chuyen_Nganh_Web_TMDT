@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import MainLayout from "../layouts/MainLayout";
+import CartView from "../components/CartView";
 import LoginRequiredModal from "../components/LoginRequiredModal";
-import CheckoutStepper from "../components/CheckoutStepper";
+import ConfirmModal from "../components/ConfirmModal";
 import ProductService from "../services/ProductService";
+import { enrichBookWithSampleMeta } from "../data/homeMockData";
 
 function resolveProductImage(item) {
   const raw =
@@ -40,7 +42,6 @@ function resolveProductImage(item) {
     return `/${clean}`;
   }
 
-  // Mặc định đường dẫn từ Laravel Storage disk('public') như "products/abc.jpg"
   return `/storage/${clean}`;
 }
 
@@ -51,62 +52,19 @@ function getFallbackImageUrl(url) {
   return null;
 }
 
-function CartBookImage({ item, alt }) {
-  const initialUrl = resolveProductImage(item);
-  const [src, setSrc] = useState(initialUrl);
-  const [retried, setRetried] = useState(false);
-
-  useEffect(() => {
-    setSrc(resolveProductImage(item));
-    setRetried(false);
-  }, [item]);
-
-  if (!src) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center text-stone-400 text-[10px] font-bold uppercase tracking-wider select-none">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          className="w-6 h-6 mb-1 text-[#9A5B13]/70"
-        >
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
-        <span>Sách</span>
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      onError={() => {
-        if (!retried) {
-          const altUrl = getFallbackImageUrl(src);
-          if (altUrl && altUrl !== src) {
-            setRetried(true);
-            setSrc(altUrl);
-            return;
-          }
-        }
-        setSrc(null);
-      }}
-      className="h-full object-contain shadow-sm"
-    />
-  );
-}
-
+/**
+ * SMART COMPONENT: Tải dữ liệu giỏ hàng, bổ sung đầy đủ metadata sách, xử lý ConfirmModal khi xóa
+ */
 export default function Cart() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [noticeMsg, setNoticeMsg] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [removingItem, setRemovingItem] = useState(null);
 
-  const loadCart = async () => {
+  const loadCart = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) {
       setLoading(false);
@@ -132,35 +90,103 @@ export default function Cart() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadCart();
-  }, []);
+
+    // Tự động tải lại giỏ hàng khi người dùng đăng nhập qua AuthModal
+    const handleUserUpdated = () => {
+      if (localStorage.getItem("token")) {
+        setShowLoginModal(false);
+        loadCart();
+      }
+    };
+    window.addEventListener("user-updated", handleUserUpdated);
+    return () => window.removeEventListener("user-updated", handleUserUpdated);
+  }, [loadCart]);
+
+  // Chuẩn hóa & bổ sung đầy đủ thông tin sách cho từng dòng sản phẩm trong giỏ
+  const enrichedItems = useMemo(() => {
+    return items.map((item) => {
+      const productObj = item.product || {};
+      const productId = item.product_id || productObj.id || item.id;
+      const cleanTitle = (
+        item.name ||
+        item.title ||
+        productObj.title ||
+        productObj.name ||
+        "Ấn phẩm BookHouse"
+      ).normalize("NFC");
+      const cleanAuthor = (
+        item.author ||
+        productObj.author ||
+        "Đang cập nhật"
+      ).normalize("NFC");
+
+      const enrichedBook = enrichBookWithSampleMeta({
+        ...productObj,
+        ...item,
+        id: productId,
+        title: cleanTitle,
+        author: cleanAuthor,
+      });
+
+      const categoryName =
+        typeof enrichedBook.category === "object"
+          ? enrichedBook.category?.name
+          : enrichedBook.category;
+
+      const resolvedImage = resolveProductImage(item);
+
+      return {
+        ...item,
+        productId,
+        title: cleanTitle,
+        author: cleanAuthor,
+        publisher: enrichedBook.publisher || "Đang cập nhật",
+        publishYear: enrichedBook.publish_year || "",
+        coverType: enrichedBook.cover_type || "Bìa mềm",
+        pages: enrichedBook.pages || "",
+        rating: Number(enrichedBook.rating || 0),
+        categoryId: enrichedBook.category_id || "",
+        categoryName: categoryName || "",
+        originalPrice: Number(enrichedBook.original_price || 0),
+        stock: Number(item.stock ?? productObj.stock ?? enrichedBook.stock ?? 0),
+        resolvedImage,
+        fallbackImage: getFallbackImageUrl(resolvedImage),
+      };
+    });
+  }, [items]);
 
   const totalBooks = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [items]
+    () =>
+      enrichedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    [enrichedItems]
   );
 
   const subtotal = useMemo(
     () =>
-      items.reduce(
-        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+      enrichedItems.reduce(
+        (sum, item) =>
+          sum + Number(item.price || 0) * Number(item.quantity || 0),
         0
       ),
-    [items]
+    [enrichedItems]
   );
 
   const handleUpdateQuantity = async (item, nextQty) => {
     if (nextQty < 1 || updatingId === item.id) return;
 
     if (item.stock > 0 && nextQty > item.stock) {
-      setErrorMsg(`Sách "${item.name}" chỉ còn ${item.stock} cuốn trong kho.`);
+      setErrorMsg(
+        `Sách "${item.title}" chỉ còn ${item.stock} cuốn trong kho.`
+      );
       return;
     }
 
     setErrorMsg("");
+    setNoticeMsg("");
     setUpdatingId(item.id);
     try {
       await ProductService.updateCartItem(item.id, nextQty);
@@ -179,14 +205,19 @@ export default function Cart() {
     }
   };
 
-  const handleRemove = async (item) => {
-    if (updatingId === item.id) return;
+  const handleConfirmRemove = async () => {
+    if (!removingItem || updatingId === removingItem.id) return;
+    const target = removingItem;
+
     setErrorMsg("");
-    setUpdatingId(item.id);
+    setNoticeMsg("");
+    setUpdatingId(target.id);
     try {
-      await ProductService.removeCartItem(item.id);
-      setItems((prev) => prev.filter((row) => row.id !== item.id));
+      await ProductService.removeCartItem(target.id);
+      setItems((prev) => prev.filter((row) => row.id !== target.id));
       window.dispatchEvent(new CustomEvent("cart-updated"));
+      setNoticeMsg(`Đã xóa "${target.title}" khỏi giỏ hàng.`);
+      setRemovingItem(null);
     } catch (err) {
       setErrorMsg(
         err.response?.data?.message || "Không thể xóa sản phẩm khỏi giỏ hàng."
@@ -198,158 +229,40 @@ export default function Cart() {
 
   return (
     <MainLayout>
+      <CartView
+        items={enrichedItems}
+        totalBooks={totalBooks}
+        subtotal={subtotal}
+        loading={loading}
+        updatingId={updatingId}
+        errorMsg={errorMsg}
+        noticeMsg={noticeMsg}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRequestRemove={(item) => setRemovingItem(item)}
+      />
+
       <LoginRequiredModal
         open={showLoginModal}
         onClose={() => setShowLoginModal(false)}
       />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        <nav className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 flex flex-wrap items-center gap-1.5 sm:gap-2">
-          <a href="/" className="hover:text-[#9A5B13] transition">Trang chủ</a>
-          <span>&rsaquo;</span>
-          <span className="text-[#9A5B13]">Giỏ ấn phẩm</span>
-        </nav>
-
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-stone-200/80 pb-5">
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#9A5B13]">
-              Quy trình hoàn tất bản đặt
-            </div>
-            <h1 className="font-serif text-2xl sm:text-4xl font-bold text-[#1A1A1A] mt-1 tracking-tight">
-              Giỏ Ấn Phẩm Của Bạn
-            </h1>
-            <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              Hiện có {items.length} đầu sách ({totalBooks} cuốn) trong giỏ
-            </p>
-          </div>
-
-          <CheckoutStepper currentStep={1} canProceedCheckout={items.length > 0} />
-        </div>
-
-        {errorMsg && (
-          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700">
-            {errorMsg}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="py-16 text-center text-sm text-stone-500">
-            Đang tải giỏ hàng...
-          </div>
-        ) : items.length === 0 ? (
-          <div className="bg-white border border-stone-200/80 rounded-2xl p-8 sm:p-12 text-center max-w-lg mx-auto space-y-4">
-            <div className="w-12 h-12 mx-auto rounded-full bg-[#FAF8F5] border border-stone-200 flex items-center justify-center text-[#9A5B13]">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-6 h-6">
-                <path d="M6 7h12l1 13H5L6 7Z" strokeLinejoin="round" />
-                <path d="M9 7V5a3 3 0 0 1 6 0v2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <h2 className="font-serif text-xl font-bold text-stone-900">
-              Giỏ hàng của bạn đang trống
-            </h2>
-            <p className="text-xs sm:text-sm text-stone-500">
-              Hãy khám phá thêm các đầu sách hay và thêm vào giỏ nhé.
-            </p>
-            <div className="pt-2">
-              <a href="/products" className="inline-block bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition">
-                Tiếp tục mua sắm
-              </a>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-7 space-y-3.5">
-              {items.map((item) => {
-                const cleanName = (item.name || item.product?.name || "").normalize("NFC");
-                const authorName = (item.author || item.product?.author || "").normalize("NFC");
-                const productId = item.product_id || item.product?.id;
-                const isBusy = updatingId === item.id;
-
-                return (
-                  <div key={item.id} className="bg-white border border-stone-200/80 rounded-2xl p-3 sm:p-4 flex gap-3 sm:gap-4 items-center shadow-2xs">
-                    <a href={productId ? `/products/${productId}` : undefined} className="w-20 sm:w-24 aspect-[3/4] bg-[#EAEAEA] rounded-xl p-2 flex items-center justify-center shrink-0 overflow-hidden">
-                      <CartBookImage item={item} alt={cleanName} />
-                    </a>
-
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <a href={productId ? `/products/${productId}` : undefined} className="font-serif text-base sm:text-lg font-bold text-stone-900 hover:text-[#9A5B13] line-clamp-2 block">
-                        {cleanName}
-                      </a>
-                      <p className="text-xs text-stone-500 truncate">
-                        {authorName}
-                      </p>
-                      <div className="text-sm sm:text-base font-bold text-[#9A5B13]">
-                        {Number(item.price || 0).toLocaleString("vi-VN")} ₫
-                      </div>
-
-                      <div className="pt-1.5 flex flex-wrap items-center justify-between gap-2">
-                        <div className="inline-flex items-center border border-stone-200 rounded-lg bg-[#FAF8F5]">
-                          <button type="button" disabled={isBusy || item.quantity <= 1} onClick={() => handleUpdateQuantity(item, item.quantity - 1)} className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-l-lg cursor-pointer">
-                            &minus;
-                          </button>
-                          <span className="px-3 text-xs sm:text-sm font-semibold text-stone-900">
-                            {item.quantity}
-                          </span>
-                          <button type="button" disabled={isBusy} onClick={() => handleUpdateQuantity(item, item.quantity + 1)} className="w-7 h-7 sm:w-8 sm:h-8 text-sm font-bold text-stone-700 hover:bg-stone-200/60 disabled:opacity-40 rounded-r-lg cursor-pointer">
-                            +
-                          </button>
-                        </div>
-
-                        <button type="button" disabled={isBusy} onClick={() => handleRemove(item)} className="text-xs font-medium text-red-600 hover:text-red-700 hover:underline disabled:opacity-40 cursor-pointer">
-                          Xóa
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <aside className="lg:col-span-5 bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xs lg:sticky lg:top-6">
-              <div className="border-b border-stone-100 pb-3">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-[#9A5B13]">
-                  Tuyển thư ký gửi
-                </div>
-                <h2 className="font-serif text-xl font-bold text-[#1A1A1A] mt-0.5">
-                  Tóm Tắt Đơn Hàng
-                </h2>
-              </div>
-
-              <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex justify-between text-stone-600">
-                  <span>Tạm tính ấn phẩm ({totalBooks} cuốn)</span>
-                  <span className="font-bold text-stone-900">
-                    {subtotal.toLocaleString("vi-VN")}đ
-                  </span>
-                </div>
-                <div className="flex justify-between text-stone-600">
-                  <span>Phí vận chuyển tiêu chuẩn</span>
-                  <span className="font-bold text-[#9A5B13]">Miễn phí (0đ)</span>
-                </div>
-              </div>
-
-              <div className="bg-[#F3EFEA] border border-stone-200/70 rounded-2xl p-4 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-stone-800">
-                    Tổng thanh toán<br />tạm tính
-                  </div>
-                  <div className="text-[10px] text-stone-500 mt-0.5">(Đã bao gồm thuế GTGT)</div>
-                </div>
-
-                <div className="font-serif text-2xl sm:text-3xl font-bold text-[#1A1A1A] tracking-tight text-right">
-                  {subtotal.toLocaleString("vi-VN")}
-                  <span className="text-base sm:text-lg font-sans font-bold ml-0.5">đ</span>
-                </div>
-              </div>
-
-              <a href="/checkout" className="w-full bg-[#141414] hover:bg-stone-800 text-white text-xs sm:text-sm font-bold uppercase tracking-wider py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm">
-                <span>Tiến hành giao nhận &amp; thanh toán</span>
-                <span>&rarr;</span>
-              </a>
-            </aside>
-          </div>
-        )}
-      </div>
+      {/* Popup xác nhận dùng chung khi bấm xóa sản phẩm khỏi giỏ */}
+      <ConfirmModal
+        open={Boolean(removingItem)}
+        variant="danger"
+        title="Xóa sản phẩm khỏi giỏ hàng"
+        message="Bạn có chắc chắn muốn xóa cuốn sách này khỏi giỏ ấn phẩm không?"
+        detailText={
+          removingItem
+            ? `${removingItem.title} (${removingItem.quantity} cuốn)`
+            : ""
+        }
+        confirmText="Xóa khỏi giỏ"
+        cancelText="Giữ lại"
+        loading={Boolean(removingItem && updatingId === removingItem.id)}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => !updatingId && setRemovingItem(null)}
+      />
     </MainLayout>
   );
 }
