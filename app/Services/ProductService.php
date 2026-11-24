@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
+use Illuminate\Support\Facades\Schema;
 
 class ProductService
 {
@@ -26,6 +27,14 @@ class ProductService
             'category' => $book->category?->name ?? 'Chưa phân loại',
             'category_id' => $book->category_id,
             'price' => (float) $book->price,
+            'original_price' => isset($book->original_price) ? (float) $book->original_price : null,
+            'discount_percent' => $book->discount_percent ?? null,
+            'pages' => $book->pages ?? null,
+            'publisher' => $book->publisher ?? null,
+            'publish_year' => $book->publish_year ?? null,
+            'rating' => isset($book->avg_rating) ? round((float) $book->avg_rating, 1) : ($book->rating ?? null),
+            'sold_count' => isset($book->sold_count) ? (int) $book->sold_count : null,
+            'created_at' => $book->created_at?->toISOString(),
             'image' => $book->image,
             'stock' => $book->stock ?? 0,
         ];
@@ -33,22 +42,66 @@ class ProductService
 
     public function getHomeData(): array
     {
-        // 1. Danh mục đang hoạt động (dùng cho Menu & phân nhóm)
         $categories = Category::where('status', 'active')
-            ->orderBy('id', 'asc')
+            ->orderBy('name', 'asc')
             ->get(['id', 'name', 'description']);
 
-        // 2. 8 sách mới nhất
+        // 1. Sách mới về (xét theo ngày thêm created_at)
         $latestBooks = Product::with('category:id,name')
             ->where('status', 'active')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->take(8)
             ->get()
             ->map(fn (Product $book) => $this->formatBook($book));
 
-        // 3. Sách theo từng danh mục
+        // 2. Sách bán chạy (dựa vào số lần xuất hiện trong hóa đơn hợp lệ)
+        $bestsellerQuery = Product::with('category:id,name')
+            ->where('products.status', 'active');
+
+        if (Schema::hasTable('order_items') && Schema::hasTable('orders')) {
+            $bestsellerQuery
+                ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
+                ->leftJoin('orders', function ($join) {
+                    $join->on('order_items.order_id', '=', 'orders.id')
+                        ->where('orders.status', '!=', 'cancelled');
+                })
+                ->select('products.*', DB::raw('COALESCE(SUM(order_items.quantity), 0) as sold_count'))
+                ->groupBy('products.id')
+                ->orderByDesc('sold_count')
+                ->orderByDesc('products.id');
+        } else {
+            $bestsellerQuery->orderByDesc('id');
+        }
+
+        $bestsellerBooks = $bestsellerQuery
+            ->take(8)
+            ->get()
+            ->map(fn (Product $book) => $this->formatBook($book));
+
+        // 3. Top đánh giá (số sao trung bình cao nhất)
+        $topRatedQuery = Product::with('category:id,name')
+            ->where('products.status', 'active');
+
+        if (Schema::hasTable('reviews')) {
+            $topRatedQuery
+                ->leftJoin('reviews', 'products.id', '=', 'reviews.product_id')
+                ->select('products.*', DB::raw('COALESCE(AVG(reviews.rating), 0) as avg_rating'))
+                ->groupBy('products.id')
+                ->orderByDesc('avg_rating')
+                ->orderByDesc('products.id');
+        } else {
+            $topRatedQuery->orderByDesc('id');
+        }
+
+        $topRatedBooks = $topRatedQuery
+            ->take(8)
+            ->get()
+            ->map(fn (Product $book) => $this->formatBook($book));
+
+        // 4. Sách theo từng danh mục
         $categoriesWithBooks = Category::where('status', 'active')
-            ->orderBy('id', 'asc')
+            ->orderBy('name', 'asc')
             ->with(['products' => function ($query) {
                 $query->with('category:id,name')
                     ->where('status', 'active')
@@ -69,6 +122,8 @@ class ProductService
         return [
             'categories' => $categories,
             'latest_books' => $latestBooks,
+            'bestseller_books' => $bestsellerBooks,
+            'top_rated_books' => $topRatedBooks,
             'categories_with_books' => $categoriesWithBooks,
         ];
     }
@@ -274,4 +329,6 @@ class ProductService
             @unlink($fullPath);
         }
     }
+
+    
 }

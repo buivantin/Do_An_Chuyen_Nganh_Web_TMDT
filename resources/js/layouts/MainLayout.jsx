@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import LoginModal from "../components/LoginModal";
 import RegisterModal from "../components/RegisterModal";
+import FloatingContactBubbles from "../components/FloatingContactBubbles";
 
 function normalizeUser(u) {
     if (!u) return null;
@@ -101,6 +102,8 @@ export default function MainLayout({ children }) {
             <Navbar />
             <main className="flex-1">{children}</main>
             <Footer />
+
+            <FloatingContactBubbles />
 
             <LoginModal
                 isOpen={authModal === "login"}
