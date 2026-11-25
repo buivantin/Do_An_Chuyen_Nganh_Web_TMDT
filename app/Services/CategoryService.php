@@ -7,9 +7,11 @@ use Exception;
 
 class CategoryService
 {
-    public function getAll()
+    public function getAll(bool $onlyActive = false)
     {
         return Category::withCount('products')
+            ->when($onlyActive, fn ($q) => $q->where('status', 'active'))
+            ->orderBy('display_order')
             ->orderBy('id')
             ->get();
     }
@@ -19,6 +21,7 @@ class CategoryService
         return Category::create([
             'name' => trim($data['name']),
             'description' => $data['description'] ?? null,
+            'display_order' => isset($data['display_order']) ? (int) $data['display_order'] : 0,
             'status' => $data['status'] ?? 'active',
         ]);
     }
@@ -27,9 +30,14 @@ class CategoryService
     {
         $category = Category::findOrFail($id);
 
+        $displayOrder = array_key_exists('display_order', $data) && $data['display_order'] !== null
+            ? (int) $data['display_order']
+            : ($category->display_order ?? 0);
+
         $category->update([
             'name' => trim($data['name']),
             'description' => $data['description'] ?? null,
+            'display_order' => $displayOrder,
             'status' => $data['status'] ?? $category->status,
         ]);
 

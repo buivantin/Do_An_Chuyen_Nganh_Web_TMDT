@@ -7,31 +7,45 @@ use App\Models\Product;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
-use Illuminate\Support\Facades\Schema;
 
 class ProductService
 {
-    // =========================================================================
-    // PHẦN 1: API TRANG CHỦ ([TM-01] - GIỮ NGUYÊN CỦA TV5)
-    // =========================================================================
-
     private function formatBook(Product $book): array
     {
+        $pageCount = $book->page_count ?? $book->pages ?? null;
+        $publishedYear = $book->published_year ?? $book->publish_year ?? null;
+
+        $basePrice = (float) $book->price;
+        $discountPercent = (int) ($book->discount ?? $book->discount_percent ?? 0);
+        $discountPercent = max(0, min(100, $discountPercent));
+
+        $finalPrice = $discountPercent > 0
+            ? (float) round($basePrice * (1 - $discountPercent / 100))
+            : $basePrice;
+
+        $originalPrice = $discountPercent > 0
+            ? $basePrice
+            : (isset($book->original_price) ? (float) $book->original_price : null);
+
         return [
             'id' => $book->id,
             'title' => $book->title ?? $book->name,
             'author' => $book->author ?? 'Đang cập nhật',
             'category' => $book->category?->name ?? 'Chưa phân loại',
             'category_id' => $book->category_id,
-            'price' => (float) $book->price,
-            'original_price' => isset($book->original_price) ? (float) $book->original_price : null,
-            'discount_percent' => $book->discount_percent ?? null,
-            'pages' => $book->pages ?? null,
+            'price' => $finalPrice,
+            'original_price' => $originalPrice,
+            'discount' => $discountPercent,
+            'discount_percent' => $discountPercent > 0 ? $discountPercent : null,
+            'pages' => $pageCount,
+            'page_count' => $pageCount,
             'publisher' => $book->publisher ?? null,
-            'publish_year' => $book->publish_year ?? null,
+            'publish_year' => $publishedYear,
+            'published_year' => $publishedYear,
             'rating' => isset($book->avg_rating) ? round((float) $book->avg_rating, 1) : ($book->rating ?? null),
             'sold_count' => isset($book->sold_count) ? (int) $book->sold_count : null,
             'created_at' => $book->created_at?->toISOString(),
@@ -40,24 +54,47 @@ class ProductService
         ];
     }
 
+    private function applyActiveProductScope($query, string $table = 'products')
+    {
+        $query->where("{$table}.status", 'active');
+
+        if (Schema::hasColumn($table, 'is_deleted')) {
+            $query->where(function ($q) use ($table) {
+                $q->where("{$table}.is_deleted", false)
+                    ->orWhereNull("{$table}.is_deleted");
+            });
+        }
+
+        return $query;
+    }
+
     public function getHomeData(): array
     {
-        $categories = Category::where('status', 'active')
+        $categoriesQuery = Category::where('status', 'active');
+        if (Schema::hasColumn('categories', 'display_order')) {
+            $categoriesQuery->orderBy('display_order', 'asc');
+        }
+        $categories = $categoriesQuery
             ->orderBy('name', 'asc')
             ->get(['id', 'name', 'description']);
 
-        // 1. Sách mới về (xét theo ngày thêm created_at)
-        $latestBooks = Product::with('category:id,name')
-            ->where('status', 'active')
+        $productColumns = Schema::hasTable('products')
+            ? Schema::getColumnListing('products')
+            : [];
+        $groupedColumns = array_map(fn (string $col) => "products.{$col}", $productColumns);
+
+        $latestQuery = Product::with('category:id,name');
+        $this->applyActiveProductScope($latestQuery, 'products');
+
+        $latestBooks = $latestQuery
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->take(8)
             ->get()
             ->map(fn (Product $book) => $this->formatBook($book));
 
-        // 2. Sách bán chạy (dựa vào số lần xuất hiện trong hóa đơn hợp lệ)
-        $bestsellerQuery = Product::with('category:id,name')
-            ->where('products.status', 'active');
+        $bestsellerQuery = Product::with('category:id,name');
+        $this->applyActiveProductScope($bestsellerQuery, 'products');
 
         if (Schema::hasTable('order_items') && Schema::hasTable('orders')) {
             $bestsellerQuery
@@ -66,12 +103,19 @@ class ProductService
                     $join->on('order_items.order_id', '=', 'orders.id')
                         ->where('orders.status', '!=', 'cancelled');
                 })
-                ->select('products.*', DB::raw('COALESCE(SUM(order_items.quantity), 0) as sold_count'))
-                ->groupBy('products.id')
+                ->select('products.*', DB::raw('COALESCE(SUM(order_items.quantity), 0) as sold_count'));
+
+            if (!empty($groupedColumns)) {
+                $bestsellerQuery->groupBy($groupedColumns);
+            } else {
+                $bestsellerQuery->groupBy('products.id');
+            }
+
+            $bestsellerQuery
                 ->orderByDesc('sold_count')
                 ->orderByDesc('products.id');
         } else {
-            $bestsellerQuery->orderByDesc('id');
+            $bestsellerQuery->orderByDesc('products.id');
         }
 
         $bestsellerBooks = $bestsellerQuery
@@ -79,19 +123,25 @@ class ProductService
             ->get()
             ->map(fn (Product $book) => $this->formatBook($book));
 
-        // 3. Top đánh giá (số sao trung bình cao nhất)
-        $topRatedQuery = Product::with('category:id,name')
-            ->where('products.status', 'active');
+        $topRatedQuery = Product::with('category:id,name');
+        $this->applyActiveProductScope($topRatedQuery, 'products');
 
         if (Schema::hasTable('reviews')) {
             $topRatedQuery
                 ->leftJoin('reviews', 'products.id', '=', 'reviews.product_id')
-                ->select('products.*', DB::raw('COALESCE(AVG(reviews.rating), 0) as avg_rating'))
-                ->groupBy('products.id')
+                ->select('products.*', DB::raw('COALESCE(AVG(reviews.rating), 0) as avg_rating'));
+
+            if (!empty($groupedColumns)) {
+                $topRatedQuery->groupBy($groupedColumns);
+            } else {
+                $topRatedQuery->groupBy('products.id');
+            }
+
+            $topRatedQuery
                 ->orderByDesc('avg_rating')
                 ->orderByDesc('products.id');
         } else {
-            $topRatedQuery->orderByDesc('id');
+            $topRatedQuery->orderByDesc('products.id');
         }
 
         $topRatedBooks = $topRatedQuery
@@ -99,13 +149,17 @@ class ProductService
             ->get()
             ->map(fn (Product $book) => $this->formatBook($book));
 
-        // 4. Sách theo từng danh mục
-        $categoriesWithBooks = Category::where('status', 'active')
+        $categoriesWithBooksQuery = Category::where('status', 'active');
+        if (Schema::hasColumn('categories', 'display_order')) {
+            $categoriesWithBooksQuery->orderBy('display_order', 'asc');
+        }
+
+        $categoriesWithBooks = $categoriesWithBooksQuery
             ->orderBy('name', 'asc')
             ->with(['products' => function ($query) {
-                $query->with('category:id,name')
-                    ->where('status', 'active')
-                    ->orderByDesc('id');
+                $query->with('category:id,name');
+                $this->applyActiveProductScope($query, 'products');
+                $query->orderByDesc('id');
             }])
             ->get()
             ->map(function (Category $category) {
@@ -128,27 +182,21 @@ class ProductService
         ];
     }
 
-    // =========================================================================
-    // PHẦN 2: CRUD SẢN PHẨM & UPLOAD ẢNH ADMIN ([TM-12] - TV4)
-    // =========================================================================
-
-    /**
-     * Lấy danh sách sản phẩm cho trang Admin (kèm danh mục, tìm kiếm, lọc trạng thái)
-     */
     public function getAllProducts(array $filters = [])
     {
         $query = Product::with('category:id,name')->orderByDesc('id');
 
         $keyword = trim((string) ($filters['keyword'] ?? $filters['search'] ?? ''));
         if ($keyword !== '') {
-            $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'like', "%{$keyword}%")
-                  ->orWhere('author', 'like', "%{$keyword}%");
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $keyword);
+            $query->where(function ($q) use ($escaped) {
+                $q->where('name', 'like', "%{$escaped}%")
+                    ->orWhere('author', 'like', "%{$escaped}%");
             });
         }
 
         if (!empty($filters['category_id'])) {
-            $query->where('category_id', $filters['category_id']);
+            $query->where('category_id', (int) $filters['category_id']);
         }
 
         if (!empty($filters['status'])) {
@@ -161,9 +209,6 @@ class ProductService
         return $query->paginate($perPage);
     }
 
-    /**
-     * Tạo mới sản phẩm kèm tải ảnh đại diện
-     */
     public function createProduct(array $data, ?UploadedFile $imageFile = null, ?int $adminId = null): Product
     {
         DB::beginTransaction();
@@ -181,10 +226,10 @@ class ProductService
             DB::commit();
 
             Log::info('[TM-12] Tạo sản phẩm mới thành công', [
-                'admin_id'   => $adminId,
+                'admin_id' => $adminId,
                 'product_id' => $product->id,
-                'name'       => $product->name,
-                'image'      => $product->image,
+                'name' => $product->name,
+                'image' => $product->image,
             ]);
 
             return $product->load('category:id,name');
@@ -197,16 +242,13 @@ class ProductService
 
             Log::error('[TM-12] Lỗi khi tạo sản phẩm', [
                 'admin_id' => $adminId,
-                'error'    => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;
         }
     }
 
-    /**
-     * Cập nhật thông tin sản phẩm & thay thế ảnh nếu có tải ảnh mới
-     */
     public function updateProduct(Product $product, array $data, ?UploadedFile $imageFile = null, ?int $adminId = null): Product
     {
         DB::beginTransaction();
@@ -227,9 +269,9 @@ class ProductService
             }
 
             Log::info('[TM-12] Cập nhật sản phẩm thành công', [
-                'admin_id'   => $adminId,
+                'admin_id' => $adminId,
                 'product_id' => $product->id,
-                'changes'    => array_keys($data),
+                'changes' => array_keys($data),
             ]);
 
             return $product->fresh('category:id,name');
@@ -241,21 +283,17 @@ class ProductService
             }
 
             Log::error('[TM-12] Lỗi khi cập nhật sản phẩm', [
-                'admin_id'   => $adminId,
+                'admin_id' => $adminId,
                 'product_id' => $product->id,
-                'error'      => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             throw $e;
         }
     }
 
-    /**
-     * Ngừng bán (ẩn) sản phẩm thay vì xóa cứng khỏi database
-     */
     public function deleteProduct(Product $product, ?int $adminId = null): void
     {
-        // Kiểm tra ngoại lệ A2c: sản phẩm đang nằm trong đơn hàng chưa hoàn tất
         $hasUnfinishedOrders = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->where('order_items.product_id', $product->id)
@@ -266,36 +304,33 @@ class ProductService
             throw new RuntimeException('Không thể xóa sản phẩm vì đang nằm trong đơn hàng chưa hoàn tất.');
         }
 
-        // Cập nhật trạng thái về inactive, giữ nguyên bản ghi và ảnh trong public/imgs
         $product->update([
             'status' => 'inactive',
         ]);
 
         Log::info('[TM-12] Đã chuyển trạng thái sản phẩm sang inactive', [
-            'admin_id'   => $adminId,
+            'admin_id' => $adminId,
             'product_id' => $product->id,
-            'name'       => $product->name,
+            'name' => $product->name,
         ]);
     }
 
-    /**
-     * Kiểm tra MIME theo nội dung thực tế (Magic Bytes), đổi tên ngẫu nhiên và lưu vào public/imgs
-     */
     private function uploadImage(UploadedFile $file, ?int $adminId = null): string
     {
         $realMime = $file->getMimeType();
         $allowedMimes = [
             'image/jpeg' => 'jpg',
-            'image/png'  => 'png',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
         ];
 
         if (!isset($allowedMimes[$realMime])) {
             Log::warning('[TM-12] Từ chối tệp tải lên do sai định dạng MIME thực tế', [
-                'admin_id'      => $adminId,
+                'admin_id' => $adminId,
                 'original_name' => $file->getClientOriginalName(),
                 'detected_mime' => $realMime,
             ]);
-            throw new RuntimeException('Nội dung tệp không hợp lệ. Chỉ chấp nhận ảnh JPG hoặc PNG.');
+            throw new RuntimeException('Nội dung tệp không hợp lệ. Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP.');
         }
 
         $extension = $allowedMimes[$realMime];
@@ -309,19 +344,16 @@ class ProductService
         $file->move($destinationPath, $randomFilename);
 
         Log::info('[TM-12] Tải ảnh đại diện thành công', [
-            'admin_id'      => $adminId,
+            'admin_id' => $adminId,
             'original_name' => $file->getClientOriginalName(),
-            'saved_name'    => $randomFilename,
-            'mime_type'     => $realMime,
-            'size_bytes'    => $file->getSize(),
+            'saved_name' => $randomFilename,
+            'mime_type' => $realMime,
+            'size_bytes' => $file->getSize(),
         ]);
 
         return "/imgs/{$randomFilename}";
     }
 
-    /**
-     * Xóa tệp ảnh vật lý trong public/imgs
-     */
     private function deletePhysicalImage(string $relativePath): void
     {
         $fullPath = public_path(ltrim($relativePath, '/'));
@@ -329,6 +361,4 @@ class ProductService
             @unlink($fullPath);
         }
     }
-
-    
 }

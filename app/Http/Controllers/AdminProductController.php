@@ -14,9 +14,14 @@ class AdminProductController extends Controller
 
     public function index(Request $request)
     {
-        return response()->json(
-            $this->products->paginate($request->only(['keyword', 'category_id', 'status']))
+        $paginator = $this->products->paginate(
+            $request->only(['keyword', 'category_id', 'status', 'stock_status'])
         );
+
+        return response()->json(array_merge(
+            $paginator->toArray(),
+            ['stock_alerts' => $this->products->getStockAlerts()]
+        ));
     }
 
     public function show(int $id)
