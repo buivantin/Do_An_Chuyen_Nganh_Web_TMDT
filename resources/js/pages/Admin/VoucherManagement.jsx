@@ -3,36 +3,29 @@ import axios from "axios";
 import AdminModal from "../../components/admin/AdminModal";
 import AdminConfirmModal from "../../components/admin/AdminConfirmModal";
 
-const VOUCHERS_STORAGE_KEY = "bookhouse_admin_vouchers";
+const MEMBERSHIP_TIERS = [
+  { level: 1, name: "Mầm Sách", badge: "bg-stone-100 text-stone-700 border-stone-200" },
+  { level: 2, name: "Bạn Đọc Tích Cực", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { level: 3, name: "Độc Giả Thân Thiết", badge: "bg-sky-50 text-sky-700 border-sky-200" },
+  { level: 4, name: "Tri Kỷ Sách", badge: "bg-amber-50 text-amber-800 border-amber-200" },
+  { level: 5, name: "Đại Sứ Tri Thức", badge: "bg-purple-50 text-purple-800 border-purple-200" },
+];
 
-const DEFAULT_VOUCHERS = [
+const DISTRIBUTION_MODES = [
   {
-    id: 1,
-    code: "BOOKHOUSE15",
-    name: "Ưu đãi độc giả mới giảm 15%",
-    discount_type: "percent",
-    discount_value: 15,
-    max_discount: 50000,
-    min_order_amount: 150000,
-    usage_limit: 200,
-    used_count: 48,
-    start_date: "2026-01-01",
-    end_date: "2026-12-31",
-    status: "active",
+    value: "all_eligible",
+    label: "Mở chung cho tất cả hạng đã chọn",
+    desc: "Mọi thành viên thuộc các cấp đã chọn đều thấy mã và sử dụng theo nguyên tắc ai dùng trước được trước.",
   },
   {
-    id: 2,
-    code: "TRIKY30K",
-    name: "Voucher giảm trực tiếp 30.000đ",
-    discount_type: "fixed",
-    discount_value: 30000,
-    max_discount: 0,
-    min_order_amount: 250000,
-    usage_limit: 100,
-    used_count: 100,
-    start_date: "2026-03-01",
-    end_date: "2026-12-31",
-    status: "active",
+    value: "priority_high_tier",
+    label: "Ưu tiên cấp bậc cao nhất từ trên xuống (Cấp 5 → 1)",
+    desc: "Khi số lượng voucher ít hơn tổng thành viên đủ hạng, hệ thống tự động chọn đúng N người có cấp bậc & chi tiêu cao nhất để phát độc quyền.",
+  },
+  {
+    value: "random",
+    label: "Phát ngẫu nhiên (Random) trong nhóm đủ điều kiện",
+    desc: "Hệ thống bốc thăm ngẫu nhiên đúng N thành viên thuộc các cấp đã chọn và gửi mã độc quyền vào ví của họ.",
   },
 ];
 
@@ -43,7 +36,10 @@ const EMPTY_FORM = {
   discount_value: "",
   max_discount: "0",
   min_order_amount: "0",
-  usage_limit: "100",
+  min_spent: "0",
+  usage_limit: "50",
+  target_tiers: [], // [] = tất cả cấp bậc
+  distribution_mode: "all_eligible",
   start_date: "",
   end_date: "",
   status: "active",
@@ -53,6 +49,7 @@ const formatVND = (val) => Number(val || 0).toLocaleString("vi-VN") + " ₫";
 
 export default function VoucherManagement() {
   const [vouchers, setVouchers] = useState([]);
+  const [tierStats, setTierStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -84,27 +81,24 @@ export default function VoucherManagement() {
     };
   };
 
-  const syncLocal = (nextList) => {
-    setVouchers(nextList);
-    localStorage.setItem(VOUCHERS_STORAGE_KEY, JSON.stringify(nextList));
-    window.dispatchEvent(new CustomEvent("vouchers-updated"));
-  };
-
   const fetchVouchers = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("/api/admin/vouchers", getAuthConfig());
-      const list = res.data?.data || res.data || [];
+      const [voucherRes, statsRes] = await Promise.all([
+        axios.get("/api/admin/vouchers", getAuthConfig()),
+        axios.get("/api/admin/vouchers/tier-stats", getAuthConfig()).catch(() => null),
+      ]);
+      const list = voucherRes.data?.data || voucherRes.data || [];
       setVouchers(Array.isArray(list) ? list : []);
-    } catch {
-      try {
-        const saved = JSON.parse(
-          localStorage.getItem(VOUCHERS_STORAGE_KEY) || "null"
-        );
-        setVouchers(Array.isArray(saved) ? saved : DEFAULT_VOUCHERS);
-      } catch {
-        setVouchers(DEFAULT_VOUCHERS);
+
+      if (statsRes?.data?.tiers) {
+        setTierStats(statsRes.data.tiers);
       }
+    } catch (err) {
+      setAlertMessage({
+        type: "error",
+        text: err.response?.data?.message || "Không thể tải danh sách voucher từ máy chủ.",
+      });
     } finally {
       setLoading(false);
     }
@@ -113,6 +107,27 @@ export default function VoucherManagement() {
   useEffect(() => {
     fetchVouchers();
   }, []);
+
+  // Tính tổng số thành viên thuộc các cấp đang chọn trong form
+  const eligibleMembersCount = useMemo(() => {
+    if (!tierStats.length) return 0;
+    if (!formData.target_tiers || formData.target_tiers.length === 0) {
+      return tierStats.reduce((sum, item) => sum + Number(item.count || 0), 0);
+    }
+    return tierStats
+      .filter((item) => formData.target_tiers.includes(Number(item.tier)))
+      .reduce((sum, item) => sum + Number(item.count || 0), 0);
+  }, [tierStats, formData.target_tiers]);
+
+  const toggleTargetTier = (level) => {
+    setFormData((prev) => {
+      const exists = prev.target_tiers.includes(level);
+      const nextTiers = exists
+        ? prev.target_tiers.filter((t) => t !== level)
+        : [...prev.target_tiers, level].sort((a, b) => a - b);
+      return { ...prev, target_tiers: nextTiers };
+    });
+  };
 
   const resetAndCloseModal = () => {
     setIsModalOpen(false);
@@ -139,23 +154,35 @@ export default function VoucherManagement() {
 
   const handleOpenCreate = () => {
     setEditingId(null);
-    setFormData(EMPTY_FORM);
+    setFormData({
+      ...EMPTY_FORM,
+      start_date: new Date().toISOString().slice(0, 10),
+    });
     setAlertMessage({ type: "", text: "" });
     setIsModalOpen(true);
   };
 
   const handleEdit = (v) => {
     setEditingId(v.id);
+    const parsedTiers = Array.isArray(v.target_tiers) && v.target_tiers.length > 0
+      ? v.target_tiers.map(Number)
+      : v.membership_tier
+      ? MEMBERSHIP_TIERS.filter((t) => t.level >= Number(v.membership_tier)).map((t) => t.level)
+      : [];
+
     setFormData({
       code: v.code || "",
-      name: v.name || v.description || "",
-      discount_type: v.discount_type || "percent",
-      discount_value: String(v.discount_value ?? ""),
+      name: v.name || "",
+      discount_type: v.discount_type || "fixed",
+      discount_value: String(v.discount_value ?? v.discount_amount ?? ""),
       max_discount: String(v.max_discount ?? 0),
-      min_order_amount: String(v.min_order_amount ?? 0),
-      usage_limit: String(v.usage_limit ?? 100),
+      min_order_amount: String(v.min_order_amount ?? v.min_order_value ?? 0),
+      min_spent: String(v.min_spent ?? 0),
+      usage_limit: String(v.usage_limit ?? 0),
+      target_tiers: parsedTiers,
+      distribution_mode: v.distribution_mode || "all_eligible",
       start_date: (v.start_date || "").slice(0, 10),
-      end_date: (v.end_date || "").slice(0, 10),
+      end_date: (v.end_date || v.expiration_date || "").slice(0, 10),
       status: v.status || "active",
     });
     setAlertMessage({ type: "", text: "" });
@@ -168,49 +195,54 @@ export default function VoucherManagement() {
     setAlertMessage({ type: "", text: "" });
 
     const payload = {
-      ...formData,
       code: cleanCode,
+      name: formData.name.trim(),
+      discount_type: formData.discount_type,
       discount_value: Number(formData.discount_value || 0),
-      max_discount: Number(formData.max_discount || 0),
+      max_discount:
+        formData.discount_type === "percent" ? Number(formData.max_discount || 0) : 0,
       min_order_amount: Number(formData.min_order_amount || 0),
+      min_spent: Number(formData.min_spent || 0),
       usage_limit: Number(formData.usage_limit || 0),
+      target_tiers: formData.target_tiers.length > 0 ? formData.target_tiers : null,
+      distribution_mode: formData.distribution_mode,
+      start_date: formData.start_date || null,
+      end_date: formData.end_date || null,
+      status: formData.status,
     };
 
     try {
+      let res;
       if (editingId) {
-        await axios.put(
+        res = await axios.put(
           `/api/admin/vouchers/${editingId}`,
           payload,
           getAuthConfig()
         );
       } else {
-        await axios.post("/api/admin/vouchers", payload, getAuthConfig());
+        res = await axios.post("/api/admin/vouchers", payload, getAuthConfig());
       }
       await fetchVouchers();
-    } catch {
-      if (editingId) {
-        const next = vouchers.map((item) =>
-          item.id === editingId ? { ...item, ...payload, id: editingId } : item
-        );
-        syncLocal(next);
-      } else {
-        const next = [
-          { ...payload, id: Date.now(), used_count: 0 },
-          ...vouchers,
-        ];
-        syncLocal(next);
-      }
+      window.dispatchEvent(new CustomEvent("vouchers-updated"));
+      setAlertMessage({
+        type: "success",
+        text:
+          res.data?.message ||
+          (editingId
+            ? `Đã cập nhật voucher ${cleanCode}.`
+            : `Đã tạo voucher khuyến mãi ${cleanCode}.`),
+      });
+      resetAndCloseModal();
+    } catch (err) {
+      const apiMsg =
+        err.response?.data?.message ||
+        Object.values(err.response?.data?.errors || {})?.[0]?.[0] ||
+        "Không thể lưu voucher. Vui lòng kiểm tra lại dữ liệu.";
+      setAlertMessage({ type: "error", text: apiMsg });
+    } finally {
+      setActionLoading(false);
+      setConfirmState((prev) => ({ ...prev, open: false }));
     }
-
-    setAlertMessage({
-      type: "success",
-      text: editingId
-        ? `Đã cập nhật voucher ${cleanCode}.`
-        : `Đã tạo voucher khuyến mãi ${cleanCode}.`,
-    });
-    setActionLoading(false);
-    setConfirmState((prev) => ({ ...prev, open: false }));
-    resetAndCloseModal();
   };
 
   const handleRequestSubmit = (e) => {
@@ -221,21 +253,39 @@ export default function VoucherManagement() {
       return;
     }
 
+    if (
+      formData.distribution_mode !== "all_eligible" &&
+      Number(formData.usage_limit) <= 0
+    ) {
+      setAlertMessage({
+        type: "error",
+        text: "Vui lòng nhập số lượng voucher phát hành (> 0) khi chọn chế độ Ưu tiên cấp cao hoặc Random.",
+      });
+      return;
+    }
+
+    const tierSummary =
+      formData.target_tiers.length === 0
+        ? "Tất cả cấp bậc"
+        : formData.target_tiers
+            .map((lv) => MEMBERSHIP_TIERS.find((t) => t.level === lv)?.name || `Cấp ${lv}`)
+            .join(", ");
+
     setConfirmState({
       open: true,
       variant: "info",
       title: editingId
         ? "Xác nhận cập nhật voucher"
-        : "Xác nhận tạo voucher khuyến mãi",
+        : "Xác nhận phát hành voucher khuyến mãi",
       message: editingId
         ? "Bạn có chắc chắn muốn lưu thay đổi cho mã khuyến mãi này?"
-        : "Bạn có chắc chắn muốn phát hành mã khuyến mãi mới này?",
-      detailText: `Mã: ${cleanCode} (${
+        : "Bạn có chắc chắn muốn phát hành mã khuyến mãi mới này theo cấu hình đã chọn?",
+      detailText: `Mã: ${cleanCode} • ${
         formData.discount_type === "percent"
           ? `Giảm ${formData.discount_value}%`
           : `Giảm ${formatVND(formData.discount_value)}`
-      })`,
-      confirmText: editingId ? "Lưu voucher" : "Tạo voucher",
+      } • Đối tượng: ${tierSummary}`,
+      confirmText: editingId ? "Lưu voucher" : "Phát hành voucher",
       cancelText: "Quay lại",
       action: executeSaveVoucher,
     });
@@ -259,22 +309,37 @@ export default function VoucherManagement() {
         try {
           await axios.put(
             `/api/admin/vouchers/${voucher.id}`,
-            { ...voucher, status: nextStatus },
+            {
+              code: voucher.code,
+              name: voucher.name,
+              discount_type: voucher.discount_type,
+              discount_value: voucher.discount_value ?? voucher.discount_amount,
+              max_discount: voucher.max_discount,
+              min_order_amount: voucher.min_order_amount ?? voucher.min_order_value,
+              min_spent: voucher.min_spent,
+              usage_limit: voucher.usage_limit,
+              target_tiers: voucher.target_tiers,
+              distribution_mode: voucher.distribution_mode,
+              start_date: voucher.start_date,
+              end_date: voucher.end_date,
+              status: nextStatus,
+            },
             getAuthConfig()
           );
-          fetchVouchers();
-        } catch {
-          const next = vouchers.map((v) =>
-            v.id === voucher.id ? { ...v, status: nextStatus } : v
-          );
-          syncLocal(next);
+          await fetchVouchers();
+          setAlertMessage({
+            type: "success",
+            text: `Đã đổi trạng thái mã ${voucher.code}.`,
+          });
+        } catch (err) {
+          setAlertMessage({
+            type: "error",
+            text: err.response?.data?.message || "Không thể cập nhật trạng thái voucher.",
+          });
+        } finally {
+          setActionLoading(false);
+          setConfirmState((prev) => ({ ...prev, open: false }));
         }
-        setAlertMessage({
-          type: "success",
-          text: `Đã đổi trạng thái mã ${voucher.code}.`,
-        });
-        setActionLoading(false);
-        setConfirmState((prev) => ({ ...prev, open: false }));
       },
     });
   };
@@ -295,17 +360,20 @@ export default function VoucherManagement() {
             `/api/admin/vouchers/${voucher.id}`,
             getAuthConfig()
           );
-          fetchVouchers();
-        } catch {
-          const next = vouchers.filter((v) => v.id !== voucher.id);
-          syncLocal(next);
+          await fetchVouchers();
+          setAlertMessage({
+            type: "success",
+            text: `Đã xóa voucher ${voucher.code}.`,
+          });
+        } catch (err) {
+          setAlertMessage({
+            type: "error",
+            text: err.response?.data?.message || "Không thể xóa voucher này.",
+          });
+        } finally {
+          setActionLoading(false);
+          setConfirmState((prev) => ({ ...prev, open: false }));
         }
-        setAlertMessage({
-          type: "success",
-          text: `Đã xóa voucher ${voucher.code}.`,
-        });
-        setActionLoading(false);
-        setConfirmState((prev) => ({ ...prev, open: false }));
       },
     });
   };
@@ -315,8 +383,15 @@ export default function VoucherManagement() {
       const matchKw =
         !keyword.trim() ||
         v.code?.toLowerCase().includes(keyword.toLowerCase()) ||
-        v.name?.toLowerCase().includes(keyword.toLowerCase());
-      const matchSt = statusFilter === "all" || v.status === statusFilter;
+        v.name?.toLowerCase().includes(keyword.toLowerCase()) ||
+        v.tier_name?.toLowerCase().includes(keyword.toLowerCase());
+
+      const eff = v.effective_status || v.status;
+      const matchSt =
+        statusFilter === "all" ||
+        eff === statusFilter ||
+        (statusFilter === "inactive" && v.status === "inactive");
+
       return matchKw && matchSt;
     });
   }, [vouchers, keyword, statusFilter]);
@@ -325,6 +400,58 @@ export default function VoucherManagement() {
     "w-full px-3.5 py-2 text-sm bg-[#FAF8F5] border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9A5B13]";
   const labelClass =
     "block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5";
+
+  const renderStatusBadge = (v) => {
+    const eff = v.effective_status || v.status;
+    if (eff === "expired" || v.is_expired) {
+      return (
+        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+          Đã hết hạn
+        </span>
+      );
+    }
+    if (eff === "exhausted") {
+      return (
+        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+          Hết lượt dùng
+        </span>
+      );
+    }
+    if (v.status === "active") {
+      return (
+        <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+          Đang chạy
+        </span>
+      );
+    }
+    return (
+      <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-600">
+        Tạm ngưng
+      </span>
+    );
+  };
+
+  const renderDistributionBadge = (v) => {
+    if (v.distribution_mode === "priority_high_tier") {
+      return (
+        <span className="inline-block mt-1 px-2 py-0.5 rounded bg-purple-50 border border-purple-200 text-[10px] font-semibold text-purple-800">
+          Ưu tiên cấp cao ({v.assigned_count || 0} người nhận)
+        </span>
+      );
+    }
+    if (v.distribution_mode === "random") {
+      return (
+        <span className="inline-block mt-1 px-2 py-0.5 rounded bg-sky-50 border border-sky-200 text-[10px] font-semibold text-sky-800">
+          Phát ngẫu nhiên ({v.assigned_count || 0} người nhận)
+        </span>
+      );
+    }
+    return (
+      <span className="inline-block mt-1 px-2 py-0.5 rounded bg-stone-100 text-[10px] font-medium text-stone-600">
+        Mở chung theo hạng
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -347,8 +474,8 @@ export default function VoucherManagement() {
               Quản Lý Voucher Khuyến Mãi
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
-              Tạo và kiểm soát mã giảm giá, điều kiện áp dụng đơn hàng và giới
-              hạn lượt dùng
+              Phát hành mã giảm giá theo hạng thành viên, giới hạn lượt dùng và
+              tự động kiểm soát hạn sử dụng
             </p>
           </div>
 
@@ -367,7 +494,7 @@ export default function VoucherManagement() {
             type="text"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Tìm theo mã voucher hoặc tên chương trình..."
+            placeholder="Tìm theo mã voucher, tên chương trình hoặc hạng thành viên..."
             className="flex-1 px-3.5 py-2 text-sm bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9A5B13]"
           />
           <select
@@ -376,7 +503,9 @@ export default function VoucherManagement() {
             className="px-3.5 py-2 text-sm bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9A5B13]"
           >
             <option value="all">Tất cả trạng thái ({vouchers.length})</option>
-            <option value="active">Đang kích hoạt</option>
+            <option value="active">Đang chạy</option>
+            <option value="expired">Đã hết hạn</option>
+            <option value="exhausted">Hết lượt dùng</option>
             <option value="inactive">Tạm ngưng</option>
           </select>
         </div>
@@ -387,6 +516,7 @@ export default function VoucherManagement() {
               <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500">
                 <th className="py-3.5 px-4">Mã Voucher</th>
                 <th className="py-3.5 px-4">Mức giảm & Điều kiện</th>
+                <th className="py-3.5 px-4">Hạng thành viên & Phân phối</th>
                 <th className="py-3.5 px-4">Lượt sử dụng</th>
                 <th className="py-3.5 px-4">Thời gian áp dụng</th>
                 <th className="py-3.5 px-4 text-center">Trạng thái</th>
@@ -396,13 +526,13 @@ export default function VoucherManagement() {
             <tbody className="divide-y divide-stone-100 text-sm">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-10 text-center text-stone-400">
+                  <td colSpan="7" className="py-10 text-center text-stone-400">
                     Đang tải danh sách voucher...
                   </td>
                 </tr>
               ) : filteredVouchers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-10 text-center text-stone-400">
+                  <td colSpan="7" className="py-10 text-center text-stone-400">
                     Chưa có voucher khuyến mãi nào.
                   </td>
                 </tr>
@@ -421,7 +551,7 @@ export default function VoucherManagement() {
                         <span className="inline-block px-2.5 py-1 rounded-lg bg-[#F5EDE2] border border-dashed border-[#9A5B13] font-mono text-xs font-bold text-[#9A5B13]">
                           {v.code}
                         </span>
-                        <div className="text-xs font-medium text-stone-700 mt-1 max-w-[200px] truncate">
+                        <div className="text-xs font-medium text-stone-700 mt-1 max-w-[190px] truncate">
                           {v.name || "Khuyến mãi cửa hàng"}
                         </div>
                       </td>
@@ -447,7 +577,14 @@ export default function VoucherManagement() {
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">
+                      <td className="py-3.5 px-4">
+                        <div className="text-xs font-semibold text-stone-800 max-w-[210px] truncate" title={v.tier_name}>
+                          {v.tier_name || "Tất cả cấp bậc"}
+                        </div>
+                        {renderDistributionBadge(v)}
+                      </td>
+
+                      <td className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">
                         <div className="flex justify-between text-xs font-semibold text-stone-700 mb-1">
                           <span>
                             {used} / {limit > 0 ? limit : "∞"}
@@ -470,19 +607,13 @@ export default function VoucherManagement() {
 
                       <td className="py-3.5 px-4 text-xs text-stone-600 whitespace-nowrap">
                         <div>Từ: {v.start_date || "Ngay lập tức"}</div>
-                        <div>Đến: {v.end_date || "Không giới hạn"}</div>
+                        <div className={v.is_expired ? "text-red-600 font-semibold" : ""}>
+                          Đến: {v.end_date || "Không giới hạn"}
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            v.status === "active"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-stone-100 text-stone-600"
-                          }`}
-                        >
-                          {v.status === "active" ? "Đang chạy" : "Tạm ngưng"}
-                        </span>
+                        {renderStatusBadge(v)}
                       </td>
 
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
@@ -526,7 +657,7 @@ export default function VoucherManagement() {
         title={
           editingId ? "Cập Nhật Voucher Khuyến Mãi" : "Thêm Voucher Khuyến Mãi"
         }
-        maxWidth="max-w-xl"
+        maxWidth="max-w-2xl"
         footer={
           <>
             <button
@@ -541,7 +672,7 @@ export default function VoucherManagement() {
               form="voucher-modal-form"
               className="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
             >
-              {editingId ? "Lưu voucher" : "Tạo voucher"}
+              {editingId ? "Lưu voucher" : "Phát hành voucher"}
             </button>
           </>
         }
@@ -579,7 +710,7 @@ export default function VoucherManagement() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                placeholder="VD: Ưu đãi mừng năm học mới"
+                placeholder="VD: Tri ân Tri Kỷ Sách & Đại Sứ"
                 className={inputClass}
               />
             </div>
@@ -655,18 +786,120 @@ export default function VoucherManagement() {
             </div>
 
             <div>
-              <label className={labelClass}>Tổng lượt sử dụng tối đa</label>
+              <label className={labelClass}>
+                Số lượng voucher phát hành (0 = Không giới hạn)
+              </label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 value={formData.usage_limit}
                 onChange={(e) =>
                   setFormData({ ...formData, usage_limit: e.target.value })
                 }
-                placeholder="100"
+                placeholder="50"
                 className={inputClass}
               />
             </div>
+          </div>
+
+          {/* KHỐI CHỌN ĐỐI TƯỢNG HẠNG THÀNH VIÊN (1 -> 5) */}
+          <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-stone-200 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-stone-700">
+                Đối tượng hạng thành viên áp dụng
+              </label>
+              <span className="text-[11px] font-semibold text-[#9A5B13]">
+                {formData.target_tiers.length === 0
+                  ? `Tất cả cấp bậc (${eligibleMembersCount} thành viên)`
+                  : `Đã chọn ${formData.target_tiers.length} cấp (${eligibleMembersCount} thành viên phù hợp)`}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, target_tiers: [] })}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                  formData.target_tiers.length === 0
+                    ? "bg-[#141414] text-white border-[#141414]"
+                    : "bg-white text-stone-600 border-stone-300 hover:bg-stone-50"
+                }`}
+              >
+                Tất cả cấp bậc
+              </button>
+
+              {MEMBERSHIP_TIERS.map((tier) => {
+                const selected = formData.target_tiers.includes(tier.level);
+                const count =
+                  tierStats.find((s) => Number(s.tier) === tier.level)?.count ?? 0;
+                return (
+                  <button
+                    key={tier.level}
+                    type="button"
+                    onClick={() => toggleTargetTier(tier.level)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 ${
+                      selected
+                        ? "bg-[#9A5B13] text-white border-[#9A5B13]"
+                        : "bg-white text-stone-700 border-stone-300 hover:bg-stone-50"
+                    }`}
+                  >
+                    <span>
+                      Cấp {tier.level}: {tier.name}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                        selected
+                          ? "bg-white/20 text-white"
+                          : "bg-stone-100 text-stone-600"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* CHẾ ĐỘ PHÂN PHỐI KHI SỐ LƯỢNG VOUCHER < SỐ THÀNH VIÊN ĐỦ ĐIỀU KIỆN */}
+            {!editingId && (
+              <div className="pt-2 border-t border-stone-200/80 space-y-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600">
+                  Chế độ phân phối voucher
+                </label>
+                <div className="space-y-2">
+                  {DISTRIBUTION_MODES.map((m) => (
+                    <label
+                      key={m.value}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                        formData.distribution_mode === m.value
+                          ? "bg-white border-[#9A5B13] shadow-2xs"
+                          : "bg-white/60 border-stone-200 hover:bg-white"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="distribution_mode"
+                        value={m.value}
+                        checked={formData.distribution_mode === m.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            distribution_mode: e.target.value,
+                          })
+                        }
+                        className="mt-0.5 accent-[#9A5B13]"
+                      />
+                      <div className="text-xs">
+                        <div className="font-bold text-stone-800">{m.label}</div>
+                        <div className="text-[11px] text-stone-500 mt-0.5">
+                          {m.desc}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
