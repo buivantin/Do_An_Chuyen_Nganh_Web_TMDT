@@ -3,6 +3,7 @@ import axios from "axios";
 import MainLayout from "../layouts/MainLayout";
 import CheckoutView from "../components/CheckoutView";
 import LoginRequiredModal from "../components/LoginRequiredModal";
+import ConfirmModal from "../components/ConfirmModal";
 import ProductService from "../services/ProductService";
 import { formatVietnamAddress } from "../components/VietnamAddressSelector";
 
@@ -84,7 +85,7 @@ function normalizeUserVoucher(raw) {
 }
 
 /**
- * SMART COMPONENT: Xử lý Checkout, tải & kiểm tra điều kiện Voucher Admin cấp cho User
+ * SMART COMPONENT: Xử lý Checkout, xác nhận đặt đơn & kiểm tra điều kiện Voucher
  */
 export default function Checkout() {
   const storedUser = useMemo(() => getStoredUser(), []);
@@ -96,6 +97,13 @@ export default function Checkout() {
   const [errorMsg, setErrorMsg] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
+
+  // Hộp thoại xác nhận trước khi gửi đơn hàng
+  const [confirmOrderModal, setConfirmOrderModal] = useState({
+    open: false,
+    payload: null,
+    finalAddress: "",
+  });
 
   // Địa chỉ
   const [addressMode, setAddressMode] = useState("saved");
@@ -303,7 +311,8 @@ export default function Checkout() {
     [provinceCode, districtCode, wardName, streetAddress]
   );
 
-  const handleSubmitOrder = async (e) => {
+  // Bước 1: Kiểm tra thông tin hợp lệ và mở hộp thoại Xác nhận / Hủy bỏ (chưa tạo đơn)
+  const handleSubmitOrder = (e) => {
     e.preventDefault();
     setErrorMsg("");
 
@@ -366,7 +375,27 @@ export default function Checkout() {
       notes: note.trim(),
     };
 
+    setConfirmOrderModal({
+      open: true,
+      payload,
+      finalAddress: finalShippingAddress,
+    });
+  };
+
+  // Bước 2: Chỉ khi khách nhấn "Xác nhận đặt hàng" mới gọi API tạo đơn và hiện thông báo thành công
+  const handleConfirmPlaceOrder = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setConfirmOrderModal({ open: false, payload: null, finalAddress: "" });
+      setShowLoginModal(true);
+      return;
+    }
+
+    const { payload, finalAddress: finalShippingAddress } = confirmOrderModal;
+    if (!payload) return;
+
     setSubmitting(true);
+    setErrorMsg("");
     try {
       const response =
         typeof ProductService.createOrder === "function"
@@ -440,9 +469,11 @@ export default function Checkout() {
         paymentMethod,
       });
 
+      setConfirmOrderModal({ open: false, payload: null, finalAddress: "" });
       window.dispatchEvent(new CustomEvent("cart-updated"));
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
+      setConfirmOrderModal({ open: false, payload: null, finalAddress: "" });
       if (err.response?.status === 401) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -468,6 +499,28 @@ export default function Checkout() {
       <LoginRequiredModal
         open={showLoginModal}
         onClose={() => setShowLoginModal(false)}
+      />
+
+      <ConfirmModal
+        open={confirmOrderModal.open}
+        variant="primary"
+        title="Xác nhận đặt đơn hàng"
+        message="Bạn có chắc chắn muốn đặt đơn hàng này không? Sau khi nhấn xác nhận, đơn hàng sẽ được tạo và chuyển sang trạng thái chờ xử lý."
+        detailText={
+          confirmOrderModal.open
+            ? `${fullName.trim()} (${phone.trim()}) • ${
+                confirmOrderModal.finalAddress
+              } • Tổng: ${grandTotal.toLocaleString("vi-VN")} ₫`
+            : ""
+        }
+        confirmText="Xác nhận đặt hàng"
+        cancelText="Hủy bỏ"
+        loading={submitting}
+        onConfirm={handleConfirmPlaceOrder}
+        onCancel={() =>
+          !submitting &&
+          setConfirmOrderModal({ open: false, payload: null, finalAddress: "" })
+        }
       />
 
       <CheckoutView
