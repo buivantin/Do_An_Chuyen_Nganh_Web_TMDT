@@ -17,11 +17,24 @@ class Order extends Model
         'phone',
         'receiver_name',
         'note',
+        'shipping_provider',
+        'tracking_code',
+        'shipper_info',
+        'delivery_note',
+        'completed_at',
+        'return_type',
+        'return_reason',
+        'return_images',
+        'return_requested_at',
+        'admin_return_note',
     ];
 
     protected $casts = [
-        'shipping_fee' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'shipping_fee'        => 'decimal:2',
+        'total_amount'        => 'decimal:2',
+        'completed_at'        => 'datetime',
+        'return_images'       => 'array',
+        'return_requested_at' => 'datetime',
     ];
 
     public function items()

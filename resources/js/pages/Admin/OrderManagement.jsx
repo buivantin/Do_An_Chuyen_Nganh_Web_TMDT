@@ -16,9 +16,21 @@ const STATUS_META = {
     label: "Đang giao",
     badge: "bg-sky-100 text-sky-800 border-sky-200",
   },
+  delivered: {
+    label: "Đã giao (3 ngày đổi/hoàn)",
+    badge: "bg-teal-100 text-teal-800 border-teal-200",
+  },
   completed: {
-    label: "Đã giao",
+    label: "Hoàn thành",
     badge: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  },
+  return_requested: {
+    label: "Yêu cầu hoàn đơn",
+    badge: "bg-orange-100 text-orange-800 border-orange-300",
+  },
+  returned: {
+    label: "Đã hoàn đơn",
+    badge: "bg-purple-100 text-purple-800 border-purple-200",
   },
   cancelled: {
     label: "Đã hủy",
@@ -41,6 +53,15 @@ const EMPTY_DELIVERY_FORM = {
   delivery_note: "",
 };
 
+function resolveAssetUrl(path) {
+  if (!path) return null;
+  const raw = String(path).trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const clean = raw.replace(/^\/+/, "");
+  if (clean.startsWith("storage/") || clean.startsWith("imgs/")) return `/${clean}`;
+  return `/storage/${clean}`;
+}
+
 export default function OrderManagement() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,17 +75,20 @@ export default function OrderManagement() {
     processing: 0,
     shipping: 0,
     completed: 0,
+    return_requested: 0,
+    returned: 0,
     cancelled: 0,
   });
 
   const [currentPage, setCurrentPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
 
-  // Modal chi tiết đơn hàng
+  // Modal chi tiết đơn hàng & ghi chú phản hồi hoàn đơn
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [nextStatus, setNextStatus] = useState("");
+  const [adminReturnNote, setAdminReturnNote] = useState("");
 
-  // Modal nhập thông tin giao hàng (bắt buộc khi chuyển từ Chuẩn bị -> Đang giao / Đã giao)
+  // Modal nhập thông tin giao hàng (bắt buộc khi chuyển từ Chuẩn bị -> Đang giao / Hoàn thành)
   const [deliveryModal, setDeliveryModal] = useState({
     open: false,
     order: null,
@@ -130,11 +154,14 @@ export default function OrderManagement() {
           processing: 0,
           shipping: 0,
           completed: 0,
+          return_requested: 0,
+          returned: 0,
           cancelled: 0,
         };
         list.forEach((o) => {
-          if (Object.prototype.hasOwnProperty.call(computed, o.status)) {
-            computed[o.status] += 1;
+          const stKey = o.status === "delivered" ? "completed" : o.status;
+          if (Object.prototype.hasOwnProperty.call(computed, stKey)) {
+            computed[stKey] += 1;
           }
         });
         setCounts(computed);
@@ -166,20 +193,21 @@ export default function OrderManagement() {
   const handleOpenDetailModal = async (order) => {
     setSelectedOrder(order);
     setNextStatus(order.status);
+    setAdminReturnNote(order.admin_return_note || "");
 
-    if (!order.items && !order.order_items) {
-      try {
-        const res = await axios.get(
-          `/api/admin/orders/${order.id}`,
-          getAuthConfig()
-        );
-        const detail = res.data?.order || res.data?.data || res.data;
-        if (detail && typeof detail === "object") {
-          setSelectedOrder({ ...order, ...detail });
-        }
-      } catch {
-        // Giữ nguyên dữ liệu hiện có
+    try {
+      const res = await axios.get(
+        `/api/admin/orders/${order.id}`,
+        getAuthConfig()
+      );
+      const detail = res.data?.order || res.data?.data || res.data;
+      if (detail && typeof detail === "object") {
+        setSelectedOrder({ ...order, ...detail });
+        setNextStatus(detail.status || order.status);
+        setAdminReturnNote(detail.admin_return_note || "");
       }
+    } catch {
+      // Giữ nguyên dữ liệu hiện có
     }
   };
 
@@ -187,7 +215,7 @@ export default function OrderManagement() {
     setActionLoading(true);
     setMsg({ type: "", text: "" });
     try {
-      await axios.put(
+      const res = await axios.put(
         `/api/admin/orders/${orderId}/status`,
         payload,
         getAuthConfig()
@@ -196,8 +224,11 @@ export default function OrderManagement() {
         STATUS_META[payload.status]?.label || payload.status;
       setMsg({
         type: "success",
-        text: `Đã cập nhật đơn #${orderId} sang trạng thái "${statusLabel}".`,
+        text:
+          res.data?.message ||
+          `Đã cập nhật đơn #${orderId} sang trạng thái "${statusLabel}".`,
       });
+      window.dispatchEvent(new Event("order-status-updated"));
       setSelectedOrder(null);
       setDeliveryModal({ open: false, order: null, targetStatus: "shipping" });
       setDeliveryForm(EMPTY_DELIVERY_FORM);
@@ -216,11 +247,12 @@ export default function OrderManagement() {
 
   /**
    * Điều phối chuyển trạng thái:
-   * - Nếu chuyển từ "Chuẩn bị hàng" (processing) sang "Đang giao" (shipping) hoặc "Đã giao" (completed):
+   * - Nếu chuyển từ "Chuẩn bị hàng" (processing) sang "Đang giao" (shipping) hoặc "Hoàn thành" (completed):
    *   Bắt buộc mở modal nhập thông tin vận chuyển/bàn giao trước.
-   * - Các trường hợp khác (Duyệt chuẩn bị, Hủy đơn, Hoàn tất từ Đang giao): mở thẳng Modal thông báo xác nhận.
+   * - Các trường hợp khác (Duyệt chuẩn bị, Hủy đơn, Hoàn tất từ Đang giao, Duyệt/Từ chối hoàn đơn):
+   *   Mở thẳng Modal thông báo xác nhận AdminConfirmModal.
    */
-  const requestChangeOrderStatus = (order, targetStatus) => {
+  const requestChangeOrderStatus = (order, targetStatus, extraPayload = {}) => {
     if (!order || !targetStatus || targetStatus === order.status) return;
 
     const orderCode =
@@ -250,15 +282,20 @@ export default function OrderManagement() {
     }
 
     const isCancelAction = targetStatus === "cancelled";
+    const isApproveReturn = targetStatus === "returned";
 
     setConfirmState({
       open: true,
-      variant: isCancelAction ? "danger" : "warning",
+      variant: isCancelAction ? "danger" : isApproveReturn ? "info" : "warning",
       title: isCancelAction
         ? "Xác nhận hủy đơn hàng"
+        : isApproveReturn
+        ? "Xác nhận hoàn đơn & hoàn lại tồn kho"
         : "Xác nhận chuyển trạng thái đơn hàng",
       message: isCancelAction
         ? "Bạn có chắc chắn muốn hủy đơn hàng này? Thao tác này không thể hoàn tác."
+        : isApproveReturn
+        ? "Chấp nhận yêu cầu hoàn đơn của khách hàng và cộng lại số lượng sách vào kho?"
         : `Bạn có chắc chắn muốn chuyển trạng thái đơn hàng sang "${targetLabel}"?`,
       detailText: "",
       detailsList: [
@@ -271,9 +308,14 @@ export default function OrderManagement() {
         { label: "Trạng thái hiện tại", value: currentLabel },
         { label: "Trạng thái mới", value: targetLabel },
       ],
-      confirmText: isCancelAction ? "Xác nhận hủy đơn" : "Xác nhận cập nhật",
+      confirmText: isCancelAction
+        ? "Xác nhận hủy đơn"
+        : isApproveReturn
+        ? "Xác nhận hoàn đơn"
+        : "Xác nhận cập nhật",
       cancelText: "Quay lại",
-      action: () => executeStatusUpdate(order.id, { status: targetStatus }),
+      action: () =>
+        executeStatusUpdate(order.id, { status: targetStatus, ...extraPayload }),
     });
   };
 
@@ -427,6 +469,28 @@ export default function OrderManagement() {
         </div>
       )}
 
+      {counts.return_requested > 0 && (
+        <div className="p-4 rounded-2xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-orange-900">
+            <span className="text-xl">📦</span>
+            <p className="font-medium text-xs sm:text-sm">
+              Hiện có{" "}
+              <strong className="text-base text-orange-700">
+                {counts.return_requested}
+              </strong>{" "}
+              yêu cầu hoàn đơn / đổi trả từ khách hàng cần xử lý.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("return_requested")}
+            className="px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-orange-700 transition cursor-pointer"
+          >
+            Xem yêu cầu hoàn đơn
+          </button>
+        </div>
+      )}
+
       <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Header đồng bộ */}
         <div className="p-4 sm:p-6 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -436,7 +500,7 @@ export default function OrderManagement() {
             </h2>
             <p className="text-xs text-stone-500 mt-0.5">
               Xác nhận đơn, chuẩn bị ấn phẩm, bàn giao vận chuyển và cập nhật
-              trạng thái đã giao
+              trạng thái hoàn thành
             </p>
           </div>
 
@@ -457,7 +521,9 @@ export default function OrderManagement() {
               { key: "pending", label: "Chờ xác nhận" },
               { key: "processing", label: "Chuẩn bị hàng" },
               { key: "shipping", label: "Đang giao" },
-              { key: "completed", label: "Đã giao" },
+              { key: "completed", label: "Hoàn thành" },
+              { key: "return_requested", label: "Yêu cầu hoàn đơn" },
+              { key: "returned", label: "Đã hoàn đơn" },
               { key: "cancelled", label: "Đã hủy" },
             ].map((tab) => {
               const isActive = statusFilter === tab.key;
@@ -648,6 +714,29 @@ export default function OrderManagement() {
                               Xác nhận đã giao
                             </button>
                           )}
+
+                          {order.status === "delivered" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                requestChangeOrderStatus(order, "completed")
+                              }
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-semibold transition cursor-pointer"
+                              title="Chốt hoàn thành ngay mà không cần đợi hết 3 ngày"
+                            >
+                              Chốt hoàn thành
+                            </button>
+                          )}
+
+                          {order.status === "return_requested" && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDetailModal(order)}
+                              className="px-2.5 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 border border-orange-300 text-orange-800 text-xs font-semibold transition cursor-pointer"
+                            >
+                              Duyệt hoàn đơn
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -684,7 +773,7 @@ export default function OrderManagement() {
         </div>
       </div>
 
-      {/* MODAL 1: NHẬP THÔNG TIN BÀN GIAO / VẬN CHUYỂN (KHI CHUYỂN TỪ CHUẨN BỊ -> ĐANG GIAO / ĐÃ GIAO) */}
+      {/* MODAL 1: NHẬP THÔNG TIN BÀN GIAO / VẬN CHUYỂN (KHI CHUYỂN TỪ CHUẨN BỊ -> ĐANG GIAO / HOÀN THÀNH) */}
       <AdminModal
         open={deliveryModal.open}
         onClose={requestCancelDeliveryModal}
@@ -830,12 +919,15 @@ export default function OrderManagement() {
             </button>
             {selectedOrder &&
               selectedOrder.status !== "completed" &&
+              selectedOrder.status !== "returned" &&
               selectedOrder.status !== "cancelled" && (
                 <button
                   type="button"
                   disabled={nextStatus === selectedOrder.status}
                   onClick={() =>
-                    requestChangeOrderStatus(selectedOrder, nextStatus)
+                    requestChangeOrderStatus(selectedOrder, nextStatus, {
+                      admin_return_note: adminReturnNote,
+                    })
                   }
                   className="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
                 >
@@ -889,6 +981,117 @@ export default function OrderManagement() {
               </div>
             </div>
 
+            {/* KHỐI XỬ LÝ YÊU CẦU HOÀN ĐƠN / ĐỔI TRẢ TỪ KHÁCH HÀNG */}
+            {selectedOrder.status === "return_requested" && (
+              <div className="p-4 rounded-xl bg-orange-50 border border-orange-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-orange-900">
+                    Phiếu yêu cầu{" "}
+                    {selectedOrder.return_type === "exchange"
+                      ? "Đổi sách mới"
+                      : "Hoàn đơn & Hoàn tiền"}
+                  </span>
+                  {selectedOrder.return_requested_at && (
+                    <span className="text-[11px] text-orange-700">
+                      {new Date(
+                        selectedOrder.return_requested_at
+                      ).toLocaleString("vi-VN")}
+                    </span>
+                  )}
+                </div>
+
+                {(() => {
+                  const rawReason = String(selectedOrder.return_reason || "");
+                  const match = rawReason.match(
+                    /^\[Sách yêu cầu đổi mới:\s*(.+?)\]\s*—\s*(.*)$/s
+                  );
+                  if (match) {
+                    return (
+                      <div className="space-y-2">
+                        <div className="text-xs text-orange-950 bg-amber-100/90 p-3 rounded-xl border border-orange-300">
+                          <strong>Sách khách chọn đổi mới:</strong> {match[1]}
+                        </div>
+                        <div className="text-xs text-orange-950 bg-white/80 p-3 rounded-xl border border-orange-200">
+                          <strong>Lý do chi tiết:</strong> {match[2]}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-xs text-orange-950 bg-white/80 p-3 rounded-xl border border-orange-200">
+                      <strong>Lý do khách gửi:</strong> {rawReason}
+                    </div>
+                  );
+                })()}
+
+                {Array.isArray(selectedOrder.return_images) &&
+                  selectedOrder.return_images.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedOrder.return_images.map((img, i) => {
+                        const src = resolveAssetUrl(img);
+                        return (
+                          <a
+                            key={i}
+                            href={src}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-16 h-16 rounded-lg overflow-hidden border border-orange-300 bg-white block"
+                          >
+                            <img
+                              src={src}
+                              alt={`Ảnh lỗi ${i + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-orange-900 mb-1">
+                    Ghi chú phản hồi gửi khách hàng
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={adminReturnNote}
+                    onChange={(e) => setAdminReturnNote(e.target.value)}
+                    placeholder="Nhập hướng dẫn gửi trả sách / lý do từ chối..."
+                    className="w-full bg-white border border-orange-300 rounded-xl p-2.5 text-xs focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requestChangeOrderStatus(selectedOrder, "completed", {
+                        admin_return_note:
+                          adminReturnNote ||
+                          "Yêu cầu hoàn đơn chưa đủ điều kiện áp dụng.",
+                      })
+                    }
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-xs font-bold text-stone-700 cursor-pointer"
+                  >
+                    Từ chối hoàn đơn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requestChangeOrderStatus(selectedOrder, "returned", {
+                        admin_return_note:
+                          adminReturnNote ||
+                          "BookHouse đã chấp nhận hoàn đơn và hoàn lại tồn kho.",
+                      })
+                    }
+                    className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Xác nhận hoàn đơn (Hoàn kho)
+                  </button>
+                </div>
+              </div>
+            )}
+
             {Array.isArray(orderItems) && orderItems.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wider text-stone-600">
@@ -925,6 +1128,7 @@ export default function OrderManagement() {
                 Trạng thái xử lý đơn hàng
               </label>
               {selectedOrder.status === "completed" ||
+              selectedOrder.status === "returned" ||
               selectedOrder.status === "cancelled" ? (
                 <div className="p-3 rounded-xl bg-stone-100 text-xs text-stone-600 italic">
                   Đơn hàng này đã ở trạng thái chốt (
@@ -942,8 +1146,14 @@ export default function OrderManagement() {
                     Đang giao (Yêu cầu nhập thông tin bàn giao)
                   </option>
                   <option value="completed">
-                    Đã giao (Yêu cầu nhập thông tin bàn giao nếu đang chuẩn bị)
+                    Hoàn thành (Yêu cầu nhập thông tin bàn giao nếu đang chuẩn
+                    bị)
                   </option>
+                  {selectedOrder.status === "return_requested" && (
+                    <option value="returned">
+                      Đã hoàn đơn (Hoàn lại tồn kho)
+                    </option>
+                  )}
                   <option value="cancelled">Hủy đơn hàng</option>
                 </select>
               )}
