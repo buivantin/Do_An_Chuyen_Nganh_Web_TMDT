@@ -11,83 +11,80 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
-use App\Http\Controllers\Api\Admin\UserController; 
-use App\Http\Controllers\Api\CartController;       
-use App\Http\Controllers\Api\ProfileController; 
+use App\Http\Controllers\Api\Admin\UserController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\AdminProductController;
+use App\Http\Controllers\BannerController;
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 Route::get('/products/{productId}/reviews', [ReviewController::class, 'index']);
+Route::get('/banners', [BannerController::class, 'index']);
 
-// Route trang chủ & danh mục (Của TV3 & TV4)
+// Route trang chủ & danh mục
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/home', [HomeController::class, 'index']);
-Route::get('/products', [ProductController::class, 'search']); // Tìm kiếm sản phẩm
-Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNumber('id'); // Chi tiết sản phẩm
+Route::get('/products', [ProductController::class, 'search']);
+Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNumber('id');
 
-// --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập - Dành cho Khách hàng & Admin) ---
+// --- AUTHENTICATED ROUTES (Bắt buộc đăng nhập) ---
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
-    Route::get('/me', fn (Request $request) =>$request->user());
-    
+    Route::get('/me', fn (Request $request) => $request->user());
 
-    // TM-06: Đặt hàng (Của TV2)
+    // Đặt hàng
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/{id}', [OrderController::class, 'show'])->whereNumber('id');
-    
-    
-    // TM-07: Khách hàng hủy đơn, hoàn đơn & xác nhận hoàn thành (Của bạn)
+
+    // Khách hàng hủy đơn, hoàn đơn & xác nhận hoàn thành
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
     Route::post('/orders/{id}/return', [OrderController::class, 'requestReturn']);
     Route::post('/orders/{id}/confirm-completed', [OrderController::class, 'confirmCompleted']);
 
-    // Đánh giá sản phẩm (Của TV4)
+    // Đánh giá sản phẩm
     Route::post('/reviews', [ReviewController::class, 'store']);
 
-    // TM-05: Giỏ hàng (Của TV5)
+    // Giỏ hàng
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart/add', [CartController::class, 'addToCart']);
     Route::put('/cart/{id}', [CartController::class, 'update']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
-    // TM-08: Hồ sơ cá nhân (Của TV1)
+    // Hồ sơ cá nhân
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/change-password', [ProfileController::class, 'changePassword']);
-    
-    // Route Upload ảnh đại diện 
     Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar']);
 });
 
 // --- ADMIN ROUTES (Bắt buộc đăng nhập VÀ phải là Admin) ---
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
-    
     Route::get('/', fn () => response()->json(['message' => 'Chào mừng Admin']));
 
-    // Thống kê Dashboard & Quản lý đánh giá (Của TV4)
+    // Thống kê Dashboard & Quản lý đánh giá
     Route::get('/dashboard', function (Request $request) {
-        $startDate =$request->query('start_date');
-        $endDate =$request->query('end_date');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
 
         $productsQuery = DB::table('products')
-            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
-                $query->whereDate('created_at', '>=',$startDate)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                $query->whereDate('created_at', '>=', $startDate)
                       ->whereDate('created_at', '<=', $endDate);
             });
 
         $booksSummary = [
-            'total' => (clone $productsQuery)->count(),
-            'low_stock' => (clone $productsQuery)->where('stock', 1)->count(),
+            'total'        => (clone $productsQuery)->count(),
+            'low_stock'    => (clone $productsQuery)->where('stock', 1)->count(),
             'out_of_stock' => (clone $productsQuery)->where('stock', 0)->count(),
         ];
 
         $orders = DB::table('orders')
-            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
-                $query->whereDate('created_at', '>=',$startDate)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                $query->whereDate('created_at', '>=', $startDate)
                       ->whereDate('created_at', '<=', $endDate);
             })
             ->select(
@@ -104,8 +101,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
         $revenues = DB::table('orders')
             ->where('status', 'completed')
-            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
-                $query->whereDate('created_at', '>=',$startDate)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                $query->whereDate('created_at', '>=', $startDate)
                       ->whereDate('created_at', '<=', $endDate);
             })
             ->select(
@@ -120,8 +117,8 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('products', 'order_items.product_id', '=', 'products.id')
             ->where('orders.status', 'completed')
-            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
-                $query->whereDate('orders.created_at', '>=',$startDate)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                $query->whereDate('orders.created_at', '>=', $startDate)
                       ->whereDate('orders.created_at', '<=', $endDate);
             })
             ->select(
@@ -137,16 +134,16 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
             ->limit(5)
             ->get()
             ->values()
-            ->map(function ($item,$index) {
-                $item->rank =$index + 1;
+            ->map(function ($item, $index) {
+                $item->rank = $index + 1;
                 return $item;
             });
 
         $reviews = DB::table('reviews')
             ->join('users', 'reviews.user_id', '=', 'users.id')
             ->join('products', 'reviews.product_id', '=', 'products.id')
-            ->when($startDate && $endDate, function ($query) use ($startDate,$endDate) {
-                $query->whereDate('reviews.created_at', '>=',$startDate)
+            ->when($startDate && $endDate, function ($query) use ($startDate, $endDate) {
+                $query->whereDate('reviews.created_at', '>=', $startDate)
                       ->whereDate('reviews.created_at', '<=', $endDate);
             })
             ->select(
@@ -163,22 +160,22 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
         return response()->json([
             'books_summary' => $booksSummary,
-            'orders' => $orders,
-            'revenues' => $revenues,
-            'top_products' => $topProducts,
-            'reviews' => $reviews,
+            'orders'        => $orders,
+            'revenues'      => $revenues,
+            'top_products'  => $topProducts,
+            'reviews'       => $reviews,
         ]);
     });
 
     Route::patch('/reviews/{id}/toggle', function ($id) {
-        $review = DB::table('reviews')->where('id',$id)->first();
+        $review = DB::table('reviews')->where('id', $id)->first();
         if (!$review) {
             return response()->json(['message' => 'Không tìm thấy đánh giá'], 404);
         }
 
-        $newStatus =$review->status === 'visible' ? 'hidden' : 'visible';
+        $newStatus = $review->status === 'visible' ? 'hidden' : 'visible';
         DB::table('reviews')->where('id', $id)->update([
-            'status' => $newStatus,
+            'status'     => $newStatus,
             'updated_at' => now(),
         ]);
 
@@ -190,35 +187,37 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
         return response()->json(['message' => 'Đã xóa đánh giá']);
     });
 
-    // TM-14: Quản lý người dùng (Của TV1)
+    // Quản lý Banner Quảng Cáo (Admin)
+    Route::get('/banners', [BannerController::class, 'adminIndex']);
+    Route::post('/banners', [BannerController::class, 'store']);
+    Route::put('/banners/{id}', [BannerController::class, 'update'])->whereNumber('id');
+    Route::patch('/banners/{id}/toggle', [BannerController::class, 'toggleStatus'])->whereNumber('id');
+    Route::delete('/banners/{id}', [BannerController::class, 'destroy'])->whereNumber('id');
+
+    // Quản lý người dùng
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::put('/users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
-    
-    // CRUD Quản lý danh mục cho Admin (Của TV4)
+
+    // Quản lý danh mục
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
-    // TM-12: Quản lý sản phẩm (Admin)
+    // Quản lý sản phẩm
     Route::get('/products', [AdminProductController::class, 'index']);
     Route::post('/products', [AdminProductController::class, 'store']);
     Route::get('/products/{id}', [AdminProductController::class, 'show']);
     Route::put('/products/{id}', [AdminProductController::class, 'update']);
     Route::put('/products/{id}/toggle-status', [AdminProductController::class, 'toggleStatus']);
     Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
-    
-    
 
-    // TM-13: Quản lý đơn hàng (Của TV5)
-    // 1. Route đếm số lượng đơn chờ (Dành cho Chuông thông báo)
-    Route::get('/orders/pending-count', [OrderController::class, 'getPendingCount']); 
-    
-    // 2. Route lấy danh sách, chi tiết và cập nhật trạng thái
-    Route::get('/orders', [OrderController::class, 'adminIndex']); 
+    // Quản lý đơn hàng
+    Route::get('/orders/pending-count', [OrderController::class, 'getPendingCount']);
+    Route::get('/orders', [OrderController::class, 'adminIndex']);
     Route::get('/orders/{id}', [OrderController::class, 'adminShow'])->whereNumber('id');
-    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']); 
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
 });
