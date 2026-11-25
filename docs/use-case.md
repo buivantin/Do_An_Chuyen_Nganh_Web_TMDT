@@ -153,23 +153,59 @@
 
 > **Lưu ý cho Dev:** Tất cả API dưới đây phải gắn Middleware `auth:sanctum` + Middleware kiểm tra quyền Admin.
 
-#### UC-A1: Quản lý danh mục
-- **Tác nhân:** Admin.
+#### UC-A1: Quản lý danh mục (TM-11)
+- **Tác nhân:** Quản trị viên (Admin).
+- **Mô tả:** Xem danh sách, tìm kiếm, thêm mới, chỉnh sửa, ẩn/hiện và xóa danh mục sách trong hệ thống.
+- **Tiền điều kiện:**
+  - Người dùng đã đăng nhập với vai trò `admin` (token hợp lệ qua Middleware `auth:sanctum` và kiểm tra quyền Admin).
 - **Luồng chính:**
-  - **Xem (Read):** Lấy danh sách danh mục.
-  - **Thêm/Sửa (Create/Update):** Nhập tên danh mục. Validate không được trùng tên.
-  - **Xóa (Delete):** Kiểm tra xem danh mục đó có chứa sản phẩm nào không (`products.category_id`). Nếu có -> Báo lỗi "Không thể xóa danh mục đang có sản phẩm".
+  1. **Xem danh sách:** Admin truy cập trang Quản lý danh mục. Hệ thống gọi API `GET /api/admin/categories` để lấy danh sách danh mục kèm số lượng sản phẩm thuộc từng danh mục.
+  2. **Thêm danh mục mới:**
+     - Admin nhấn "Thêm danh mục", nhập Tên danh mục và chọn Trạng thái (`active` hoặc `hidden`).
+     - Gọi API `POST /api/admin/categories`.
+     - Backend kiểm tra dữ liệu (tên không rỗng, không trùng với tên danh mục đã có trong bảng `categories`), lưu bản ghi mới và trả về thông báo thành công.
+  3. **Sửa danh mục:**
+     - Admin nhấn "Sửa" trên một danh mục, cập nhật Tên danh mục hoặc Trạng thái.
+     - Gọi API `PUT /api/admin/categories/{id}`.
+     - Backend kiểm tra tên không trùng (ngoại trừ chính danh mục đang sửa) và cập nhật CSDL.
+  4. **Xóa danh mục:**
+     - Admin nhấn "Xóa" và xác nhận trên hộp thoại.
+     - Gọi API `DELETE /api/admin/categories/{id}`.
+     - Backend kiểm tra bảng `products`: nếu không có sản phẩm nào thuộc `category_id` này, hệ thống thực hiện xóa danh mục khỏi CSDL.
+- **Luồng ngoại lệ:**
+  - **Tên danh mục trống hoặc bị trùng:** Backend trả về mã lỗi `422` kèm thông báo tiếng Việt (*"Vui lòng nhập tên danh mục"* hoặc *"Tên danh mục đã tồn tại"*).
+  - **Xóa danh mục đang chứa sản phẩm:** Nếu tồn tại bản ghi trong `products` có `category_id` tương ứng -> Chặn thao tác xóa, trả về lỗi và hiển thị thông báo *"Không thể xóa danh mục đang có sản phẩm"*.
+  - **Không có quyền truy cập:** Trả về lỗi `401`/`403` nếu tài khoản không phải Admin.
 
-#### UC-A2: Quản lý sản phẩm
-- **Tác nhân:** Admin.
+#### UC-A2: Quản lý sản phẩm (TM-12)
+- **Tác nhân:** Quản trị viên (Admin).
+- **Mô tả:** Quản lý toàn bộ vòng đời đầu sách (xem danh sách phân trang, tìm kiếm/lọc, theo dõi cảnh báo tồn kho, thêm mới kèm ảnh bìa, cập nhật thông tin/nhập kho, ẩn/hiện và xóa mềm/xóa cứng).
+- **Tiền điều kiện:**
+  - Người dùng đã đăng nhập với vai trò `admin`.
+  - CSDL đã có ít nhất 1 danh mục (`categories`) để gán cho sản phẩm.
 - **Luồng chính:**
-  - **Xem:** Danh sách sản phẩm (có phân trang server, tìm kiếm theo tên).
-  - **Thêm mới:**
-    - Upload 1 ảnh (chặn file > 2MB, chỉ nhận JPG/PNG).
-    - Nhập Tên, Giá, Số lượng, Mô tả, Danh mục.
-  - **Sửa:** Cập nhật thông tin. Có thể thay đổi ảnh.
-  - **Ẩn/Hiện:** Thay đổi trạng thái `status` của sản phẩm (active/hidden) để ẩn khỏi trang khách hàng.
-  - **Xóa:** Nếu sản phẩm đã từng nằm trong đơn hàng -> Chuyển sang Xóa mềm (`is_deleted = 1`). Nếu chưa -> Xóa cứng.
+  1. **Xem danh sách, tìm kiếm & Cảnh báo tồn kho:**
+     - Admin truy cập trang Quản lý sản phẩm. Frontend gọi API `GET /api/admin/products` với các tham số phân trang (`page`), từ khóa (`keyword` — tìm theo tên sách, tác giả hoặc mã `#ID`), danh mục (`category_id`) và trạng thái tồn kho (`stock_status`).
+     - Backend truy vấn các sản phẩm chưa bị xóa mềm (`is_deleted = false`), phân trang phía server (10 sách/trang) và trả về kèm khối **Cảnh báo tồn kho** liệt kê các đầu sách đã hết hàng (`stock = 0`) hoặc sắp hết hàng (`1 <= stock <= 5`).
+     - Trên khung Cảnh báo tồn kho, Admin có thể lọc nhanh sách hết hàng/sắp hết hoặc nhấn nút `+ Nhập kho` để mở nhanh biểu mẫu cập nhật tồn kho.
+  2. **Thêm sản phẩm mới:**
+     - Admin nhấn "Thêm sách mới", nhập thông tin: Tên sách (bắt buộc), Tác giả, Nhà xuất bản, Năm xuất bản, Số trang, Giá niêm yết (`> 0`), Phần trăm giảm giá (`0–100%`, hệ thống tự động tính và hiển thị trước giá bán sau giảm), Số lượng tồn kho (bắt buộc `>= 1`), Danh mục, Trạng thái (`active`/`hidden`), Mô tả và chọn 1 ảnh bìa (`JPG`/`PNG`, dung lượng `<= 2 MB`).
+     - Frontend kiểm tra dữ liệu hợp lệ tiếng Việt và hiển thị hộp thoại xác nhận trước khi gửi `POST /api/admin/products` (`multipart/form-data`).
+     - Backend xác thực dữ liệu (`AdminProductRequest`), kiểm tra nội dung tệp ảnh theo MIME type thực tế (`image/jpeg`, `image/png`), đổi tên tệp ngẫu nhiên (`Str::random(40)`), lưu vào `public/uploads/products/` và thêm bản ghi vào bảng `products`.
+  3. **Sửa thông tin & Nhập kho:**
+     - Admin nhấn "Sửa" (hoặc "Nhập / Sửa"), chỉnh sửa thông tin sách và gọi `POST /api/admin/products/{id}` (`_method=PUT`).
+     - Khi cập nhật sách có sẵn, hệ thống cho phép nhập `stock >= 0`; nếu cập nhật `stock = 0`, hệ thống hiển thị thông báo hết hàng và tự động đưa đầu sách vào mục Cảnh báo tồn kho.
+     - Nếu không chọn ảnh mới thì giữ nguyên ảnh cũ; nếu tải ảnh mới thì lưu ảnh mới và xóa tệp ảnh cũ khỏi thư mục lưu trữ.
+  4. **Ẩn / Hiện sản phẩm:**
+     - Admin nhấn "Ẩn" hoặc "Hiện" và xác nhận. Hệ thống gọi `PUT /api/admin/products/{id}/toggle-status` để đảo trạng thái `status` giữa `active` và `hidden` (sản phẩm `hidden` sẽ không hiển thị ở trang khách hàng).
+  5. **Xóa sản phẩm (Xóa mềm / Xóa cứng):**
+     - Admin nhấn "Xóa" và xác nhận. Backend mở **Database Transaction** và kiểm tra bảng `order_items`:
+       - **Đã từng có trong đơn hàng:** Thực hiện **Xóa mềm** (`is_deleted = true`, `status = 'hidden'`) và xóa khỏi `cart_items` để bảo toàn lịch sử đơn hàng cũ.
+       - **Chưa từng có trong đơn hàng:** Thực hiện **Xóa cứng** bản ghi khỏi `products`, xóa khỏi `cart_items` và xóa tệp ảnh bìa trên server.
+- **Luồng ngoại lệ:**
+  - **Dữ liệu nhập không hợp lệ (`422`):** Bỏ trống tên sách/danh mục, giá `<= 0`, giảm giá ngoài khoảng `0–100%`, tồn kho `< 1` khi thêm mới (hoặc `< 0` khi cập nhật), năm xuất bản hoặc số trang không hợp lệ -> Hiển thị thông báo lỗi tiếng Việt ngay bên dưới từng ô nhập liệu.
+  - **Ảnh bìa sai định dạng hoặc vượt dung lượng:** Tệp tải lên không phải `JPG`/`PNG` (kể cả trường hợp đổi đuôi file giả mạo MIME) hoặc dung lượng `> 2 MB` -> Chặn tải lên và báo lỗi tiếng Việt.
+  - **Sản phẩm không tồn tại (`404`):** Thao tác trên ID không tồn tại hoặc sản phẩm đã bị xóa mềm -> Báo lỗi *"Không tìm thấy sản phẩm"*.
 
 #### UC-A3: Quản lý đơn hàng
 - **Tác nhân:** Admin.
