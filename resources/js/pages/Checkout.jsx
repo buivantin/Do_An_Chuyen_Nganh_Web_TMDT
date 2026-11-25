@@ -85,7 +85,7 @@ function normalizeUserVoucher(raw) {
 }
 
 /**
- * SMART COMPONENT: Xử lý Checkout, tải & kiểm tra điều kiện Voucher Admin cấp cho User
+ * SMART COMPONENT: Xử lý Checkout, xác nhận đặt đơn & kiểm tra điều kiện Voucher
  */
 export default function Checkout() {
   const storedUser = useMemo(() => getStoredUser(), []);
@@ -98,7 +98,7 @@ export default function Checkout() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
 
-  // Hộp thoại xác nhận / hủy bỏ trước khi gửi đơn hàng
+  // Hộp thoại xác nhận trước khi gửi đơn hàng
   const [confirmOrderModal, setConfirmOrderModal] = useState({
     open: false,
     payload: null,
@@ -382,7 +382,7 @@ export default function Checkout() {
     });
   };
 
-  // Bước 2: Chỉ khi khách nhấn "Xác nhận đặt hàng" mới gọi API tạo đơn hàng
+  // Bước 2: Chỉ khi khách nhấn "Xác nhận đặt hàng" mới gọi API tạo đơn và hiện thông báo thành công
   const handleConfirmPlaceOrder = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
