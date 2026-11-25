@@ -13,9 +13,14 @@ export default defineConfig({
             ],
             refresh: true,
         }),
+        react(),
         tailwindcss(),
     ],
     server: {
+        host: "127.0.0.1",
+        hmr: {
+            host: "127.0.0.1",
+        },
         watch: {
             ignored: ["**/storage/framework/views/**"],
         },

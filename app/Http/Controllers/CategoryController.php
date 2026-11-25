@@ -13,12 +13,13 @@ class CategoryController extends Controller
 
     public function __construct(CategoryService $categoryService)
     {
-        $this->categoryService =$categoryService;
+        $this->categoryService = $categoryService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $categories =$this->categoryService->getAll();
+        $onlyActive = !$request->is('api/admin/*');
+        $categories = $this->categoryService->getAll($onlyActive);
 
         return response()->json([
             'success' => true,
@@ -28,11 +29,12 @@ class CategoryController extends Controller
 
     public function store(Request $request)
     {
-        $validated =$request->validate(
+        $validated = $request->validate(
             [
                 'name' => 'required|string|max:255|unique:categories,name',
                 'description' => 'nullable|string|max:1000',
                 'status' => 'nullable|in:active,inactive',
+                'display_order' => 'nullable|integer|min:0',
             ],
             [
                 'name.required' => 'Tên danh mục không được để trống.',
@@ -54,13 +56,14 @@ class CategoryController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, int$id)
+    public function update(Request $request, int $id)
     {
-        $validated =$request->validate(
+        $validated = $request->validate(
             [
                 'name' => 'required|string|max:255|unique:categories,name,' . $id,
                 'description' => 'nullable|string|max:1000',
                 'status' => 'nullable|in:active,inactive',
+                'display_order' => 'nullable|integer|min:0',
             ],
             [
                 'name.required' => 'Tên danh mục không được để trống.',
@@ -74,7 +77,7 @@ class CategoryController extends Controller
         );
 
         try {
-            $category =$this->categoryService->update($id,$validated);
+            $category = $this->categoryService->update($id, $validated);
 
             return response()->json([
                 'success' => true,
@@ -98,7 +101,12 @@ class CategoryController extends Controller
                 'success' => true,
                 'message' => 'Xóa danh mục thành công.',
             ]);
-        } catch (ModelNotFoundException $e) { return response()->json([ 'success' => false, 'message' => 'Danh mục không tồn tại.', ], 404); } catch (Exception $e) {
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Danh mục không tồn tại.',
+            ], 404);
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

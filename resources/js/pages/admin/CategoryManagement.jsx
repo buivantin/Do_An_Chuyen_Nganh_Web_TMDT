@@ -327,13 +327,21 @@ export default function CategoryManagement() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                <th className="py-3.5 px-4">ID</th>
-                <th className="py-3.5 px-4">Tên danh mục</th>
-                <th className="py-3.5 px-4">Mô tả</th>
-                <th className="py-3.5 px-4 text-center">Thứ tự</th>
-                <th className="py-3.5 px-4 text-center">Số đầu sách</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
-                <th className="py-3.5 px-4 text-right">Thao tác</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">ID</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Tên danh mục</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Mô tả</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">
+                  Thứ tự
+                </th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">
+                  Số đầu sách
+                </th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">
+                  Trạng thái
+                </th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap w-44">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 text-sm">
@@ -358,10 +366,10 @@ export default function CategoryManagement() {
                     <td className="py-3.5 px-4 font-semibold text-[#1A1A1A] whitespace-nowrap">
                       {cat.name}
                     </td>
-                    <td className="py-3.5 px-4 text-stone-500 max-w-xs truncate">
+                    <td className="py-3.5 px-4 text-stone-500 max-w-sm lg:max-w-md truncate">
                       {cat.description || "—"}
                     </td>
-                    <td className="py-3.5 px-4 text-center text-xs font-semibold text-stone-600">
+                    <td className="py-3.5 px-4 text-center text-xs font-semibold text-stone-600 whitespace-nowrap">
                       {cat.display_order ?? 0}
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
@@ -380,26 +388,26 @@ export default function CategoryManagement() {
                         {cat.status === "active" ? "Hiển thị" : "Đang ẩn"}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center justify-end gap-1.5">
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap w-44">
+                      <div className="inline-flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleEdit(cat)}
-                          className="px-2.5 py-1.5 rounded-lg bg-[#FAF6F0] hover:bg-[#F5EDE2] border border-[#E5D5BE] text-[#9A5B13] text-xs font-semibold transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 text-xs font-medium transition cursor-pointer"
                         >
                           Sửa
                         </button>
                         <button
                           type="button"
                           onClick={() => requestToggleStatus(cat)}
-                          className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-stone-50 border border-stone-200 text-[#9A5B13] text-xs font-medium transition cursor-pointer"
                         >
                           {cat.status === "active" ? "Ẩn" : "Hiện"}
                         </button>
                         <button
                           type="button"
                           onClick={() => requestDeleteCategory(cat)}
-                          className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-semibold transition cursor-pointer"
+                          className="px-2.5 py-1 rounded-md bg-white hover:bg-red-50/70 border border-red-200/80 text-red-600 text-xs font-medium transition cursor-pointer"
                         >
                           Xóa
                         </button>
@@ -476,6 +484,11 @@ export default function CategoryManagement() {
                 }
                 className={inputClass}
               />
+              {serverErrors.display_order && (
+                <p className="text-red-600 text-xs mt-1">
+                  {serverErrors.display_order[0]}
+                </p>
+              )}
             </div>
 
             <div>

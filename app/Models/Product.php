@@ -17,6 +17,7 @@ class Product extends Model
         'description',
         'status',
         'price',
+        'discount',
         'category_id',
         'image',
         'stock',
@@ -27,6 +28,7 @@ class Product extends Model
         'published_year' => 'integer',
         'page_count' => 'integer',
         'price' => 'decimal:2',
+        'discount' => 'integer',
         'stock' => 'integer',
         'is_deleted' => 'boolean',
     ];
