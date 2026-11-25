@@ -4,23 +4,28 @@ import AdminModal from "../../components/admin/AdminModal";
 import AdminConfirmModal from "../../components/admin/AdminConfirmModal";
 
 const MEMBER_TIERS = {
-  mam_sach: {
-    label: "Mầm Sách",
+  1: {
+    label: "01. Mầm Sách",
     icon: "🌱",
     badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
   },
-  nguoi_doc: {
-    label: "Người Đọc",
+  2: {
+    label: "02. Người Đọc",
     icon: "📖",
     badge: "bg-sky-50 text-sky-800 border-sky-200",
   },
-  mot_sach: {
-    label: "Mọt Sách",
+  3: {
+    label: "03. Tri Thức",
     icon: "📚",
     badge: "bg-[#F5EDE2] text-[#9A5B13] border-[#E5D5BE]",
   },
-  tri_ky: {
-    label: "Tri Kỷ Thư Viện",
+  4: {
+    label: "04. Học Giả",
+    icon: "🎓",
+    badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
+  },
+  5: {
+    label: "05. Đại Sứ Tri Thức",
     icon: "🏛️",
     badge: "bg-amber-50 text-amber-900 border-amber-300",
   },
@@ -32,26 +37,21 @@ const EMPTY_FORM = {
   phone: "",
   address: "",
   password: "",
-  role: "user",
-  member_tier: "mam_sach",
+  role: "customer",
+  membership_tier: 1,
   status: "active",
 };
 
-function resolveMemberTierKey(user) {
-  const raw = String(
-    user.member_tier || user.tier || user.rank || ""
-  ).toLowerCase();
-  if (MEMBER_TIERS[raw]) return raw;
-  if (raw.includes("tri") || raw.includes("vip")) return "tri_ky";
-  if (raw.includes("mot") || raw.includes("gold")) return "mot_sach";
-  if (raw.includes("doc") || raw.includes("silver")) return "nguoi_doc";
+function resolveMemberTier(user) {
+  const num = Number(user?.membership_tier || 0);
+  if (MEMBER_TIERS[num]) return num;
 
-  const completed = Number(user.completed_orders_count || 0);
-  const spent = Number(user.total_spent || 0);
-  if (completed >= 7 || spent >= 3000000) return "tri_ky";
-  if (completed >= 3 || spent >= 1000000) return "mot_sach";
-  if (completed >= 1 || spent >= 300000) return "nguoi_doc";
-  return "mam_sach";
+  const spent = Number(user?.total_spent || 0);
+  if (spent >= 3500000) return 5;
+  if (spent >= 1800000) return 4;
+  if (spent >= 800000) return 3;
+  if (spent >= 300000) return 2;
+  return 1;
 }
 
 export default function UserManagement() {
@@ -173,14 +173,14 @@ export default function UserManagement() {
   const handleEdit = (user) => {
     setEditingId(user.id);
     setFormData({
-      username: user.username || user.name || "",
+      username: user.username || "",
       email: user.email || "",
       phone: user.phone || "",
       address: user.address || "",
       password: "",
-      role: user.role || "user",
-      member_tier: resolveMemberTierKey(user),
-      status: user.status || "active",
+      role: user.role === "admin" ? "admin" : "customer",
+      membership_tier: resolveMemberTier(user),
+      status: user.status === "active" ? "active" : "inactive",
     });
     setServerErrors({});
     setAlertMessage({ type: "", text: "" });
@@ -194,12 +194,12 @@ export default function UserManagement() {
 
     const payload = {
       username: formData.username.trim(),
-      name: formData.username.trim(),
       email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      address: formData.address.trim(),
+      phone: formData.phone.trim() || null,
+      address: formData.address.trim() || null,
       role: formData.role,
-      member_tier: formData.member_tier,
+      membership_tier:
+        formData.role === "admin" ? 1 : Number(formData.membership_tier),
       status: formData.status,
     };
     if (formData.password) {
@@ -245,7 +245,8 @@ export default function UserManagement() {
 
   const handleRequestSubmit = (e) => {
     e.preventDefault();
-    const tierLabel = MEMBER_TIERS[formData.member_tier]?.label || "Mầm Sách";
+    const tierLabel =
+      MEMBER_TIERS[Number(formData.membership_tier)]?.label || "01. Mầm Sách";
     setConfirmState({
       open: true,
       variant: "info",
@@ -255,7 +256,9 @@ export default function UserManagement() {
       message: editingId
         ? "Bạn có chắc chắn muốn lưu thông tin và cấp bậc thành viên cho tài khoản này?"
         : "Bạn có chắc chắn muốn tạo tài khoản người dùng mới?",
-      detailText: `${formData.username} (${formData.email}) — Hạng: ${tierLabel}`,
+      detailText: `${formData.username} (${formData.email})${
+        formData.role === "admin" ? " — Quản trị viên" : ` — Hạng: ${tierLabel}`
+      }`,
       confirmText: editingId ? "Lưu thay đổi" : "Tạo tài khoản",
       cancelText: "Quay lại",
       action: executeSaveUser,
@@ -289,8 +292,11 @@ export default function UserManagement() {
             text: `Đã cập nhật trạng thái tài khoản "${user.username}".`,
           });
           fetchUsers(keyword, currentPage);
-        } catch {
-          setAlertMessage({ type: "error", text: "Thao tác thất bại!" });
+        } catch (error) {
+          setAlertMessage({
+            type: "error",
+            text: error.response?.data?.message || "Thao tác thất bại!",
+          });
         } finally {
           setActionLoading(false);
           setConfirmState((prev) => ({ ...prev, open: false }));
@@ -335,7 +341,11 @@ export default function UserManagement() {
   const displayedUsers =
     tierFilter === "all"
       ? users
-      : users.filter((u) => resolveMemberTierKey(u) === tierFilter);
+      : users.filter(
+          (u) =>
+            u.role !== "admin" &&
+            resolveMemberTier(u) === Number(tierFilter)
+        );
 
   const inputClass =
     "w-full px-3.5 py-2 text-sm bg-[#FAF8F5] border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9A5B13]";
@@ -384,7 +394,7 @@ export default function UserManagement() {
         >
           <input
             type="text"
-            placeholder="Tìm theo tên người dùng, email, SĐT..."
+            placeholder="Tìm theo họ tên, email, SĐT..."
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             className="flex-1 px-3.5 py-2 text-sm bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9A5B13]"
@@ -395,10 +405,11 @@ export default function UserManagement() {
             className="px-3.5 py-2 text-sm bg-white border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#9A5B13]"
           >
             <option value="all">Tất cả cấp bậc thành viên</option>
-            <option value="mam_sach">🌱 Mầm Sách</option>
-            <option value="nguoi_doc">📖 Người Đọc</option>
-            <option value="mot_sach">📚 Mọt Sách</option>
-            <option value="tri_ky">🏛️ Tri Kỷ Thư Viện</option>
+            <option value="1">🌱 01. Mầm Sách</option>
+            <option value="2">📖 02. Người Đọc</option>
+            <option value="3">📚 03. Tri Thức</option>
+            <option value="4">🎓 04. Học Giả</option>
+            <option value="5">🏛️ 05. Đại Sứ Tri Thức</option>
           </select>
           <button
             type="submit"
@@ -415,7 +426,7 @@ export default function UserManagement() {
                 <th className="py-3.5 px-4">ID</th>
                 <th className="py-3.5 px-4">Độc giả</th>
                 <th className="py-3.5 px-4">Liên hệ</th>
-                <th className="py-3.5 px-4">Cấp bậc thành viên</th>
+                <th className="py-3.5 px-4">Cấp bậc &amp; Tích lũy</th>
                 <th className="py-3.5 px-4 text-center">Vai trò</th>
                 <th className="py-3.5 px-4 text-center">Trạng thái</th>
                 <th className="py-3.5 px-4 text-right">Thao tác</th>
@@ -436,9 +447,8 @@ export default function UserManagement() {
                 </tr>
               ) : (
                 displayedUsers.map((user) => {
-                  const tierKey = resolveMemberTierKey(user);
-                  const tierInfo =
-                    MEMBER_TIERS[tierKey] || MEMBER_TIERS.mam_sach;
+                  const tierNum = resolveMemberTier(user);
+                  const tierInfo = MEMBER_TIERS[tierNum] || MEMBER_TIERS[1];
 
                   return (
                     <tr
@@ -450,7 +460,7 @@ export default function UserManagement() {
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="font-semibold text-[#1A1A1A]">
-                          {user.username || user.name}
+                          {user.username}
                         </div>
                         <div className="text-xs text-stone-500">
                           {user.email}
@@ -465,12 +475,29 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold ${tierInfo.badge}`}
-                        >
-                          <span>{tierInfo.icon}</span>
-                          <span>{tierInfo.label}</span>
-                        </span>
+                        {user.role === "admin" ? (
+                          <span className="text-xs text-stone-400 italic">
+                            Hệ thống
+                          </span>
+                        ) : (
+                          <div>
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold ${tierInfo.badge}`}
+                            >
+                              <span>{tierInfo.icon}</span>
+                              <span>{tierInfo.label}</span>
+                            </span>
+                            <div className="text-[11px] text-stone-500 mt-1">
+                              Tích lũy:{" "}
+                              <strong>
+                                {Number(user.total_spent || 0).toLocaleString(
+                                  "vi-VN"
+                                )}
+                                đ
+                              </strong>
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
@@ -503,20 +530,24 @@ export default function UserManagement() {
                           >
                             Sửa
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => requestToggleStatus(user)}
-                            className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition cursor-pointer"
-                          >
-                            {user.status === "active" ? "Khóa" : "Mở"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => requestDeleteUser(user)}
-                            className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-semibold transition cursor-pointer"
-                          >
-                            Xóa
-                          </button>
+                          {user.role !== "admin" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => requestToggleStatus(user)}
+                                className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition cursor-pointer"
+                              >
+                                {user.status === "active" ? "Khóa" : "Mở"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => requestDeleteUser(user)}
+                                className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-semibold transition cursor-pointer"
+                              >
+                                Xóa
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -589,7 +620,7 @@ export default function UserManagement() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>
-                Họ và tên / Username <span className="text-red-500">*</span>
+                Họ và tên <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -610,7 +641,7 @@ export default function UserManagement() {
 
             <div>
               <label className={labelClass}>
-                Email <span className="text-red-500">*</span>
+                Email đăng nhập <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -673,16 +704,21 @@ export default function UserManagement() {
             <div>
               <label className={labelClass}>Cấp bậc thành viên</label>
               <select
-                value={formData.member_tier}
+                disabled={formData.role === "admin"}
+                value={formData.membership_tier}
                 onChange={(e) =>
-                  setFormData({ ...formData, member_tier: e.target.value })
+                  setFormData({
+                    ...formData,
+                    membership_tier: Number(e.target.value),
+                  })
                 }
-                className={inputClass}
+                className={`${inputClass} disabled:bg-stone-100 disabled:text-stone-400`}
               >
-                <option value="mam_sach">🌱 Mầm Sách</option>
-                <option value="nguoi_doc">📖 Người Đọc</option>
-                <option value="mot_sach">📚 Mọt Sách</option>
-                <option value="tri_ky">🏛️ Tri Kỷ Thư Viện</option>
+                <option value={1}>🌱 01. Mầm Sách</option>
+                <option value={2}>📖 02. Người Đọc</option>
+                <option value={3}>📚 03. Tri Thức</option>
+                <option value={4}>🎓 04. Học Giả</option>
+                <option value={5}>🏛️ 05. Đại Sứ Tri Thức</option>
               </select>
             </div>
 
@@ -695,7 +731,7 @@ export default function UserManagement() {
                 }
                 className={inputClass}
               >
-                <option value="user">Độc giả (User)</option>
+                <option value="customer">Độc giả (Customer)</option>
                 <option value="admin">Quản trị viên (Admin)</option>
               </select>
             </div>
@@ -710,7 +746,7 @@ export default function UserManagement() {
                 className={inputClass}
               >
                 <option value="active">Hoạt động</option>
-                <option value="locked">Đã khóa</option>
+                <option value="inactive">Đã khóa</option>
               </select>
             </div>
           </div>

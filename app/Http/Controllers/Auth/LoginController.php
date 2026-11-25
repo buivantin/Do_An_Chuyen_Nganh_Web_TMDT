@@ -5,14 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Services\AuthService;
+use Illuminate\Http\Request;
 
 class LoginController extends Controller
 {
     public function __construct(private AuthService $auth)
     {
     }
-
-   
 
     public function login(LoginRequest $request)
     {
@@ -24,7 +23,7 @@ class LoginController extends Controller
         return response()->json([
             'message' => 'Đăng nhập thành công.',
             'token'   => $this->auth->issueToken($user),
-            'user'    => $user,   // có role để React điều hướng
+            'user'    => $user,
         ]);
     }
 

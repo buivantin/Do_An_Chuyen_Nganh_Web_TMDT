@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException; 
+use Illuminate\Validation\ValidationException;
 
 class AuthService
 {
@@ -24,11 +24,14 @@ class AuthService
         }
 
         return $this->users->create([
-            'username' => trim($data['username']),
-            'email'    => $email,
-            'password' => Hash::make($data['password']), // bam mat khau
-            'role'     => 'customer',
-            'status'   => 'active',
+            'username'        => trim($data['username']),
+            'email'           => $email,
+            'phone'           => !empty($data['phone']) ? trim($data['phone']) : null,
+            'password'        => Hash::make($data['password']),
+            'role'            => 'customer',
+            'status'          => 'active',
+            'total_spent'     => 0,
+            'membership_tier' => 1,
         ]);
     }
 
@@ -43,7 +46,6 @@ class AuthService
             ]);
         }
 
-        // Kiểm tra tài khoản bị khóa (Yêu cầu của TM-14)
         if ($user->status !== 'active') {
             throw ValidationException::withMessages([
                 'email' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.',
@@ -60,7 +62,6 @@ class AuthService
 
     public function logout(User $user): void
     {
-        // Sửa lại thành xóa tất cả token để tránh lỗi gạch chân đỏ của VS Code
-        $user->tokens()->delete(); 
+        $user->tokens()->delete();
     }
 }

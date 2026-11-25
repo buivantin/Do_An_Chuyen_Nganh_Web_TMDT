@@ -188,7 +188,10 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // TM-14: Quản lý người dùng (Của TV1)
     Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
     Route::put('/users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
     
     // CRUD Quản lý danh mục cho Admin (Của TV4)
     Route::get('/categories', [CategoryController::class, 'index']);
