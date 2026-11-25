@@ -262,7 +262,7 @@ export function HeaderView({
 }
 
 /**
- * SMART COMPONENT: Quản lý dữ liệu giỏ hàng, tìm kiếm, user, AuthModal & ConfirmModal đăng xuất
+ * SMART COMPONENT: Quản lý dữ liệu giỏ hàng (đồng bộ real-time nhiều tab/trình duyệt), tìm kiếm, user
  */
 export default function Header({ onOpenAuthModal }) {
   const [keyword, setKeyword] = useState(
@@ -313,12 +313,15 @@ export default function Header({ onOpenAuthModal }) {
         res.data ??
         [];
       const list = Array.isArray(raw) ? raw : [];
-      const count = list.reduce((s, it) => s + Number(it.quantity || 1), 0);
+      const count = list.reduce(
+        (s, it) => s + Math.max(0, Number(it.quantity || 1)),
+        0
+      );
       const total = list.reduce(
         (s, it) =>
           s +
           Number(it.price ?? it.product?.price ?? 0) *
-            Number(it.quantity || 1),
+            Math.max(0, Number(it.quantity || 1)),
         0
       );
       setCartSummary({ count, total });
@@ -330,7 +333,15 @@ export default function Header({ onOpenAuthModal }) {
   useEffect(() => {
     loadCartSummary();
 
-    const handleCartUpdated = () => loadCartSummary();
+    const handleCartUpdated = () => {
+      loadCartSummary();
+      try {
+        localStorage.setItem("bookhouse_cart_sync", String(Date.now()));
+      } catch {
+        // ignore
+      }
+    };
+
     const handleUserUpdated = (e) => {
       if (e.detail) {
         setUser(e.detail);
@@ -340,6 +351,20 @@ export default function Header({ onOpenAuthModal }) {
         } catch {
           setUser(null);
         }
+      }
+    };
+
+    // Đồng bộ giỏ hàng ngay lập tức khi tab khác cập nhật localStorage
+    const handleStorageChange = (e) => {
+      if (e.key === "bookhouse_cart_sync") {
+        loadCartSummary();
+      }
+    };
+
+    // Đồng bộ ngay khi chuyển từ trình duyệt hoặc cửa sổ khác quay lại tab này
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadCartSummary();
       }
     };
 
@@ -354,14 +379,27 @@ export default function Header({ onOpenAuthModal }) {
       }
     };
 
+    // Đồng bộ định kỳ mỗi 8 giây cho trường hợp mở 2 trình duyệt khác nhau (Chrome & Edge)
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === "visible" && localStorage.getItem("token")) {
+        loadCartSummary();
+      }
+    }, 8000);
+
     window.addEventListener("cart-updated", handleCartUpdated);
     window.addEventListener("user-updated", handleUserUpdated);
+    window.addEventListener("storage", handleStorageChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("open-auth-modal", handleOpenAuthEvent);
     window.addEventListener("open-login-modal", handleOpenAuthEvent);
     document.addEventListener("mousedown", handleClickOutside);
+
     return () => {
+      clearInterval(syncInterval);
       window.removeEventListener("cart-updated", handleCartUpdated);
       window.removeEventListener("user-updated", handleUserUpdated);
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("open-auth-modal", handleOpenAuthEvent);
       window.removeEventListener("open-login-modal", handleOpenAuthEvent);
       document.removeEventListener("mousedown", handleClickOutside);

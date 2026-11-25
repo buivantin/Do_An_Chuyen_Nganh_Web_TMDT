@@ -164,7 +164,7 @@ export default function Checkout() {
           axios
             .get("/api/user/vouchers", { headers })
             .catch(() =>
-              axios.get("/api/vouchers", { headers }).catch(() => null)
+              axios.get("/api/vouchers",  { headers }).catch(() => null)
             ),
         ]);
 
@@ -463,7 +463,7 @@ export default function Checkout() {
         receiver: fullName.trim(),
         phone: phone.trim(),
         address: finalShippingAddress,
-        total: grandTotal,
+        total: createdOrder.total_amount ?? grandTotal,
         discount: voucherDiscount,
         voucherCode: selectedVoucher?.code || "",
         paymentMethod,

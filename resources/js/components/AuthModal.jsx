@@ -56,6 +56,7 @@ export function AuthModalView({
   onSubmit,
   submitting = false,
   errorMsg = "",
+  successMsg = "",
 }) {
   if (!open) return null;
 
@@ -122,6 +123,12 @@ export function AuthModalView({
         {errorMsg && (
           <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
             {errorMsg}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-medium">
+            {successMsg}
           </div>
         )}
 
@@ -281,6 +288,7 @@ export default function AuthModal({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -328,7 +336,12 @@ export default function AuthModal({
       const res = await axios.post(endpoint, payload, {
         headers: { Accept: "application/json" },
       });
-
+      if (mode === "register") {
+        setSuccessMsg("Đăng ký thành công! Vui lòng đăng nhập.");
+        setForm((prev) => ({ ...prev, password: "", password_confirmation: "" }));
+        setMode("login");
+        return;
+      }
       const token =
         res.data?.token ||
         res.data?.access_token ||
@@ -388,6 +401,7 @@ export default function AuthModal({
       onSubmit={handleSubmit}
       submitting={submitting}
       errorMsg={errorMsg}
+      successMsg={successMsg}
     />
   );
 }
