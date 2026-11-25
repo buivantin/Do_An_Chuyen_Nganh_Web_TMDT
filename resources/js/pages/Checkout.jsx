@@ -45,7 +45,7 @@ function normalizeUserVoucher(raw) {
     discountTypeRaw === "percent" || discountTypeRaw === "percentage";
 
   const discountValue = Number(
-    v.discount_value ?? v.value ?? v.amount ?? v.discount ?? 0
+    v.discount_value ?? v.discount_amount ?? v.value ?? v.amount ?? 0
   );
   const maxDiscount = Number(
     v.max_discount ?? v.max_discount_amount ?? v.max_value ?? 0
@@ -54,12 +54,18 @@ function normalizeUserVoucher(raw) {
     v.min_order_value ?? v.min_order_amount ?? v.min_order ?? 0
   );
 
-  const rawDate = v.expires_at || v.end_date || v.expired_at || null;
+  const rawDate =
+    v.expiration_date || v.end_date || v.expires_at || v.expired_at || null;
   let expiresLabel = "";
+  let isExpiredClient = false;
   if (rawDate) {
     const d = new Date(rawDate);
     if (!Number.isNaN(d.getTime())) {
       expiresLabel = d.toLocaleDateString("vi-VN");
+      // Nếu chuỗi chỉ có YYYY-MM-DD thì tính hết hạn vào 23:59:59 cùng ngày
+      const endOfDay =
+        String(rawDate).length <= 10 ? new Date(`${rawDate}T23:59:59`) : d;
+      isExpiredClient = endOfDay.getTime() < Date.now();
     }
   }
 
@@ -73,6 +79,7 @@ function normalizeUserVoucher(raw) {
     id: v.id || raw?.id || v.code,
     code: String(v.code || "VOUCHER").toUpperCase(),
     title: v.name || v.title || v.description || "Ưu đãi độc giả BookHouse",
+    tierName: v.tier_name || "",
     isPercent,
     discountValue,
     maxDiscount,
@@ -80,7 +87,8 @@ function normalizeUserVoucher(raw) {
     expiresLabel,
     discountLabel,
     isUsed: Boolean(raw?.is_used || raw?.used_at || v.is_used),
-    isExpired: rawDate ? new Date(rawDate).getTime() < Date.now() : false,
+    isExpired: Boolean(v.is_expired ?? isExpiredClient),
+    serverReason: v.reason || null,
   };
 }
 
@@ -161,11 +169,7 @@ export default function Checkout() {
         const [cartItems, profileRes, voucherRes] = await Promise.all([
           ProductService.getCart(),
           axios.get("/api/profile", { headers }).catch(() => null),
-          axios
-            .get("/api/user/vouchers", { headers })
-            .catch(() =>
-              axios.get("/api/vouchers",  { headers }).catch(() => null)
-            ),
+          axios.get("/api/vouchers/available", { headers }).catch(() => null),
         ]);
 
         setItems(

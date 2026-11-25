@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\User;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +12,67 @@ use Illuminate\Support\Facades\Schema;
 
 class OrderController extends Controller
 {
+    /**
+     * Hoàn trả lượt sử dụng voucher khi đơn hàng bị hủy
+     */
+    private function releaseOrderVoucher(Order $order): void
+    {
+        if (!Schema::hasColumn('orders', 'voucher_id') || empty($order->voucher_id)) {
+            return;
+        }
+
+        $voucher = Voucher::find($order->voucher_id);
+        if (!$voucher) {
+            return;
+        }
+
+        if ($voucher->used_count > 0) {
+            $voucher->decrement('used_count');
+        }
+
+        if ($order->user_id && Schema::hasTable('user_vouchers')) {
+            DB::table('user_vouchers')
+                ->where('voucher_id', $voucher->id)
+                ->where('user_id', $order->user_id)
+                ->update(['used_at' => null, 'updated_at' => now()]);
+        }
+    }
+
+    /**
+     * Cập nhật chi tiêu tích lũy & tự động thăng hạng thành viên khi đơn hàng hoàn thành
+     */
+    private function syncUserMembershipOnCompleted(Order $order): void
+    {
+        if (!$order->user_id || !Schema::hasColumn('users', 'total_spent')) {
+            return;
+        }
+
+        $user = User::find($order->user_id);
+        if (!$user || $user->role === 'admin') {
+            return;
+        }
+
+        $orderNetAmount = max(0, (float) $order->total_amount - (float) ($order->shipping_fee ?? 0));
+        $newTotalSpent = (float) $user->total_spent + $orderNetAmount;
+
+        // Xác định cấp bậc theo mốc chi tiêu tích lũy (1 -> 5)
+        $newTier = 1;
+        if ($newTotalSpent >= 10000000) {
+            $newTier = 5; // Đại Sứ Tri Thức
+        } elseif ($newTotalSpent >= 5000000) {
+            $newTier = 4; // Tri Kỷ Sách
+        } elseif ($newTotalSpent >= 2000000) {
+            $newTier = 3; // Độc Giả Thân Thiết
+        } elseif ($newTotalSpent >= 500000) {
+            $newTier = 2; // Bạn Đọc Tích Cực
+        }
+
+        $user->update([
+            'total_spent'     => $newTotalSpent,
+            'membership_tier' => max((int) $user->membership_tier, $newTier),
+        ]);
+    }
+
     /**
      * 1. Tự động hoàn thành đơn "delivered" sau 3 ngày nếu không hoàn đơn
      * 2. Tự động hủy đơn "pending" quá 5 ngày Admin chưa xác nhận & trả sản phẩm về giỏ hàng
@@ -19,12 +82,7 @@ class OrderController extends Controller
         // A. Tự động hoàn thành đơn đã giao quá 3 ngày
         if (Schema::hasColumn('orders', 'delivered_at')) {
             $threeDaysAgo = Carbon::now()->subDays(3);
-            $completeData = ['status' => 'completed'];
-            if (Schema::hasColumn('orders', 'completed_at')) {
-                $completeData['completed_at'] = Carbon::now();
-            }
-
-            Order::where('status', 'delivered')
+            $ordersToComplete = Order::where('status', 'delivered')
                 ->where(function ($q) use ($threeDaysAgo) {
                     $q->where('delivered_at', '<=', $threeDaysAgo)
                       ->orWhere(function ($q2) use ($threeDaysAgo) {
@@ -32,7 +90,16 @@ class OrderController extends Controller
                              ->where('updated_at', '<=', $threeDaysAgo);
                       });
                 })
-                ->update($completeData);
+                ->get();
+
+            foreach ($ordersToComplete as $deliveredOrder) {
+                $completeData = ['status' => 'completed'];
+                if (Schema::hasColumn('orders', 'completed_at')) {
+                    $completeData['completed_at'] = Carbon::now();
+                }
+                $deliveredOrder->update($completeData);
+                $this->syncUserMembershipOnCompleted($deliveredOrder);
+            }
         }
 
         // B. Tự động trả đơn về giỏ hàng nếu Admin không xác nhận trong vòng 5 ngày
@@ -65,6 +132,8 @@ class OrderController extends Controller
                     }
                 }
 
+                $this->releaseOrderVoucher($order);
+
                 $expireMessage = '[Hệ thống] Đơn hàng chưa được xử lý trong vòng 5 ngày nên đã tự động hủy và trả sản phẩm về giỏ hàng của bạn.';
                 $newNote = trim(($order->note ? $order->note . ' | ' : '') . $expireMessage);
 
@@ -77,7 +146,8 @@ class OrderController extends Controller
     }
 
     /**
-     * Đặt hàng (POST /api/orders) - Chưa trừ kho ở bước này, chỉ trừ khi Admin xác nhận
+     * Đặt hàng (POST /api/orders)
+     * Xác thực tuyệt đối Voucher ở Backend (chống giả mạo F12), chưa trừ kho ở bước này
      */
     public function store(Request $request)
     {
@@ -125,54 +195,108 @@ class OrderController extends Controller
             }
         }
 
-        $order = DB::transaction(function () use ($user, $receiverName, $phone, $address, $cartItems, $request) {
-            $subtotal = $cartItems->sum(fn ($i) => $i->price * $i->quantity);
-            $shippingFee = max(0, (float) $request->input('shipping_fee', 0));
-            $discount = max(0, (float) $request->input('discount_amount', 0));
-            $totalAmount = max(0, $subtotal - $discount) + $shippingFee;
+        $subtotal = (float) $cartItems->sum(fn ($i) => $i->price * $i->quantity);
+        $shippingFee = max(0, (float) $request->input('shipping_fee', 0));
+        $voucherIdInput = $request->input('voucher_id');
+        $voucherCodeInput = trim((string) ($request->input('voucher_code') ?? $request->input('code') ?? ''));
 
-            $orderData = [
-                'user_id' => $user->id,
-                'receiver_name' => $receiverName,
-                'phone' => $phone,
-                'address' => $address,
-                'payment_method' => $request->input('payment_method', 'cod'),
-                'shipping_fee' => $shippingFee,
-                'total_amount' => $totalAmount,
-                'note' => $request->input('note') ?? $request->input('notes'),
-                'status' => 'pending',
-            ];
+        try {
+            $order = DB::transaction(function () use (
+                $user,
+                $receiverName,
+                $phone,
+                $address,
+                $cartItems,
+                $request,
+                $subtotal,
+                $shippingFee,
+                $voucherIdInput,
+                $voucherCodeInput
+            ) {
+                $discount = 0.0;
+                $appliedVoucher = null;
 
-            if (Schema::hasColumn('orders', 'discount_amount')) {
-                $orderData['discount_amount'] = $discount;
-            }
-            if (Schema::hasColumn('orders', 'voucher_id')) {
-                $orderData['voucher_id'] = $request->input('voucher_id');
-            }
+                // Kiểm tra & khóa voucher trên Server (bỏ qua hoàn toàn discount_amount giả mạo từ Client)
+                if (!empty($voucherIdInput) || $voucherCodeInput !== '') {
+                    $voucherQuery = Voucher::lockForUpdate();
+                    if (!empty($voucherIdInput)) {
+                        $appliedVoucher = $voucherQuery->find((int) $voucherIdInput);
+                    } else {
+                        $appliedVoucher = $voucherQuery->where('code', strtoupper($voucherCodeInput))->first();
+                    }
 
-            $order = Order::create($orderData);
+                    if (!$appliedVoucher) {
+                        abort(422, 'Mã giảm giá không tồn tại hoặc đã bị xóa.');
+                    }
 
-            if (Schema::hasColumn('orders', 'order_code') && empty($order->order_code)) {
-                $order->order_code = 'DH' . str_pad((string) $order->id, 4, '0', STR_PAD_LEFT);
-                $order->save();
-            }
+                    $check = $appliedVoucher->validateForUser($user, $subtotal);
+                    if (!$check['valid']) {
+                        abort(422, $check['message']);
+                    }
 
-            foreach ($cartItems as $item) {
-                DB::table('order_items')->insert([
-                    'order_id' => $order->id,
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+                    $discount = $appliedVoucher->calculateDiscount($subtotal);
+                }
 
-            // Chỉ xóa giỏ hàng, KHÔNG trừ stock ở đây (chỉ trừ khi Admin xác nhận đơn)
-            DB::table('cart_items')->where('user_id', $user->id)->delete();
+                $totalAmount = max(0, $subtotal - $discount) + $shippingFee;
 
-            return $order->load(['items.product']);
-        });
+                $orderData = [
+                    'user_id' => $user->id,
+                    'receiver_name' => $receiverName,
+                    'phone' => $phone,
+                    'address' => $address,
+                    'payment_method' => $request->input('payment_method', 'cod'),
+                    'shipping_fee' => $shippingFee,
+                    'total_amount' => $totalAmount,
+                    'note' => $request->input('note') ?? $request->input('notes'),
+                    'status' => 'pending',
+                ];
+
+                if (Schema::hasColumn('orders', 'discount_amount')) {
+                    $orderData['discount_amount'] = $discount;
+                }
+                if (Schema::hasColumn('orders', 'voucher_id')) {
+                    $orderData['voucher_id'] = $appliedVoucher?->id;
+                }
+
+                $order = Order::create($orderData);
+
+                if (Schema::hasColumn('orders', 'order_code') && empty($order->order_code)) {
+                    $order->order_code = 'DH' . str_pad((string) $order->id, 4, '0', STR_PAD_LEFT);
+                    $order->save();
+                }
+
+                // Cập nhật lượt đã sử dụng của Voucher & đánh dấu đã dùng trong user_vouchers
+                if ($appliedVoucher) {
+                    $appliedVoucher->increment('used_count');
+                    if (Schema::hasTable('user_vouchers')) {
+                        DB::table('user_vouchers')
+                            ->where('voucher_id', $appliedVoucher->id)
+                            ->where('user_id', $user->id)
+                            ->update(['used_at' => now(), 'updated_at' => now()]);
+                    }
+                }
+
+                foreach ($cartItems as $item) {
+                    DB::table('order_items')->insert([
+                        'order_id' => $order->id,
+                        'product_id' => $item->product_id,
+                        'quantity' => $item->quantity,
+                        'price' => $item->price,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                // Chỉ xóa giỏ hàng, KHÔNG trừ stock ở đây (chỉ trừ khi Admin xác nhận đơn)
+                DB::table('cart_items')->where('user_id', $user->id)->delete();
+
+                return $order->load(['items.product']);
+            });
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $e->getStatusCode());
+        }
 
         return response()->json([
             'message' => 'Đặt hàng thành công! Đơn hàng đang chờ quản trị viên xác nhận.',
@@ -216,7 +340,6 @@ class OrderController extends Controller
 
     /**
      * Khách hàng hủy đơn khi đang chờ xác nhận (POST /api/orders/{id}/cancel)
-     * Vì đơn pending chưa trừ kho nên chỉ cần đổi trạng thái sang cancelled
      */
     public function cancel(Request $request, $id)
     {
@@ -228,7 +351,10 @@ class OrderController extends Controller
             ], 422);
         }
 
-        $order->update(['status' => 'cancelled']);
+        DB::transaction(function () use ($order) {
+            $this->releaseOrderVoucher($order);
+            $order->update(['status' => 'cancelled']);
+        });
 
         return response()->json([
             'message' => 'Đã hủy đơn hàng thành công.',
@@ -319,6 +445,7 @@ class OrderController extends Controller
         }
 
         $order->update($updateData);
+        $this->syncUserMembershipOnCompleted($order);
 
         return response()->json([
             'message' => 'Cảm ơn bạn đã xác nhận hoàn thành đơn hàng!',
@@ -476,7 +603,7 @@ class OrderController extends Controller
             $updateData['completed_at'] = Carbon::now();
         }
 
-        DB::transaction(function () use ($order, $updateData, $isStockDeductedOld, $isStockDeductedNew) {
+        DB::transaction(function () use ($order, $updateData, $oldStatus, $newStatus, $isStockDeductedOld, $isStockDeductedNew) {
             // 1. Trừ tồn kho khi Admin xác nhận đơn (từ pending -> processing/shipping/completed)
             if (!$isStockDeductedOld && $isStockDeductedNew) {
                 foreach ($order->items as $item) {
@@ -495,7 +622,17 @@ class OrderController extends Controller
                 }
             }
 
+            // 3. Hoàn lại lượt dùng voucher nếu đơn bị hủy
+            if ($oldStatus !== 'cancelled' && $newStatus === 'cancelled') {
+                $this->releaseOrderVoucher($order);
+            }
+
             $order->update($updateData);
+
+            // 4. Cộng dồn chi tiêu & thăng hạng thành viên khi đơn chuyển sang hoàn thành
+            if ($oldStatus !== 'completed' && $newStatus === 'completed') {
+                $this->syncUserMembershipOnCompleted($order);
+            }
         });
 
         return response()->json([

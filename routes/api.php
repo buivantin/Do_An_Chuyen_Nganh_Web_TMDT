@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\ProfileController; 
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\AdminProductController;
+use App\Http\Controllers\VoucherController;
 
 // --- PUBLIC ROUTES (Không cần đăng nhập) ---
 Route::post('/register', [RegisterController::class, 'store']);
@@ -53,6 +54,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cart/add', [CartController::class, 'addToCart']);
     Route::put('/cart/{id}', [CartController::class, 'update']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
+
+    // Voucher khuyến mãi dành cho khách hàng
+    Route::get('/vouchers/available', [VoucherController::class, 'availableForUser']);
+    Route::post('/vouchers/apply', [VoucherController::class, 'apply']);
 
     // TM-08: Hồ sơ cá nhân (Của TV1)
     Route::get('/profile', [ProfileController::class, 'show']);
@@ -210,8 +215,13 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/products/{id}', [AdminProductController::class, 'update']);
     Route::put('/products/{id}/toggle-status', [AdminProductController::class, 'toggleStatus']);
     Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
-    
-    
+
+    // Quản lý Voucher khuyến mãi (Admin)
+    Route::get('/vouchers/tier-stats', [VoucherController::class, 'tierStats']);
+    Route::get('/vouchers', [VoucherController::class, 'adminIndex']);
+    Route::post('/vouchers', [VoucherController::class, 'store']);
+    Route::put('/vouchers/{id}', [VoucherController::class, 'update']);
+    Route::delete('/vouchers/{id}', [VoucherController::class, 'destroy']);
 
     // TM-13: Quản lý đơn hàng (Của TV5)
     // 1. Route đếm số lượng đơn chờ (Dành cho Chuông thông báo)
