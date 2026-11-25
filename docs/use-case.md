@@ -14,16 +14,26 @@
 
 ### 2.1. NHÓM CHỨC NĂNG KHÁCH VÃNG LAI (GUEST)
 
-#### UC-G1: Xem trang chủ
-- **Tác nhân:** Guest, Customer.
-- **Mô tả:** Hiển thị giao diện chính với các khối sách mới, sách bán chạy và thanh menu danh mục.
-- **Tiền điều kiện:** Không.
+#### UC-G1: Xem trang chủ (TM-01)
+- **Tác nhân:** Khách vãng lai (Guest), Khách hàng (Customer).
+- **Mô tả:** Hiển thị giao diện chính bao gồm thanh menu danh mục, khối baner quảng cáo, khối sách bán chạy và sách mới.
+- **Tiền điều kiện:** 
+  - Người dùng truy cập vào đường dẫn `/`.
+  - Cơ sở dữ liệu (CSDL) phải có sẵn dữ liệu ở các bảng: `categories` (status='active'), `products` (status='active', is_deleted=false).
 - **Luồng chính:**
-  1. Người dùng truy cập đường dẫn `/`.
-  2. Hệ thống gọi API lấy danh sách 8 sách mới nhất (sắp xếp theo `created_at` giảm dần).
-  3. Hệ thống gọi API lấy danh sách danh mục (`categories`) đang hoạt động để hiển thị lên thanh Menu.
-  4. Giao diện hiển thị dữ liệu. Hỗ trợ responsive (màn hình 360px đến 1366px).
-- **Luồng ngoại lệ:** Mất kết nối API -> Hiển thị khung xương (skeleton loading) hoặc thông báo "Không thể tải dữ liệu, vui lòng F5".
+  1. Người dùng truy cập đường dẫn `/`. Frontend kích hoạt trạng thái hiển thị khung xương (Skeleton Loading).
+  2. Hệ thống (Backend) truy vấn bảng `categories` để lấy danh sách các danh mục đang hoạt động (`status = 'active'`).
+  3. Hệ thống truy vấn bảng `products` để lấy 8 sách mới nhất (sắp xếp theo `created_at` giảm dần, điều kiện `status = 'active'` và `is_deleted = false`).
+  4. Hệ thống truy vấn kết hợp bảng `products` và `order_items` để tính tổng số lượng đã bán, lấy ra top 5 sách bán chạy nhất (điều kiện sách đang active).
+  5. Hệ thống truy vấn bảng `reviews` để tính điểm trung bình (`AVG(rating)`) và tổng số lượt đánh giá (`COUNT(id)`) cho từng cuốn sách ở bước 3 và 4.
+  6. Backend trả về dữ liệu (JSON) cho Frontend.
+  7. Frontend hiển thị giao diện: Thanh Menu danh mục, khối "Sách mới nhất" (dạng Slider), khối "Sách bán chạy" (dạng Lưới). Giao diện tự động co giãn (Responsive) trên màn hình 360px đến 1366px.
+- **Luồng ngoại lệ:**
+  - **Mất kết nối API / Lỗi Server 500:** Hiển thị thông báo *"Không thể tải dữ liệu trang chủ. Vui lòng F5 để thử lại."*
+  - **CSDL chưa có sách nào:** Ẩn các khối sách, hiển thị dòng chữ *"Chưa có sách nào được cập nhật."* (Không được để trắng trang).
+  - **Sách chưa có đánh giá:** Nếu `reviews` trống, ẩn phần hiển thị ngôi sao, không hiển thị `0 sao`.
+  - **Sách hết hàng (stock = 0):** Nút "Thêm vào giỏ" trên thẻ sách bị vô hiệu hóa (Disabled) và đổi chữ thành "Hết hàng".
+  - **Khách chưa đăng nhập bấm "Thêm vào giỏ":** Không gọi API, hiển thị Popup yêu cầu đăng nhập.
 
 #### UC-G2: Tìm kiếm / Lọc sản phẩm
 - **Tác nhân:** Guest, Customer.
