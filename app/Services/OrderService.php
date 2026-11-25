@@ -15,7 +15,11 @@ class OrderService
     public function placeOrder(int $userId, array $data): Order
     {
         return DB::transaction(function () use ($userId, $data) {
-            $cartItems = CartItem::where('user_id', $userId)->get();
+            // 1. Khóa dòng cart_items của user này để chặn bấm đúp nút Đặt hàng (2 request song song)
+            $cartItems = CartItem::where('user_id', $userId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
 
             if ($cartItems->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -23,6 +27,7 @@ class OrderService
                 ]);
             }
 
+            // 2. Khóa dòng products theo thứ tự ID tăng dần để tránh Deadlock
             $products = Product::whereIn('id', $cartItems->pluck('product_id'))
                 ->orderBy('id')
                 ->lockForUpdate()
@@ -48,8 +53,39 @@ class OrderService
                 $subtotal += $product->price * $item->quantity;
             }
 
-            $shippingFee = (float) ($data['shipping_fee'] ?? 0);
-            $grandTotal = $subtotal + $shippingFee;
+            $shippingRates = [
+                'standard' => 0,
+                'express'  => 35000,
+            ];
+            $shippingMethod = strtolower(trim($data['shipping_method'] ?? 'standard'));
+            $shippingFee = $shippingRates[$shippingMethod] ?? 0;
+
+            // 2. Tự kiểm tra & tính giảm giá Voucher từ Database (nếu có voucher_id)
+            $voucherId = null;
+            $discountAmount = 0;
+
+            if (!empty($data['voucher_id'])) {
+                // Nếu dự án có bảng vouchers, query trực tiếp từ DB để kiểm tra điều kiện
+                $voucher = DB::table('vouchers')
+                    ->where('id', $data['voucher_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($voucher && $subtotal >= ($voucher->min_order_value ?? 0)) {
+                    $voucherId = $voucher->id;
+                    $type = strtolower($voucher->discount_type ?? 'fixed');
+                    $val = (float) ($voucher->discount_value ?? 0);
+
+                    if ($type === 'percent' || $type === 'percentage') {
+                        $rawDisc = round(($subtotal * $val) / 100);
+                        $maxDisc = (float) ($voucher->max_discount ?? 0);
+                        $discountAmount = $maxDisc > 0 ? min($rawDisc, $maxDisc) : $rawDisc;
+                    } else {
+                        $discountAmount = min($val, $subtotal);
+                    }
+                }
+            }
+            $grandTotal = max(0, $subtotal - $discountAmount) + $shippingFee;
 
             $order = Order::create([
                 'user_id'        => $userId,
@@ -74,7 +110,15 @@ class OrderService
                     'price'      => $product->price,
                 ]);
 
-                $product->decrement('stock', $item->quantity);
+                $affectedRows = Product::where('id', $product->id)
+                    ->where('stock', '>=', $item->quantity)
+                    ->decrement('stock', $item->quantity);
+
+                if ($affectedRows === 0) {
+                    throw ValidationException::withMessages([
+                        'cart' => "Sản phẩm {$product->name} vừa hết hàng, vui lòng kiểm tra lại.",
+                    ]);
+                }
             }
 
             CartItem::where('user_id', $userId)->delete();

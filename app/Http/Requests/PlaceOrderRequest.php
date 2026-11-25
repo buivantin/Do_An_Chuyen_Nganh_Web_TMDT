@@ -37,7 +37,7 @@ class PlaceOrderRequest extends FormRequest
             'address'         => ['required', 'string', 'max:500'],
             'payment_method'  => ['required', 'string', 'in:cod,vnpay,momo'],
             'shipping_method' => ['nullable', 'string', 'in:standard,express'],
-            'shipping_fee'    => ['nullable', 'numeric', 'min:0'],
+            //'shipping_fee'    => ['nullable', 'numeric', 'min:0'],
             'note'            => ['nullable', 'string', 'max:1000'],
         ];
     }
