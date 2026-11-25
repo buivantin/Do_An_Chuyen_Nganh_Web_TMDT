@@ -63,9 +63,8 @@ function normalizeUserVoucher(raw) {
     if (!Number.isNaN(d.getTime())) {
       expiresLabel = d.toLocaleDateString("vi-VN");
       // Nếu chuỗi chỉ có YYYY-MM-DD thì tính hết hạn vào 23:59:59 cùng ngày
-      const endOfDay = String(rawDate).length <= 10
-        ? new Date(`${rawDate}T23:59:59`)
-        : d;
+      const endOfDay =
+        String(rawDate).length <= 10 ? new Date(`${rawDate}T23:59:59`) : d;
       isExpiredClient = endOfDay.getTime() < Date.now();
     }
   }
@@ -94,7 +93,7 @@ function normalizeUserVoucher(raw) {
 }
 
 /**
- * SMART COMPONENT: Xử lý Checkout, tải & kiểm tra điều kiện Voucher Admin cấp cho User
+ * SMART COMPONENT: Xử lý Checkout, xác nhận đặt đơn & kiểm tra điều kiện Voucher
  */
 export default function Checkout() {
   const storedUser = useMemo(() => getStoredUser(), []);
@@ -107,7 +106,7 @@ export default function Checkout() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(null);
 
-  // Hộp thoại xác nhận / hủy bỏ trước khi gửi đơn hàng
+  // Hộp thoại xác nhận trước khi gửi đơn hàng
   const [confirmOrderModal, setConfirmOrderModal] = useState({
     open: false,
     payload: null,
@@ -129,7 +128,7 @@ export default function Checkout() {
   const [districtCode, setDistrictCode] = useState("");
   const [wardName, setWardName] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
-  const [saveAsDefault, setSaveAsDefault] = useState(true);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [note, setNote] = useState("");
 
   // Vận chuyển & Thanh toán
@@ -387,7 +386,7 @@ export default function Checkout() {
     });
   };
 
-  // Bước 2: Chỉ khi khách nhấn "Xác nhận đặt hàng" mới gọi API tạo đơn hàng
+  // Bước 2: Chỉ khi khách nhấn "Xác nhận đặt hàng" mới gọi API tạo đơn và hiện thông báo thành công
   const handleConfirmPlaceOrder = async () => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -414,14 +413,21 @@ export default function Checkout() {
               })
             ).data;
 
+      // Chỉ cập nhật địa chỉ mặc định nếu người dùng chủ động tick chọn, giữ nguyên tên tài khoản gốc
       if (addressMode === "new" && saveAsDefault && finalShippingAddress) {
+        const currentStored = getStoredUser() || {};
+        const keptName =
+          savedProfile.name || currentStored.username || currentStored.name || "";
+        const keptPhone =
+          savedProfile.phone || currentStored.phone || phone.trim();
+
         axios
           .put(
             "/api/profile",
             {
-              username: fullName.trim(),
-              name: fullName.trim(),
-              phone: phone.trim(),
+              username: keptName,
+              name: keptName,
+              phone: keptPhone,
               address: finalShippingAddress,
             },
             {
@@ -432,15 +438,19 @@ export default function Checkout() {
             }
           )
           .then(() => {
-            const currentStored = getStoredUser() || {};
             const nextUser = {
               ...currentStored,
-              username: fullName.trim(),
-              name: fullName.trim(),
-              phone: phone.trim(),
+              username: keptName,
+              name: keptName,
+              phone: keptPhone,
               address: finalShippingAddress,
             };
             localStorage.setItem("user", JSON.stringify(nextUser));
+            setSavedProfile((prev) => ({
+              ...prev,
+              phone: keptPhone,
+              address: finalShippingAddress,
+            }));
             window.dispatchEvent(
               new CustomEvent("user-updated", { detail: nextUser })
             );
@@ -457,7 +467,7 @@ export default function Checkout() {
         receiver: fullName.trim(),
         phone: phone.trim(),
         address: finalShippingAddress,
-        total: grandTotal,
+        total: createdOrder.total_amount ?? grandTotal,
         discount: voucherDiscount,
         voucherCode: selectedVoucher?.code || "",
         paymentMethod,

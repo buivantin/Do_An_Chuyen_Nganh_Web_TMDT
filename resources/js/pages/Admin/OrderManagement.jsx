@@ -248,9 +248,8 @@ export default function OrderManagement() {
   /**
    * Điều phối chuyển trạng thái:
    * - Nếu chuyển từ "Chuẩn bị hàng" (processing) sang "Đang giao" (shipping) hoặc "Hoàn thành" (completed):
-   *   Bắt buộc mở modal nhập thông tin vận chuyển/bàn giao trước.
-   * - Các trường hợp khác (Duyệt chuẩn bị, Hủy đơn, Hoàn tất từ Đang giao, Duyệt/Từ chối hoàn đơn):
-   *   Mở thẳng Modal thông báo xác nhận AdminConfirmModal.
+   *   Đóng modal chi tiết (nếu đang mở) và mở modal nhập thông tin vận chuyển/bàn giao trước.
+   * - Các trường hợp khác: Mở thẳng Modal thông báo xác nhận AdminConfirmModal.
    */
   const requestChangeOrderStatus = (order, targetStatus, extraPayload = {}) => {
     if (!order || !targetStatus || targetStatus === order.status) return;
@@ -265,6 +264,7 @@ export default function OrderManagement() {
       (targetStatus === "shipping" || targetStatus === "completed");
 
     if (requiresDeliveryInfo) {
+      setSelectedOrder(null);
       setDeliveryError("");
       setDeliveryForm({
         shipping_provider:
