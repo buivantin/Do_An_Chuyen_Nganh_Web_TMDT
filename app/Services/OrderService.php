@@ -53,8 +53,39 @@ class OrderService
                 $subtotal += $product->price * $item->quantity;
             }
 
-            $shippingFee = (float) ($data['shipping_fee'] ?? 0);
-            $grandTotal = $subtotal + $shippingFee;
+            $shippingRates = [
+                'standard' => 0,
+                'express'  => 35000,
+            ];
+            $shippingMethod = strtolower(trim($data['shipping_method'] ?? 'standard'));
+            $shippingFee = $shippingRates[$shippingMethod] ?? 0;
+
+            // 2. Tự kiểm tra & tính giảm giá Voucher từ Database (nếu có voucher_id)
+            $voucherId = null;
+            $discountAmount = 0;
+
+            if (!empty($data['voucher_id'])) {
+                // Nếu dự án có bảng vouchers, query trực tiếp từ DB để kiểm tra điều kiện
+                $voucher = DB::table('vouchers')
+                    ->where('id', $data['voucher_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($voucher && $subtotal >= ($voucher->min_order_value ?? 0)) {
+                    $voucherId = $voucher->id;
+                    $type = strtolower($voucher->discount_type ?? 'fixed');
+                    $val = (float) ($voucher->discount_value ?? 0);
+
+                    if ($type === 'percent' || $type === 'percentage') {
+                        $rawDisc = round(($subtotal * $val) / 100);
+                        $maxDisc = (float) ($voucher->max_discount ?? 0);
+                        $discountAmount = $maxDisc > 0 ? min($rawDisc, $maxDisc) : $rawDisc;
+                    } else {
+                        $discountAmount = min($val, $subtotal);
+                    }
+                }
+            }
+            $grandTotal = max(0, $subtotal - $discountAmount) + $shippingFee;
 
             $order = Order::create([
                 'user_id'        => $userId,
