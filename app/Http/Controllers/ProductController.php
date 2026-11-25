@@ -53,63 +53,201 @@ class ProductController extends Controller
         ]);
     }
 
+    public function filterOptions(): JsonResponse
+    {
+        $authors = [];
+        if (Schema::hasColumn('products', 'author')) {
+            $authorsQuery = Product::query();
+            $this->applyActiveScope($authorsQuery, 'products');
+            $authors = $authorsQuery
+                ->whereNotNull('author')
+                ->where('author', '!=', '')
+                ->whereRaw('LOWER(TRIM(author)) != ?', ['đang cập nhật'])
+                ->selectRaw('TRIM(author) as name, COUNT(*) as count')
+                ->groupBy(DB::raw('TRIM(author)'))
+                ->orderBy('name')
+                ->get();
+        }
+
+        $publishers = [];
+        if (Schema::hasColumn('products', 'publisher')) {
+            $publishersQuery = Product::query();
+            $this->applyActiveScope($publishersQuery, 'products');
+            $publishers = $publishersQuery
+                ->whereNotNull('publisher')
+                ->where('publisher', '!=', '')
+                ->selectRaw('TRIM(publisher) as name, COUNT(*) as count')
+                ->groupBy(DB::raw('TRIM(publisher)'))
+                ->orderBy('name')
+                ->get();
+        }
+
+        return response()->json([
+            'status'     => 'success',
+            'authors'    => $authors,
+            'publishers' => $publishers,
+        ]);
+    }
+
     public function search(Request $request): JsonResponse
     {
-        $perPage = min(max((int) $request->input('per_page', 12), 1), 50);
+        $perPage = min(max((int) $request->input('per_page', 12), 1), 60);
 
-        $query = Product::with('category:id,name');
+        $hasOrderItems = Schema::hasTable('order_items') && Schema::hasTable('orders');
+        $hasReviews = Schema::hasTable('reviews');
+        $hasReviewStatus = $hasReviews && Schema::hasColumn('reviews', 'status');
+
+        $query = Product::with('category:id,name')->select('products.*');
         $this->applyActiveScope($query, 'products');
 
-        $query
-            ->when($request->filled('keyword'), function ($q) use ($request) {
-                $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($request->keyword));
-                $keyword = '%' . $escaped . '%';
-                $q->where(function ($sub) use ($keyword) {
-                    $sub->where('products.name', 'LIKE', $keyword)
-                        ->orWhere('products.author', 'LIKE', $keyword);
-                });
-            })
-            ->when($request->filled('category_id'), function ($q) use ($request) {
-                $q->where('products.category_id', (int) $request->category_id);
-            })
-            ->when($request->filled('min_price'), function ($q) use ($request) {
-                $q->where('products.price', '>=', (float) $request->min_price);
-            })
-            ->when($request->filled('max_price'), function ($q) use ($request) {
-                $q->where('products.price', '<=', (float) $request->max_price);
-            });
+        // Subquery tính tổng lượt bán thật từ đơn hàng không bị hủy
+        if ($hasOrderItems) {
+            $soldSub = DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->where('orders.status', '!=', 'cancelled')
+                ->whereColumn('order_items.product_id', 'products.id')
+                ->selectRaw('COALESCE(SUM(order_items.quantity), 0)');
 
-        switch ($request->input('sort')) {
+            $query->selectSub($soldSub, 'sold_count');
+        }
+
+        // Subquery tính điểm đánh giá trung bình & tổng lượt đánh giá thật
+        if ($hasReviews) {
+            $ratingSub = DB::table('reviews')
+                ->whereColumn('reviews.product_id', 'products.id')
+                ->when($hasReviewStatus, fn ($q) => $q->where('reviews.status', 'visible'))
+                ->selectRaw('ROUND(COALESCE(AVG(reviews.rating), 0), 1)');
+
+            $reviewCountSub = DB::table('reviews')
+                ->whereColumn('reviews.product_id', 'products.id')
+                ->when($hasReviewStatus, fn ($q) => $q->where('reviews.status', 'visible'))
+                ->selectRaw('COUNT(*)');
+
+            $query->selectSub($ratingSub, 'rating');
+            $query->selectSub($reviewCountSub, 'reviews_count');
+        }
+
+        // 1. Tìm kiếm theo từ khóa
+        $rawKeyword = $request->input('search') ?? $request->input('keyword');
+        if (is_string($rawKeyword) && trim($rawKeyword) !== '') {
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($rawKeyword));
+            $keyword = '%' . $escaped . '%';
+            $query->where(function ($sub) use ($keyword) {
+                $sub->where('products.name', 'LIKE', $keyword);
+                if (Schema::hasColumn('products', 'author')) {
+                    $sub->orWhere('products.author', 'LIKE', $keyword);
+                }
+                if (Schema::hasColumn('products', 'publisher')) {
+                    $sub->orWhere('products.publisher', 'LIKE', $keyword);
+                }
+            });
+        }
+
+        // 2. Lọc theo danh mục
+        if ($request->filled('category_id')) {
+            $categoryIds = is_array($request->category_id)
+                ? $request->category_id
+                : explode(',', (string) $request->category_id);
+            $categoryIds = array_values(array_filter(array_map('intval', $categoryIds)));
+            if (!empty($categoryIds)) {
+                $query->whereIn('products.category_id', $categoryIds);
+            }
+        }
+
+        // 3. Lọc theo tác giả (hỗ trợ cả author[]=... và author=...)
+        if ($request->filled('author') && Schema::hasColumn('products', 'author')) {
+            $rawAuthors = $request->input('author');
+            $authors = is_array($rawAuthors) ? $rawAuthors : explode('|', (string) $rawAuthors);
+            $authors = array_values(array_filter(array_map('trim', $authors)));
+            if (!empty($authors)) {
+                $query->whereIn(DB::raw('TRIM(products.author)'), $authors);
+            }
+        }
+
+        // 4. Lọc theo nhà xuất bản (hỗ trợ cả publisher[]=... và publisher=...)
+        if ($request->filled('publisher') && Schema::hasColumn('products', 'publisher')) {
+            $rawPublishers = $request->input('publisher');
+            $publishers = is_array($rawPublishers) ? $rawPublishers : explode('|', (string) $rawPublishers);
+            $publishers = array_values(array_filter(array_map('trim', $publishers)));
+            if (!empty($publishers)) {
+                $query->whereIn(DB::raw('TRIM(products.publisher)'), $publishers);
+            }
+        }
+
+        // 5. Lọc theo khoảng giá (xét trên giá thực tế sau giảm nếu có)
+        if ($request->filled('min_price')) {
+            $query->where('products.price', '>=', (float) $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $query->where('products.price', '<=', (float) $request->max_price);
+        }
+
+        // 6. Lọc theo năm xuất bản
+        if (Schema::hasColumn('products', 'published_year')) {
+            if ($request->filled('min_year')) {
+                $query->whereNotNull('products.published_year')
+                    ->where('products.published_year', '>=', (int) $request->min_year);
+            }
+            if ($request->filled('max_year')) {
+                $query->whereNotNull('products.published_year')
+                    ->where('products.published_year', '<=', (int) $request->max_year);
+            }
+        }
+
+        // 7. Lọc theo số sao tối thiểu
+        if ($request->filled('min_rating') && $hasReviews) {
+            $minRating = (float) $request->min_rating;
+            $statusClause = $hasReviewStatus ? "AND r.status = 'visible'" : '';
+            $query->whereRaw(
+                "(SELECT COALESCE(AVG(r.rating), 0) FROM reviews r WHERE r.product_id = products.id {$statusClause}) >= ?",
+                [$minRating]
+            );
+        }
+
+        // 8. Sắp xếp
+        switch ($request->input('sort', 'bestseller')) {
             case 'price_asc':
                 $query->orderBy('products.price', 'asc');
                 break;
             case 'price_desc':
                 $query->orderBy('products.price', 'desc');
                 break;
-            case 'bestseller':
-                if (Schema::hasTable('order_items') && Schema::hasTable('orders')) {
-                    $productColumns = Schema::hasTable('products')
-                        ? Schema::getColumnListing('products')
-                        : [];
-                    $groupedColumns = array_map(fn (string $col) => "products.{$col}", $productColumns);
-
-                    $query
-                        ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
-                        ->leftJoin('orders', function ($join) {
-                            $join->on('order_items.order_id', '=', 'orders.id')
-                                ->where('orders.status', '!=', 'cancelled');
-                        })
-                        ->select('products.*', DB::raw('COALESCE(SUM(order_items.quantity), 0) as sold_count'))
-                        ->groupBy(!empty($groupedColumns) ? $groupedColumns : ['products.id'])
-                        ->orderByDesc('sold_count')
-                        ->orderByDesc('products.id');
-                } else {
-                    $query->orderBy('products.created_at', 'desc');
+            case 'title_asc':
+                $query->orderBy('products.name', 'asc');
+                break;
+            case 'title_desc':
+                $query->orderBy('products.name', 'desc');
+                break;
+            case 'published_year_asc':
+                if (Schema::hasColumn('products', 'published_year')) {
+                    $query->orderByRaw('products.published_year IS NULL ASC')
+                        ->orderBy('products.published_year', 'asc');
                 }
+                $query->orderByDesc('products.id');
+                break;
+            case 'published_year_desc':
+                if (Schema::hasColumn('products', 'published_year')) {
+                    $query->orderByRaw('products.published_year IS NULL ASC')
+                        ->orderBy('products.published_year', 'desc');
+                }
+                $query->orderByDesc('products.id');
+                break;
+            case 'rating':
+            case 'rating_desc':
+                if ($hasReviews) {
+                    $query->orderByDesc('rating');
+                }
+                $query->orderByDesc('products.id');
+                break;
+            case 'bestseller':
+                if ($hasOrderItems) {
+                    $query->orderByDesc('sold_count');
+                }
+                $query->orderByDesc('products.id');
                 break;
             case 'newest':
             default:
-                $query->orderBy('products.created_at', 'desc');
+                $query->orderByDesc('products.created_at')->orderByDesc('products.id');
                 break;
         }
 
@@ -152,7 +290,7 @@ class ProductController extends Controller
             'name'         => 'required|string|max:255',
             'author'       => 'nullable|string|max:255',
             'publisher'    => 'nullable|string|max:255',
-            'publish_year' => 'nullable|integer|min:1000|max:2100',
+            'published_year' => 'nullable|integer|min:1000|max:2100',
             'price'        => 'required|numeric|gt:0|max:999999999',
             'discount'     => 'nullable|numeric|min:0|max:100',
             'stock'        => 'required|integer|min:0|max:1000000',
@@ -167,9 +305,9 @@ class ProductController extends Controller
             'author.string'         => 'Tên tác giả phải là chuỗi ký tự hợp lệ.',
             'author.max'            => 'Tên tác giả không được vượt quá 255 ký tự.',
             'publisher.max'         => 'Nhà xuất bản không được vượt quá 255 ký tự.',
-            'publish_year.integer'  => 'Năm xuất bản phải là số nguyên.',
-            'publish_year.min'      => 'Năm xuất bản không hợp lệ.',
-            'publish_year.max'      => 'Năm xuất bản không hợp lệ.',
+            'published_year.integer'  => 'Năm xuất bản phải là số nguyên.',
+            'published_year.min'      => 'Năm xuất bản không hợp lệ.',
+            'published_year.max'      => 'Năm xuất bản không hợp lệ.',
             'price.required'        => 'Vui lòng nhập giá bán.',
             'price.numeric'         => 'Giá bán phải là một số hợp lệ.',
             'price.gt'              => 'Giá bán phải lớn hơn 0.',
@@ -232,7 +370,7 @@ class ProductController extends Controller
             'name'         => 'sometimes|required|string|max:255',
             'author'       => 'nullable|string|max:255',
             'publisher'    => 'nullable|string|max:255',
-            'publish_year' => 'nullable|integer|min:1000|max:2100',
+            'published_year' => 'nullable|integer|min:1000|max:2100',
             'price'        => 'sometimes|required|numeric|gt:0|max:999999999',
             'discount'     => 'nullable|numeric|min:0|max:100',
             'stock'        => 'sometimes|required|integer|min:0|max:1000000',
@@ -247,9 +385,9 @@ class ProductController extends Controller
             'author.string'         => 'Tên tác giả phải là chuỗi ký tự hợp lệ.',
             'author.max'            => 'Tên tác giả không được vượt quá 255 ký tự.',
             'publisher.max'         => 'Nhà xuất bản không được vượt quá 255 ký tự.',
-            'publish_year.integer'  => 'Năm xuất bản phải là số nguyên.',
-            'publish_year.min'      => 'Năm xuất bản không hợp lệ.',
-            'publish_year.max'      => 'Năm xuất bản không hợp lệ.',
+            'published_year.integer'  => 'Năm xuất bản phải là số nguyên.',
+            'published_year.min'      => 'Năm xuất bản không hợp lệ.',
+            'published_year.max'      => 'Năm xuất bản không hợp lệ.',
             'price.required'        => 'Giá bán không được để trống.',
             'price.numeric'         => 'Giá bán phải là một số hợp lệ.',
             'price.gt'              => 'Giá bán phải lớn hơn 0.',

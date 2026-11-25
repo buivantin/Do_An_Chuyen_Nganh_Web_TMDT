@@ -24,6 +24,7 @@ Route::post('/register', [RegisterController::class, 'store']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 Route::get('/products/{productId}/reviews', [ReviewController::class, 'index']);
 Route::get('/banners', [BannerController::class, 'index']);
+Route::get('/products/filter-options', [ProductController::class, 'filterOptions']);
 
 // Route trang chủ & danh mục
 Route::get('/categories', [CategoryController::class, 'index']);

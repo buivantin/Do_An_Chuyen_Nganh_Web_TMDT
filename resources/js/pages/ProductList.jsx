@@ -3,7 +3,6 @@ import axios from "axios";
 import MainLayout from "../layouts/MainLayout";
 import ProductListView from "../components/ProductListView";
 import ProductService from "../services/ProductService";
-import { enrichBookWithSampleMeta } from "../data/homeMockData";
 
 const PER_PAGE = 12;
 
@@ -47,12 +46,12 @@ function readUrlParams() {
     minPrice: sp.get("min_price") || "",
     maxPrice: sp.get("max_price") || "",
     sort: sp.get("sort") || "bestseller",
-    page: Number(sp.get("page")) || 1,
+    page: Math.max(1, Number(sp.get("page")) || 1),
   };
 }
 
 /**
- * SMART COMPONENT: Xử lý API, đo vị trí Navbar để fixed thanh Sắp xếp, lọc & phân trang
+ * SMART COMPONENT: Phân trang & lọc trực tiếp qua Server API (tối ưu cho hàng nghìn đầu sách)
  */
 export default function ProductList({
   products = null,
@@ -62,9 +61,18 @@ export default function ProductList({
   const isFromProp = Array.isArray(products);
 
   const [categories, setCategories] = useState(propCategories || []);
-  const [catalogBooks, setCatalogBooks] = useState(() =>
+  const [books, setBooks] = useState(() =>
     isFromProp ? products.map(enrichBookWithSampleMeta) : []
   );
+  const [pagination, setPagination] = useState(() => ({
+    currentPage: 1,
+    lastPage: 1,
+    total: isFromProp ? products.length : 0,
+  }));
+
+  const [authorOptions, setAuthorOptions] = useState([]);
+  const [publisherOptions, setPublisherOptions] = useState([]);
+
   const [filters, setFilters] = useState(readUrlParams);
   const [priceRange, setPriceRange] = useState(() => {
     const init = readUrlParams();
@@ -162,10 +170,65 @@ export default function ProductList({
       .catch(() => setCategories([]));
   }, [propCategories]);
 
-  // Tải danh sách sách từ DB
+  // Lấy danh sách Tác giả & Nhà xuất bản cho Sidebar từ endpoint nhẹ riêng biệt
   useEffect(() => {
     if (isFromProp) {
-      setCatalogBooks(products.map(enrichBookWithSampleMeta));
+      const authorMap = new Map();
+      const pubMap = new Map();
+      products.forEach((b) => {
+        const a = String(b.author || "").trim();
+        if (a && a.toLowerCase() !== "đang cập nhật") {
+          authorMap.set(a, (authorMap.get(a) || 0) + 1);
+        }
+        const p = String(b.publisher || "").trim();
+        if (p) pubMap.set(p, (pubMap.get(p) || 0) + 1);
+      });
+      setAuthorOptions(
+        Array.from(authorMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name, "vi"))
+      );
+      setPublisherOptions(
+        Array.from(pubMap.entries())
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => a.name.localeCompare(b.name, "vi"))
+      );
+      return;
+    }
+
+    let active = true;
+    axios
+      .get("/api/products/filter-options", {
+        headers: { Accept: "application/json" },
+      })
+      .then((res) => {
+        if (!active) return;
+        const authors = (res.data?.authors || []).sort((a, b) =>
+          String(a.name).localeCompare(String(b.name), "vi")
+        );
+        const publishers = (res.data?.publishers || []).sort((a, b) =>
+          String(a.name).localeCompare(String(b.name), "vi")
+        );
+        setAuthorOptions(authors);
+        setPublisherOptions(publishers);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [isFromProp, products]);
+
+  // Tải đúng 12 cuốn sách của trang hiện tại theo điều kiện lọc từ API
+  useEffect(() => {
+    if (isFromProp) {
+      const enriched = products.map(enrichBookWithSampleMeta);
+      const total = enriched.length;
+      const lastPage = Math.max(1, Math.ceil(total / PER_PAGE));
+      const currentPage = Math.min(Math.max(1, filters.page), lastPage);
+      const start = (currentPage - 1) * PER_PAGE;
+      setBooks(enriched.slice(start, start + PER_PAGE));
+      setPagination({ currentPage, lastPage, total });
       setLoading(false);
       return;
     }
@@ -174,32 +237,70 @@ export default function ProductList({
     setLoading(true);
     setError("");
 
+    const params = new URLSearchParams();
+    params.set("page", String(filters.page));
+    params.set("per_page", String(PER_PAGE));
+
+    if (filters.keyword.trim()) {
+      params.set("search", filters.keyword.trim());
+    }
+    if (filters.categoryIds.length > 0) {
+      params.set("category_id", filters.categoryIds.join(","));
+    }
+    filters.authors.forEach((a) => params.append("author[]", a));
+    filters.publishers.forEach((p) => params.append("publisher[]", p));
+
+    if (filters.minRating !== "") {
+      params.set("min_rating", String(filters.minRating));
+    }
+    if (filters.minYear !== "") {
+      params.set("min_year", String(filters.minYear));
+    }
+    if (filters.maxYear !== "") {
+      params.set("max_year", String(filters.maxYear));
+    }
+    if (filters.minPrice !== "") {
+      params.set("min_price", String(filters.minPrice));
+    }
+    if (filters.maxPrice !== "") {
+      params.set("max_price", String(filters.maxPrice));
+    }
+    if (filters.sort) {
+      params.set("sort", filters.sort);
+    }
+
     axios
-      .get("/api/products", {
-        params: { per_page: 500 },
+      .get(`/api/products?${params.toString()}`, {
         headers: { Accept: "application/json" },
       })
       .then((res) => {
         if (!active) return;
-        const raw =
-          res.data?.data?.data ??
-          res.data?.data ??
-          res.data?.products ??
-          res.data ??
-          [];
-        const list = Array.isArray(raw) ? raw : [];
-        setCatalogBooks(list.map(enrichBookWithSampleMeta));
+        const payload = res.data || {};
+        const rawList = Array.isArray(payload.data)
+          ? payload.data
+          : Array.isArray(payload.data?.data)
+          ? payload.data.data
+          : [];
+
+        const meta = payload.meta || payload;
+        const total = Number(meta.total ?? rawList.length);
+        const lastPage = Math.max(
+          1,
+          Number(meta.last_page ?? Math.ceil(total / PER_PAGE))
+        );
+        const currentPage = Math.min(
+          Math.max(1, Number(meta.current_page ?? filters.page)),
+          lastPage
+        );
+
+        setBooks(rawList);
+        setPagination({ currentPage, lastPage, total });
       })
-      .catch(async () => {
-        try {
-          const fallback = await ProductService.search("", "", "", "", "newest", 1);
-          if (!active) return;
-          setCatalogBooks((fallback.items || []).map(enrichBookWithSampleMeta));
-        } catch {
-          if (!active) return;
-          setCatalogBooks([]);
-          setError("Không thể tải dữ liệu sách từ hệ thống.");
-        }
+      .catch(() => {
+        if (!active) return;
+        setBooks([]);
+        setPagination({ currentPage: 1, lastPage: 1, total: 0 });
+        setError("Không thể tải dữ liệu sách từ hệ thống.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -208,9 +309,9 @@ export default function ProductList({
     return () => {
       active = false;
     };
-  }, [isFromProp, products]);
+  }, [isFromProp, products, filters]);
 
-  // Đồng bộ URL
+  // Đồng bộ URL trình duyệt
   useEffect(() => {
     const sp = new URLSearchParams();
     if (filters.keyword) sp.set("keyword", filters.keyword);
@@ -247,33 +348,6 @@ export default function ProductList({
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // Trích xuất danh sách Tác giả & Nhà xuất bản
-  const { authorOptions, publisherOptions } = useMemo(() => {
-    const authorMap = new Map();
-    const pubMap = new Map();
-
-    catalogBooks.forEach((b) => {
-      const author = String(b.author || "").trim().normalize("NFC");
-      if (author && author.toLowerCase() !== "đang cập nhật") {
-        authorMap.set(author, (authorMap.get(author) || 0) + 1);
-      }
-
-      const pub = String(b.publisher || "").trim().normalize("NFC");
-      if (pub) {
-        pubMap.set(pub, (pubMap.get(pub) || 0) + 1);
-      }
-    });
-
-    return {
-      authorOptions: Array.from(authorMap.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, "vi")),
-      publisherOptions: Array.from(pubMap.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => a.name.localeCompare(b.name, "vi")),
-    };
-  }, [catalogBooks]);
-
   const filteredAuthors = useMemo(() => {
     const q = authorSearch.trim().toLowerCase();
     if (!q) return authorOptions;
@@ -285,143 +359,6 @@ export default function ProductList({
     if (!q) return publisherOptions;
     return publisherOptions.filter((p) => p.name.toLowerCase().includes(q));
   }, [publisherOptions, publisherSearch]);
-
-  // Lọc & Sắp xếp sách
-  const filteredAndSortedBooks = useMemo(() => {
-    let result = [...catalogBooks];
-
-    if (filters.keyword.trim()) {
-      const kw = filters.keyword.trim().toLowerCase();
-      result = result.filter(
-        (b) =>
-          (b.title || b.name || "").toLowerCase().includes(kw) ||
-          (b.author || "").toLowerCase().includes(kw) ||
-          (b.publisher || "").toLowerCase().includes(kw)
-      );
-    }
-
-    if (filters.categoryIds.length > 0) {
-      const selectedCats = categories.filter((c) =>
-        filters.categoryIds.includes(String(c.id))
-      );
-      const selectedNames = selectedCats.map((c) => c.name.toLowerCase());
-
-      result = result.filter((b) => {
-        const catIdMatch = filters.categoryIds.includes(String(b.category_id));
-        const catName =
-          typeof b.category === "object" ? b.category?.name : b.category;
-        const catNameMatch =
-          catName && selectedNames.includes(String(catName).toLowerCase());
-        return catIdMatch || catNameMatch;
-      });
-    }
-
-    if (filters.minRating !== "") {
-      const minR = Number(filters.minRating);
-      result = result.filter((b) => Number(b.rating || 0) >= minR);
-    }
-
-    if (filters.authors.length > 0) {
-      const selectedAuthorSet = new Set(
-        filters.authors.map((a) => a.toLowerCase())
-      );
-      result = result.filter((b) =>
-        selectedAuthorSet.has(String(b.author || "").trim().toLowerCase())
-      );
-    }
-
-    if (filters.publishers.length > 0) {
-      const selectedPubSet = new Set(
-        filters.publishers.map((p) => p.toLowerCase())
-      );
-      result = result.filter((b) =>
-        selectedPubSet.has(String(b.publisher || "").trim().toLowerCase())
-      );
-    }
-
-    if (filters.minYear !== "") {
-      const minY = Number(filters.minYear);
-      result = result.filter((b) => Number(b.publish_year || 0) >= minY);
-    }
-    if (filters.maxYear !== "") {
-      const maxY = Number(filters.maxYear);
-      result = result.filter((b) => Number(b.publish_year || 0) <= maxY);
-    }
-
-    if (filters.minPrice !== "") {
-      result = result.filter(
-        (b) => Number(b.price || 0) >= Number(filters.minPrice)
-      );
-    }
-    if (filters.maxPrice !== "") {
-      result = result.filter(
-        (b) => Number(b.price || 0) <= Number(filters.maxPrice)
-      );
-    }
-
-    switch (filters.sort) {
-      case "title_asc":
-        result.sort((a, b) =>
-          String(a.title || a.name || "").localeCompare(
-            String(b.title || b.name || ""),
-            "vi",
-            { sensitivity: "base" }
-          )
-        );
-        break;
-      case "title_desc":
-        result.sort((a, b) =>
-          String(b.title || b.name || "").localeCompare(
-            String(a.title || a.name || ""),
-            "vi",
-            { sensitivity: "base" }
-          )
-        );
-        break;
-      case "publish_year_asc":
-        result.sort(
-          (a, b) => Number(a.publish_year || 0) - Number(b.publish_year || 0)
-        );
-        break;
-      case "publish_year_desc":
-        result.sort(
-          (a, b) => Number(b.publish_year || 0) - Number(a.publish_year || 0)
-        );
-        break;
-      case "price_asc":
-        result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
-        break;
-      case "price_desc":
-        result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
-        break;
-      case "rating_desc":
-        result.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
-        break;
-      case "newest":
-        result.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
-        break;
-      case "bestseller":
-      default:
-        result.sort(
-          (a, b) => Number(b.sold_count || 0) - Number(a.sold_count || 0)
-        );
-        break;
-    }
-
-    return result;
-  }, [catalogBooks, categories, filters]);
-
-  const pagination = useMemo(() => {
-    const total = filteredAndSortedBooks.length;
-    const lastPage = Math.max(1, Math.ceil(total / PER_PAGE));
-    const currentPage = Math.min(Math.max(1, filters.page), lastPage);
-    return { currentPage, lastPage, total };
-  }, [filteredAndSortedBooks.length, filters.page]);
-
-  const paginatedBooks = useMemo(() => {
-    const start = (pagination.currentPage - 1) * PER_PAGE;
-    return filteredAndSortedBooks.slice(start, start + PER_PAGE);
-  }, [filteredAndSortedBooks, pagination.currentPage]);
 
   const updateFilter = (patch) => {
     setFilters((prev) => ({ ...prev, ...patch, page: 1 }));
@@ -586,7 +523,7 @@ export default function ProductList({
 
   const viewNode = (
     <ProductListView
-      books={paginatedBooks}
+      books={books}
       categories={categories}
       totalAuthorCount={authorOptions.length}
       filteredAuthors={filteredAuthors}
