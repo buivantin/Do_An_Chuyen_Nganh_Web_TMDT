@@ -15,7 +15,11 @@ class OrderService
     public function placeOrder(int $userId, array $data): Order
     {
         return DB::transaction(function () use ($userId, $data) {
-            $cartItems = CartItem::where('user_id', $userId)->get();
+            // 1. Khóa dòng cart_items của user này để chặn bấm đúp nút Đặt hàng (2 request song song)
+            $cartItems = CartItem::where('user_id', $userId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
 
             if ($cartItems->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -23,6 +27,7 @@ class OrderService
                 ]);
             }
 
+            // 2. Khóa dòng products theo thứ tự ID tăng dần để tránh Deadlock
             $products = Product::whereIn('id', $cartItems->pluck('product_id'))
                 ->orderBy('id')
                 ->lockForUpdate()
@@ -74,7 +79,15 @@ class OrderService
                     'price'      => $product->price,
                 ]);
 
-                $product->decrement('stock', $item->quantity);
+                $affectedRows = Product::where('id', $product->id)
+                    ->where('stock', '>=', $item->quantity)
+                    ->decrement('stock', $item->quantity);
+
+                if ($affectedRows === 0) {
+                    throw ValidationException::withMessages([
+                        'cart' => "Sản phẩm {$product->name} vừa hết hàng, vui lòng kiểm tra lại.",
+                    ]);
+                }
             }
 
             CartItem::where('user_id', $userId)->delete();
