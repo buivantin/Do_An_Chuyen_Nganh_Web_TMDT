@@ -1,32 +1,486 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import axios from "axios";
-import {
-  ADMIN_BANNERS_STORAGE_KEY,
-  DEFAULT_HERO_BANNERS,
-} from "../../data/homeMockData";
+import { ADMIN_BANNERS_STORAGE_KEY } from "../../data/homeMockData";
 import { resolveBookImageUrl } from "../../components/ProductCard";
 import AdminModal from "../../components/admin/AdminModal";
 import AdminConfirmModal from "../../components/admin/AdminConfirmModal";
+import SearchableSelect from "../../components/admin/SearchableSelect";
 
 const EMPTY_FORM = {
+  badge_text: "Ấn phẩm & Trích dẫn nổi bật",
   title: "",
   quote: "",
   description: "",
   banner_image: "",
+  image_file: null,
+  image_preview: "",
   book_id: "",
-  badge_text: "Ấn phẩm & Trích dẫn nổi bật",
+  sort_order: 1,
   status: "active",
 };
 
+const STATUS_OPTIONS = [
+  {
+    value: "active",
+    label: "Hiển thị (Active)",
+    subLabel: "Xuất hiện trên trang chủ",
+    sortKey: "A",
+  },
+  {
+    value: "inactive",
+    label: "Đang ẩn (Inactive)",
+    subLabel: "Tạm ẩn khỏi trang chủ",
+    sortKey: "B",
+  },
+];
+
+const FILTER_STATUS_OPTIONS = [
+  { value: "all", label: "Tất cả trạng thái", sortKey: "0" },
+  { value: "active", label: "Đang hiển thị (Active)", sortKey: "1" },
+  { value: "inactive", label: "Đang ẩn (Inactive)", sortKey: "2" },
+];
+
+/**
+ * DUMB COMPONENT: Giao diện bảng & modal quản lý Banner Quảng Cáo
+ */
+export const BannerManagementView = memo(function BannerManagementView({
+  banners = [],
+  bookOptions = [],
+  sortOrderOptions = [],
+  loading = false,
+  msg = { type: "", text: "" },
+  searchQuery = "",
+  statusFilter = "all",
+  onSearchQueryChange,
+  onStatusFilterChange,
+  isModalOpen = false,
+  editingId = null,
+  form = EMPTY_FORM,
+  fileInputRef,
+  onOpenCreate,
+  onEdit,
+  onRequestCancelModal,
+  onFieldChange,
+  onFileChange,
+  onClearFile,
+  onRequestSubmit,
+  onRequestToggleStatus,
+  onRequestDelete,
+  confirmState,
+  actionLoading = false,
+  onCloseConfirm,
+}) {
+  const inputClass =
+    "w-full px-3.5 py-2 text-sm bg-[#FAF8F5] border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9A5B13]";
+  const labelClass =
+    "block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5";
+
+  const previewUrl =
+    form.image_preview ||
+    (form.banner_image ? resolveBookImageUrl(form.banner_image) : "");
+
+  return (
+    <div className="space-y-4">
+      {msg.text && (
+        <div
+          className={`p-3.5 rounded-xl border text-xs sm:text-sm font-medium ${
+            msg.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}
+        >
+          {msg.text}
+        </div>
+      )}
+
+      <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-stone-200 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-lg sm:text-xl font-bold text-[#1A1A1A]">
+                Danh Sách Banner Quảng Cáo
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Quản lý slide quảng bá, trích dẫn nổi bật và sách liên kết tại
+                trang chủ
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onOpenCreate}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-xs shrink-0"
+            >
+              <span className="text-base leading-none">+</span>
+              <span>Thêm banner mới</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div className="sm:col-span-8">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange?.(e.target.value)}
+                placeholder="Tìm kiếm banner theo tiêu đề, trích dẫn hoặc sách liên kết..."
+                className={inputClass}
+              />
+            </div>
+            <div className="sm:col-span-4">
+              <SearchableSelect
+                options={FILTER_STATUS_OPTIONS}
+                value={statusFilter}
+                onChange={onStatusFilterChange}
+                placeholder="Lọc theo trạng thái"
+                searchPlaceholder="Gõ trạng thái..."
+                sortOrder="09"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500">
+                <th className="py-3.5 px-4 text-center w-16">Thứ tự</th>
+                <th className="py-3.5 px-4">Hình ảnh</th>
+                <th className="py-3.5 px-4">Tiêu đề &amp; Trích dẫn</th>
+                <th className="py-3.5 px-4">Sách liên kết</th>
+                <th className="py-3.5 px-4 text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-stone-400">
+                    Đang tải danh sách banner...
+                  </td>
+                </tr>
+              ) : banners.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-10 text-center text-stone-400">
+                    Chưa có banner nào phù hợp.
+                  </td>
+                </tr>
+              ) : (
+                banners.map((item) => {
+                  const isHidden = item.status === "inactive";
+                  const imgSrc = item.banner_image || item.image;
+                  const quoteText = item.quote || item.promo_label;
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-stone-50/70 transition"
+                    >
+                      <td className="py-3.5 px-4 text-center font-bold text-stone-600">
+                        #{item.sort_order ?? 0}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <img
+                          src={resolveBookImageUrl(imgSrc)}
+                          alt={item.title}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src =
+                              "https://placehold.co/192x112/F5EDE2/9A5B13?text=Banner";
+                          }}
+                          className="w-24 h-14 object-cover rounded-lg border border-stone-200 bg-stone-100"
+                        />
+                      </td>
+                      <td className="py-3.5 px-4 min-w-[240px]">
+                        {item.badge_text && (
+                          <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-[#9A5B13] mb-0.5">
+                            {item.badge_text}
+                          </span>
+                        )}
+                        <div className="font-semibold text-[#1A1A1A] line-clamp-1">
+                          {item.title}
+                        </div>
+                        {quoteText && (
+                          <div className="text-xs italic text-[#9A5B13] line-clamp-1 mt-0.5">
+                            &ldquo;{quoteText}&rdquo;
+                          </div>
+                        )}
+                        {item.description && (
+                          <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">
+                            {item.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        {item.book_title ? (
+                          <span className="inline-block px-2.5 py-1 rounded-lg bg-[#F5EDE2] text-[#9A5B13] text-xs font-semibold max-w-[210px] truncate">
+                            {item.book_title}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-stone-400">
+                            Không liên kết
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            !isHidden
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-stone-100 text-stone-600"
+                          }`}
+                        >
+                          {!isHidden ? "Hiển thị" : "Đang ẩn"}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onEdit?.(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#FAF6F0] hover:bg-[#F5EDE2] border border-[#E5D5BE] text-[#9A5B13] text-xs font-semibold transition cursor-pointer"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRequestToggleStatus?.(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition cursor-pointer"
+                          >
+                            {!isHidden ? "Ẩn" : "Hiện"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRequestDelete?.(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-semibold transition cursor-pointer"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL THÊM / CẬP NHẬT BANNER */}
+      <AdminModal
+        open={isModalOpen}
+        onClose={onRequestCancelModal}
+        subtitle={editingId ? `Banner #${editingId}` : "Quảng bá trang chủ"}
+        title={
+          editingId ? "Cập Nhật Banner Quảng Cáo" : "Thêm Banner Quảng Cáo Mới"
+        }
+        maxWidth="max-w-2xl"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={onRequestCancelModal}
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-700 text-xs font-semibold transition cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              form="banner-modal-form"
+              className="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+            >
+              {editingId ? "Lưu thay đổi" : "Thêm banner"}
+            </button>
+          </>
+        }
+      >
+        <form
+          id="banner-modal-form"
+          onSubmit={onRequestSubmit}
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>
+                Tiêu đề Banner <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={form.title}
+                onChange={(e) => onFieldChange?.("title", e.target.value)}
+                placeholder="VD: Tuyển Tập Triết Lý Sống Kinh Điển"
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Nhãn nổi bật (Badge)</label>
+              <input
+                type="text"
+                value={form.badge_text}
+                onChange={(e) => onFieldChange?.("badge_text", e.target.value)}
+                placeholder="VD: Ấn phẩm & Trích dẫn nổi bật"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+            <div className="sm:col-span-8">
+              <label className={labelClass}>
+                Sách được liên kết (Sắp xếp A–Z, gõ để tìm)
+              </label>
+              <SearchableSelect
+                options={bookOptions}
+                value={form.book_id}
+                onChange={(val) => onFieldChange?.("book_id", val)}
+                placeholder="-- Chọn đầu sách liên kết --"
+                searchPlaceholder="Gõ tên sách, tác giả hoặc mã ID..."
+                allowEmpty
+                emptyLabel="-- Không liên kết sách --"
+                sortOrder="az"
+              />
+            </div>
+
+            <div className="sm:col-span-4">
+              <label className={labelClass}>Thứ tự hiển thị (0–9)</label>
+              <SearchableSelect
+                options={sortOrderOptions}
+                value={form.sort_order}
+                onChange={(val) => onFieldChange?.("sort_order", Number(val))}
+                placeholder="Chọn thứ tự"
+                searchPlaceholder="Gõ số thứ tự..."
+                sortOrder="09"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              Câu nói hay / Trích dẫn nổi bật
+            </label>
+            <textarea
+              rows={2}
+              value={form.quote}
+              onChange={(e) => onFieldChange?.("quote", e.target.value)}
+              placeholder="Nhập câu trích dẫn hay hoặc điểm nổi bật của cuốn sách..."
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Nội dung quảng cáo ngắn</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={(e) =>
+                  onFieldChange?.("description", e.target.value)
+                }
+                placeholder="Mô tả ngắn thu hút độc giả..."
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Trạng thái hiển thị (A–Z)</label>
+              <SearchableSelect
+                options={STATUS_OPTIONS}
+                value={form.status}
+                onChange={(val) => onFieldChange?.("status", val)}
+                placeholder="Chọn trạng thái"
+                searchPlaceholder="Gõ trạng thái..."
+                sortOrder="az"
+              />
+            </div>
+          </div>
+
+          {/* UPLOAD FILE ẢNH BANNER + XEM TRƯỚC */}
+          <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-stone-700">
+                Hình ảnh Banner (Tải tệp ảnh từ máy tính)
+              </label>
+              {(form.image_file || form.banner_image) && (
+                <button
+                  type="button"
+                  onClick={onClearFile}
+                  className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                >
+                  Xóa ảnh đã chọn
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={onFileChange}
+                className="block w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#141414] file:text-white hover:file:bg-stone-800 file:cursor-pointer cursor-pointer"
+              />
+            </div>
+
+            <div className="text-[11px] text-stone-400">
+              Hỗ trợ JPG, PNG, WEBP, GIF (tối đa 5MB). Khuyến nghị tỷ lệ ngang
+              16:7 (1400×600px).
+            </div>
+
+            {previewUrl && (
+              <div className="pt-1">
+                <div className="text-[11px] font-semibold text-stone-500 mb-1.5">
+                  Xem trước hình ảnh banner:
+                </div>
+                <div className="w-full h-36 sm:h-44 rounded-xl overflow-hidden border border-stone-200 bg-stone-900">
+                  <img
+                    src={previewUrl}
+                    alt="Xem trước banner"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src =
+                        "https://placehold.co/800x320/1B1714/F3D19E?text=Banner+Preview";
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </form>
+      </AdminModal>
+
+      <AdminConfirmModal
+        open={confirmState.open}
+        variant={confirmState.variant}
+        title={confirmState.title}
+        message={confirmState.message}
+        detailText={confirmState.detailText}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        loading={actionLoading}
+        onConfirm={() => confirmState.action?.()}
+        onCancel={onCloseConfirm}
+      />
+    </div>
+  );
+});
+
+/**
+ * SMART COMPONENT: Quản lý state, gọi API multipart/form-data & đồng bộ dữ liệu
+ */
 export default function BannerManagement() {
   const [banners, setBanners] = useState([]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [msg, setMsg] = useState({ type: "", text: "" });
+  const fileInputRef = useRef(null);
 
   const [confirmState, setConfirmState] = useState({
     open: false,
@@ -40,11 +494,42 @@ export default function BannerManagement() {
   });
   const [actionLoading, setActionLoading] = useState(false);
 
-  const token = localStorage.getItem("token");
+  const getAuthHeaders = useCallback((extra = {}) => {
+    const token = localStorage.getItem("token");
+    return {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...extra,
+    };
+  }, []);
+
+  const fetchBanners = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get("/api/admin/banners", {
+        headers: getAuthHeaders(),
+      });
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setBanners(list);
+      localStorage.setItem(ADMIN_BANNERS_STORAGE_KEY, JSON.stringify(list));
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text:
+          err.response?.data?.message ||
+          "Không thể tải danh sách banner từ máy chủ.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [getAuthHeaders]);
 
   useEffect(() => {
+    fetchBanners();
+
     axios
-      .get("/api/products?per_page=100", {
+      .get("/api/products", {
+        params: { per_page: 200 },
         headers: { Accept: "application/json" },
       })
       .then((res) => {
@@ -52,52 +537,58 @@ export default function BannerManagement() {
         setBooks(Array.isArray(list) ? list : []);
       })
       .catch(() => {});
+  }, [fetchBanners]);
 
-    axios
-      .get("/api/admin/banners", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      })
-      .then((res) => {
-        const list = res.data?.data || res.data || [];
-        if (Array.isArray(list) && list.length > 0) {
-          setBanners(list);
-          return;
-        }
-        throw new Error("empty");
-      })
-      .catch(() => {
-        try {
-          const saved = JSON.parse(
-            localStorage.getItem(ADMIN_BANNERS_STORAGE_KEY) || "null"
-          );
-          setBanners(
-            Array.isArray(saved) && saved.length > 0
-              ? saved
-              : DEFAULT_HERO_BANNERS
-          );
-        } catch {
-          setBanners(DEFAULT_HERO_BANNERS);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [token]);
+  const bookOptions = useMemo(() => {
+    return books.map((b) => {
+      const title = String(b.name || b.title || `Sách #${b.id}`).trim();
+      const author = b.author ? ` — ${b.author}` : "";
+      return {
+        value: b.id,
+        label: `${title}${author}`,
+        subLabel: `Mã sách #${b.id}`,
+        keywords: `${b.id} ${title} ${b.author || ""}`,
+        sortKey: title,
+      };
+    });
+  }, [books]);
 
-  const persistBannersLocal = (nextList) => {
-    setBanners(nextList);
-    localStorage.setItem(ADMIN_BANNERS_STORAGE_KEY, JSON.stringify(nextList));
-    window.dispatchEvent(new CustomEvent("banners-updated"));
-  };
+  const sortOrderOptions = useMemo(() => {
+    const maxOrder = Math.max(20, banners.length + 5);
+    return Array.from({ length: maxOrder + 1 }, (_, i) => ({
+      value: i,
+      label: i === 0 ? "0 — Ưu tiên đầu tiên" : `Vị trí số ${i}`,
+      sortKey: i,
+    }));
+  }, [banners.length]);
 
-  const resetAndCloseModal = () => {
+  const filteredBanners = useMemo(() => {
+    const kw = searchQuery.trim().toLowerCase();
+    return banners.filter((item) => {
+      if (statusFilter !== "all" && item.status !== statusFilter) {
+        return false;
+      }
+      if (!kw) return true;
+      const haystack = `${item.title || ""} ${item.quote || ""} ${
+        item.description || ""
+      } ${item.book_title || ""}`.toLowerCase();
+      return haystack.includes(kw);
+    });
+  }, [banners, searchQuery, statusFilter]);
+
+  const resetAndCloseModal = useCallback(() => {
+    if (form.image_preview && form.image_preview.startsWith("blob:")) {
+      URL.revokeObjectURL(form.image_preview);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     setIsModalOpen(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
-  };
+  }, [form.image_preview]);
 
-  const requestCancelModal = () => {
+  const requestCancelModal = useCallback(() => {
     setConfirmState({
       open: true,
       variant: "danger",
@@ -112,75 +603,137 @@ export default function BannerManagement() {
         setConfirmState((prev) => ({ ...prev, open: false }));
       },
     });
-  };
+  }, [form.title, resetAndCloseModal]);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = useCallback(() => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      sort_order: banners.length + 1,
+    });
     setMsg({ type: "", text: "" });
     setIsModalOpen(true);
-  };
+  }, [banners.length]);
 
-  const handleEdit = (banner) => {
+  const handleEdit = useCallback((banner) => {
     setEditingId(banner.id);
     setForm({
-      title: banner.title || "",
-      quote: banner.quote || "",
-      description: banner.description || "",
-      banner_image: banner.banner_image || "",
-      book_id: banner.book_id || "",
       badge_text: banner.badge_text || "Ấn phẩm & Trích dẫn nổi bật",
+      title: banner.title || "",
+      quote: banner.quote || banner.promo_label || "",
+      description: banner.description || "",
+      banner_image: banner.banner_image || banner.image || "",
+      image_file: null,
+      image_preview: "",
+      book_id: banner.product_id || banner.book_id || "",
+      sort_order: Number(banner.sort_order ?? 0),
       status: banner.status || "active",
     });
     setMsg({ type: "", text: "" });
     setIsModalOpen(true);
-  };
+  }, []);
+
+  const handleFieldChange = useCallback((field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg({
+        type: "error",
+        text: "Dung lượng ảnh vượt quá 5MB. Vui lòng chọn ảnh nhẹ hơn.",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setForm((prev) => {
+      if (prev.image_preview && prev.image_preview.startsWith("blob:")) {
+        URL.revokeObjectURL(prev.image_preview);
+      }
+      return {
+        ...prev,
+        image_file: file,
+        image_preview: preview,
+      };
+    });
+  }, []);
+
+  const handleClearFile = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setForm((prev) => {
+      if (prev.image_preview && prev.image_preview.startsWith("blob:")) {
+        URL.revokeObjectURL(prev.image_preview);
+      }
+      return {
+        ...prev,
+        image_file: null,
+        image_preview: "",
+        banner_image: "",
+      };
+    });
+  }, []);
 
   const executeSaveBanner = async () => {
     setActionLoading(true);
     setMsg({ type: "", text: "" });
 
-    const linkedBook = books.find(
-      (b) => String(b.id) === String(form.book_id)
-    );
-
-    const payload = {
-      ...form,
-      book_id: linkedBook ? linkedBook.id : form.book_id || null,
-      book_title: linkedBook ? linkedBook.name || linkedBook.title : "",
-      book_author: linkedBook ? linkedBook.author : "",
-      book_image: linkedBook ? linkedBook.image : "",
-    };
-
     try {
-      if (editingId) {
-        await axios.put(`/api/admin/banners/${editingId}`, payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } else {
-        await axios.post("/api/admin/banners", payload, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      const formData = new FormData();
+      formData.append("title", form.title.trim());
+      formData.append("badge_text", form.badge_text.trim());
+      formData.append("quote", form.quote.trim());
+      formData.append("description", form.description.trim());
+      formData.append("status", form.status);
+      formData.append("sort_order", String(form.sort_order ?? 0));
+
+      if (form.book_id) {
+        formData.append("product_id", String(form.book_id));
       }
-    } catch {
-      // Fallback đồng bộ localStorage
-    }
 
-    if (editingId) {
-      const next = banners.map((b) =>
-        b.id === editingId ? { ...b, ...payload, id: editingId } : b
-      );
-      persistBannersLocal(next);
-      setMsg({ type: "success", text: "Đã cập nhật banner quảng cáo!" });
-    } else {
-      const next = [{ ...payload, id: Date.now() }, ...banners];
-      persistBannersLocal(next);
-      setMsg({ type: "success", text: "Đã thêm banner quảng cáo mới!" });
-    }
+      if (form.image_file instanceof File) {
+        formData.append("image_file", form.image_file);
+      } else if (form.banner_image) {
+        formData.append("banner_image", form.banner_image);
+      }
 
-    setActionLoading(false);
-    setConfirmState((prev) => ({ ...prev, open: false }));
-    resetAndCloseModal();
+      if (editingId) {
+        formData.append("_method", "PUT");
+        await axios.post(`/api/admin/banners/${editingId}`, formData, {
+          headers: getAuthHeaders({ "Content-Type": "multipart/form-data" }),
+        });
+        setMsg({ type: "success", text: "Đã cập nhật banner quảng cáo!" });
+      } else {
+        await axios.post("/api/admin/banners", formData, {
+          headers: getAuthHeaders({ "Content-Type": "multipart/form-data" }),
+        });
+        setMsg({ type: "success", text: "Đã thêm banner quảng cáo mới!" });
+      }
+
+      await fetchBanners();
+      window.dispatchEvent(new CustomEvent("banners-updated"));
+      resetAndCloseModal();
+    } catch (err) {
+      const firstErr = err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat()[0]
+        : null;
+      setMsg({
+        type: "error",
+        text:
+          firstErr ||
+          err.response?.data?.message ||
+          "Không thể lưu banner quảng cáo.",
+      });
+    } finally {
+      setActionLoading(false);
+      setConfirmState((prev) => ({ ...prev, open: false }));
+    }
   };
 
   const handleRequestSubmit = (e) => {
@@ -206,348 +759,115 @@ export default function BannerManagement() {
     });
   };
 
-  const requestToggleStatus = (banner) => {
-    const nextStatus = banner.status === "inactive" ? "active" : "inactive";
-    const label = nextStatus === "active" ? "Hiển thị" : "Ẩn";
-    setConfirmState({
-      open: true,
-      variant: "warning",
-      title: `Xác nhận ${label.toLowerCase()} banner`,
-      message: `Bạn có chắc chắn muốn ${label.toLowerCase()} banner "${
-        banner.title
-      }" trên trang chủ?`,
-      detailText: banner.title,
-      confirmText: `Xác nhận ${label}`,
-      cancelText: "Hủy",
-      action: () => {
-        const next = banners.map((b) =>
-          b.id === banner.id ? { ...b, status: nextStatus } : b
-        );
-        persistBannersLocal(next);
-        setMsg({
-          type: "success",
-          text: `Đã cập nhật trạng thái banner "${banner.title}".`,
-        });
-        setConfirmState((prev) => ({ ...prev, open: false }));
-      },
-    });
-  };
+  const requestToggleStatus = useCallback(
+    (banner) => {
+      const nextLabel = banner.status === "inactive" ? "Hiển thị" : "Ẩn";
+      setConfirmState({
+        open: true,
+        variant: "warning",
+        title: `Xác nhận ${nextLabel.toLowerCase()} banner`,
+        message: `Bạn có chắc chắn muốn ${nextLabel.toLowerCase()} banner "${
+          banner.title
+        }" trên trang chủ?`,
+        detailText: banner.title,
+        confirmText: `Xác nhận ${nextLabel}`,
+        cancelText: "Hủy",
+        action: async () => {
+          setActionLoading(true);
+          try {
+            await axios.patch(
+              `/api/admin/banners/${banner.id}/toggle`,
+              {},
+              { headers: getAuthHeaders() }
+            );
+            await fetchBanners();
+            window.dispatchEvent(new CustomEvent("banners-updated"));
+            setMsg({
+              type: "success",
+              text: `Đã cập nhật trạng thái banner "${banner.title}".`,
+            });
+          } catch (err) {
+            setMsg({
+              type: "error",
+              text:
+                err.response?.data?.message ||
+                "Không thể thay đổi trạng thái banner.",
+            });
+          } finally {
+            setActionLoading(false);
+            setConfirmState((prev) => ({ ...prev, open: false }));
+          }
+        },
+      });
+    },
+    [fetchBanners, getAuthHeaders]
+  );
 
-  const requestDeleteBanner = (banner) => {
-    setConfirmState({
-      open: true,
-      variant: "danger",
-      title: "Xác nhận xóa banner quảng cáo",
-      message: "Bạn có chắc chắn muốn xóa vĩnh viễn banner này?",
-      detailText: banner.title,
-      confirmText: "Xóa banner",
-      cancelText: "Hủy",
-      action: async () => {
-        setActionLoading(true);
-        try {
-          await axios.delete(`/api/admin/banners/${banner.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        } catch {
-          // ignore
-        }
-        const next = banners.filter((b) => b.id !== banner.id);
-        persistBannersLocal(next);
-        if (editingId === banner.id) resetAndCloseModal();
-        setMsg({ type: "success", text: "Đã xóa banner quảng cáo." });
-        setActionLoading(false);
-        setConfirmState((prev) => ({ ...prev, open: false }));
-      },
-    });
-  };
-
-  const inputClass =
-    "w-full px-3.5 py-2 text-sm bg-[#FAF8F5] border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9A5B13]";
-  const labelClass =
-    "block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5";
+  const requestDeleteBanner = useCallback(
+    (banner) => {
+      setConfirmState({
+        open: true,
+        variant: "danger",
+        title: "Xác nhận xóa banner quảng cáo",
+        message: "Bạn có chắc chắn muốn xóa vĩnh viễn banner này?",
+        detailText: banner.title,
+        confirmText: "Xóa banner",
+        cancelText: "Hủy",
+        action: async () => {
+          setActionLoading(true);
+          try {
+            await axios.delete(`/api/admin/banners/${banner.id}`, {
+              headers: getAuthHeaders(),
+            });
+            await fetchBanners();
+            window.dispatchEvent(new CustomEvent("banners-updated"));
+            if (editingId === banner.id) resetAndCloseModal();
+            setMsg({ type: "success", text: "Đã xóa banner quảng cáo." });
+          } catch (err) {
+            setMsg({
+              type: "error",
+              text: err.response?.data?.message || "Không thể xóa banner.",
+            });
+          } finally {
+            setActionLoading(false);
+            setConfirmState((prev) => ({ ...prev, open: false }));
+          }
+        },
+      });
+    },
+    [editingId, fetchBanners, getAuthHeaders, resetAndCloseModal]
+  );
 
   return (
-    <div className="space-y-4">
-      {msg.text && (
-        <div
-          className={`p-3.5 rounded-xl border text-xs sm:text-sm font-medium ${
-            msg.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-red-50 border-red-200 text-red-800"
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
-
-      <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-serif text-lg sm:text-xl font-bold text-[#1A1A1A]">
-              Danh Sách Banner Quảng Cáo
-            </h2>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Quản lý slide quảng bá, trích dẫn nổi bật và sách liên kết tại
-              trang chủ
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow-xs shrink-0"
-          >
-            <span className="text-base leading-none">+</span>
-            <span>Thêm banner mới</span>
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                <th className="py-3.5 px-4">Hình ảnh</th>
-                <th className="py-3.5 px-4">Tiêu đề & Trích dẫn</th>
-                <th className="py-3.5 px-4">Sách liên kết</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
-                <th className="py-3.5 px-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan="5" className="py-10 text-center text-stone-400">
-                    Đang tải danh sách banner...
-                  </td>
-                </tr>
-              ) : banners.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="py-10 text-center text-stone-400">
-                    Chưa có banner nào.
-                  </td>
-                </tr>
-              ) : (
-                banners.map((item) => {
-                  const isHidden = item.status === "inactive";
-                  return (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-stone-50/70 transition"
-                    >
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <img
-                          src={resolveBookImageUrl(item.banner_image)}
-                          alt={item.title}
-                          className="w-24 h-14 object-cover rounded-lg border border-stone-200 bg-stone-100"
-                        />
-                      </td>
-                      <td className="py-3.5 px-4 min-w-[240px]">
-                        <div className="font-semibold text-[#1A1A1A] line-clamp-1">
-                          {item.title}
-                        </div>
-                        {item.quote && (
-                          <div className="text-xs italic text-[#9A5B13] line-clamp-1 mt-0.5">
-                            &ldquo;{item.quote}&rdquo;
-                          </div>
-                        )}
-                        {item.description && (
-                          <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">
-                            {item.description}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        {item.book_title ? (
-                          <span className="inline-block px-2.5 py-1 rounded-lg bg-[#F5EDE2] text-[#9A5B13] text-xs font-semibold">
-                            {item.book_title}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-stone-400">
-                            Không liên kết
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            !isHidden
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-stone-100 text-stone-600"
-                          }`}
-                        >
-                          {!isHidden ? "Hiển thị" : "Đang ẩn"}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                            className="px-2.5 py-1.5 rounded-lg bg-[#FAF6F0] hover:bg-[#F5EDE2] border border-[#E5D5BE] text-[#9A5B13] text-xs font-semibold transition cursor-pointer"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => requestToggleStatus(item)}
-                            className="px-2.5 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition cursor-pointer"
-                          >
-                            {!isHidden ? "Ẩn" : "Hiện"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => requestDeleteBanner(item)}
-                            className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-semibold transition cursor-pointer"
-                          >
-                            Xóa
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <AdminModal
-        open={isModalOpen}
-        onClose={requestCancelModal}
-        subtitle={editingId ? `Banner #${editingId}` : "Quảng bá trang chủ"}
-        title={
-          editingId ? "Cập Nhật Banner Quảng Cáo" : "Thêm Banner Quảng Cáo Mới"
-        }
-        maxWidth="max-w-2xl"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={requestCancelModal}
-              className="px-4 py-2.5 rounded-xl bg-white hover:bg-stone-100 border border-stone-300 text-stone-700 text-xs font-semibold transition cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              form="banner-modal-form"
-              className="px-5 py-2.5 rounded-xl bg-[#141414] hover:bg-stone-800 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
-            >
-              {editingId ? "Lưu thay đổi" : "Thêm banner"}
-            </button>
-          </>
-        }
-      >
-        <form
-          id="banner-modal-form"
-          onSubmit={handleRequestSubmit}
-          className="space-y-4"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>
-                Tiêu đề Banner <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="VD: Tuyển Tập Triết Lý Sống Kinh Điển"
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Sách được liên kết</label>
-              <select
-                value={form.book_id}
-                onChange={(e) => setForm({ ...form, book_id: e.target.value })}
-                className={inputClass}
-              >
-                <option value="">-- Chọn đầu sách liên kết --</option>
-                {books.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    #{b.id} - {b.name || b.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              Câu nói hay / Trích dẫn nổi bật
-            </label>
-            <textarea
-              rows={2}
-              value={form.quote}
-              onChange={(e) => setForm({ ...form, quote: e.target.value })}
-              placeholder="Nhập câu trích dẫn hay hoặc điểm nổi bật của cuốn sách..."
-              className={inputClass}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass}>Nội dung quảng cáo ngắn</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                placeholder="Mô tả ngắn thu hút độc giả..."
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Trạng thái hiển thị</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className={inputClass}
-              >
-                <option value="active">Hiển thị (Active)</option>
-                <option value="inactive">Đang ẩn (Inactive)</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>
-              Hình ảnh Banner (URL hoặc đường dẫn /imgs/...)
-            </label>
-            <input
-              type="text"
-              value={form.banner_image}
-              onChange={(e) =>
-                setForm({ ...form, banner_image: e.target.value })
-              }
-              placeholder="https://... hoặc /imgs/banner1.jpg"
-              className={inputClass}
-            />
-          </div>
-        </form>
-      </AdminModal>
-
-      <AdminConfirmModal
-        open={confirmState.open}
-        variant={confirmState.variant}
-        title={confirmState.title}
-        message={confirmState.message}
-        detailText={confirmState.detailText}
-        confirmText={confirmState.confirmText}
-        cancelText={confirmState.cancelText}
-        loading={actionLoading}
-        onConfirm={() => confirmState.action?.()}
-        onCancel={() =>
-          !actionLoading &&
-          setConfirmState((prev) => ({ ...prev, open: false }))
-        }
-      />
-    </div>
+    <BannerManagementView
+      banners={filteredBanners}
+      bookOptions={bookOptions}
+      sortOrderOptions={sortOrderOptions}
+      loading={loading}
+      msg={msg}
+      searchQuery={searchQuery}
+      statusFilter={statusFilter}
+      onSearchQueryChange={setSearchQuery}
+      onStatusFilterChange={setStatusFilter}
+      isModalOpen={isModalOpen}
+      editingId={editingId}
+      form={form}
+      fileInputRef={fileInputRef}
+      onOpenCreate={handleOpenCreate}
+      onEdit={handleEdit}
+      onRequestCancelModal={requestCancelModal}
+      onFieldChange={handleFieldChange}
+      onFileChange={handleFileChange}
+      onClearFile={handleClearFile}
+      onRequestSubmit={handleRequestSubmit}
+      onRequestToggleStatus={requestToggleStatus}
+      onRequestDelete={requestDeleteBanner}
+      confirmState={confirmState}
+      actionLoading={actionLoading}
+      onCloseConfirm={() =>
+        !actionLoading &&
+        setConfirmState((prev) => ({ ...prev, open: false }))
+      }
+    />
   );
 }

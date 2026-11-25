@@ -1,15 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, memo } from "react";
 import axios from "axios";
-import {
-  ADMIN_BANNERS_STORAGE_KEY,
-  DEFAULT_HERO_BANNERS,
-} from "../data/homeMockData";
+import { DEFAULT_HERO_BANNERS } from "../data/homeMockData";
 import { resolveBookImageUrl } from "./ProductCard";
 
 /**
- * DUMB COMPONENT: Hiển thị Hero Banner trượt ngang chậm & mượt mà, responsive riêng Mobile & PC
+ * DUMB COMPONENT: Hiển thị Hero Banner trượt ngang chậm & mượt mà
  */
-export function HeroBannerView({
+export const HeroBannerView = memo(function HeroBannerView({
   banners = [],
   activeIndex = 0,
   onPrev,
@@ -29,7 +26,6 @@ export function HeroBannerView({
       onTouchEnd={onTouchEnd}
       className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-stone-200/80 bg-[#1B1714] text-white shadow-md"
     >
-      {/* Dải trượt ngang các Banner */}
       <div
         className="flex transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform"
         style={{
@@ -37,20 +33,31 @@ export function HeroBannerView({
         }}
       >
         {banners.map((item, idx) => {
-          const linkedBookHref = item.book_id
-            ? `/products/${item.book_id}`
+          const linkedProductId = item.product_id || item.book_id;
+          const linkedBookHref = linkedProductId
+            ? `/products/${linkedProductId}`
             : "/products";
+          const bgImage = item.image || item.banner_image;
+          const quoteText = item.promo_label || item.quote;
+          const bookTitle =
+            item.book_title || item.product?.name || "Xem chi tiết ấn phẩm";
+          const bookAuthor = item.book_author || item.product?.author || "";
+          const bookImage =
+            item.book_image ||
+            item.product?.image_path ||
+            item.product?.image ||
+            "";
 
           return (
             <div
               key={item.id || idx}
               className="relative w-full shrink-0 overflow-hidden"
             >
-              {/* Ảnh nền Banner */}
               <div className="absolute inset-0">
                 <img
-                  src={resolveBookImageUrl(item.banner_image)}
+                  src={resolveBookImageUrl(bgImage)}
                   alt={item.title}
+                  loading={idx === 0 ? "eager" : "lazy"}
                   onError={(e) => {
                     e.currentTarget.onerror = null;
                     e.currentTarget.src =
@@ -61,22 +68,23 @@ export function HeroBannerView({
                 <div className="absolute inset-0 bg-gradient-to-r from-[#16120F]/95 via-[#1C1713]/85 to-[#1C1713]/65" />
               </div>
 
-              {/* Nội dung Banner: Mobile gọn 1 cột, PC chia 12 cột */}
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-7 sm:py-11 lg:py-14 pb-14 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-center">
                 <div className="lg:col-span-8 space-y-3.5 sm:space-y-5">
                   <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-[#9A5B13]/30 border border-[#E5B87B]/40 text-[#F3D19E] text-[10px] sm:text-[11px] font-bold uppercase tracking-widest">
                     <span>✦</span>
-                    <span>{item.badge_text || "Ấn phẩm & Trích dẫn nổi bật"}</span>
+                    <span>
+                      {item.badge_text || "Ấn phẩm & Trích dẫn nổi bật"}
+                    </span>
                   </span>
 
                   <h1 className="font-serif text-xl sm:text-3xl lg:text-4xl font-bold text-[#FAF8F5] leading-snug sm:leading-tight">
                     {item.title}
                   </h1>
 
-                  {item.quote && (
+                  {quoteText && (
                     <blockquote className="border-l-4 border-[#D99B4E] pl-3 sm:pl-4 py-1 bg-white/5 rounded-r-xl">
                       <p className="font-serif italic text-xs sm:text-lg text-[#F7E7CE] leading-relaxed">
-                        {item.quote}
+                        {quoteText}
                       </p>
                     </blockquote>
                   )}
@@ -103,7 +111,6 @@ export function HeroBannerView({
                   </div>
                 </div>
 
-                {/* Thẻ sách được liên kết */}
                 <div className="lg:col-span-4 flex justify-start lg:justify-end">
                   <a
                     href={linkedBookHref}
@@ -111,8 +118,9 @@ export function HeroBannerView({
                   >
                     <div className="w-16 sm:w-24 aspect-[3/4] rounded-xl bg-[#F5EFE6] p-1.5 shrink-0 overflow-hidden shadow-lg">
                       <img
-                        src={resolveBookImageUrl(item.book_image)}
-                        alt={item.book_title || item.title}
+                        src={resolveBookImageUrl(bookImage)}
+                        alt={bookTitle}
+                        loading="lazy"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src =
@@ -123,15 +131,12 @@ export function HeroBannerView({
                     </div>
 
                     <div className="min-w-0 space-y-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#F3D19E]">
-                        Sách liên kết
-                      </span>
                       <h2 className="font-serif text-sm sm:text-lg font-bold text-white line-clamp-2 group-hover:text-[#F3D19E] transition-colors">
-                        {item.book_title || "Xem chi tiết ấn phẩm"}
+                        {bookTitle}
                       </h2>
-                      {item.book_author && (
+                      {bookAuthor && (
                         <p className="text-[11px] sm:text-xs text-stone-300 truncate">
-                          {item.book_author}
+                          {bookAuthor}
                         </p>
                       )}
                       <div className="pt-0.5 text-[11px] sm:text-xs font-bold text-[#F3D19E] group-hover:underline">
@@ -146,7 +151,6 @@ export function HeroBannerView({
         })}
       </div>
 
-      {/* Điều hướng Slide Banner */}
       {banners.length > 1 && (
         <div className="absolute bottom-3.5 sm:bottom-5 inset-x-0 z-20 px-4 sm:px-8 lg:px-12 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -187,63 +191,39 @@ export function HeroBannerView({
       )}
     </section>
   );
-}
+});
 
 /**
- * SMART COMPONENT: Tự động lướt banner chậm mượt, hỗ trợ vuốt ngang trên Mobile
+ * SMART COMPONENT: Tự động đồng bộ danh sách banner từ API /api/banners
  */
 export default function HeroBanner({ initialBanners = null }) {
-  const [banners, setBanners] = useState(() => {
-    if (Array.isArray(initialBanners) && initialBanners.length > 0) {
-      return initialBanners;
-    }
-    try {
-      const saved = JSON.parse(
-        localStorage.getItem(ADMIN_BANNERS_STORAGE_KEY) || "null"
-      );
-      if (Array.isArray(saved) && saved.length > 0) return saved;
-    } catch {
-      // ignore
-    }
-    return DEFAULT_HERO_BANNERS;
-  });
+  const [banners, setBanners] = useState(() =>
+    Array.isArray(initialBanners) && initialBanners.length > 0
+      ? initialBanners
+      : DEFAULT_HERO_BANNERS
+  );
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartXRef = useRef(null);
 
-  useEffect(() => {
-    let active = true;
+  const loadBanners = useCallback(() => {
     axios
       .get("/api/banners", { headers: { Accept: "application/json" } })
       .then((res) => {
-        if (!active) return;
         const list = res.data?.data || res.data?.banners || res.data;
         if (Array.isArray(list) && list.length > 0) {
           setBanners(list);
+          setActiveIndex((prev) => (prev >= list.length ? 0 : prev));
         }
       })
       .catch(() => {});
-
-    const handleStorageUpdate = () => {
-      try {
-        const saved = JSON.parse(
-          localStorage.getItem(ADMIN_BANNERS_STORAGE_KEY) || "null"
-        );
-        if (Array.isArray(saved) && saved.length > 0) {
-          setBanners(saved);
-          setActiveIndex(0);
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    window.addEventListener("banners-updated", handleStorageUpdate);
-    return () => {
-      active = false;
-      window.removeEventListener("banners-updated", handleStorageUpdate);
-    };
   }, []);
+
+  useEffect(() => {
+    loadBanners();
+    window.addEventListener("banners-updated", loadBanners);
+    return () => window.removeEventListener("banners-updated", loadBanners);
+  }, [loadBanners]);
 
   useEffect(() => {
     if (banners.length <= 1 || isPaused) return;
