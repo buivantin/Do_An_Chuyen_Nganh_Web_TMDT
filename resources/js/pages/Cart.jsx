@@ -53,7 +53,7 @@ function getFallbackImageUrl(url) {
 }
 
 /**
- * SMART COMPONENT: Tải dữ liệu giỏ hàng, bổ sung đầy đủ metadata sách, xử lý ConfirmModal khi xóa
+ * SMART COMPONENT: Tải dữ liệu giỏ hàng, đồng bộ real-time nhiều tab/trình duyệt, chặn số lượng âm
  */
 export default function Cart() {
   const [items, setItems] = useState([]);
@@ -64,7 +64,7 @@ export default function Cart() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [removingItem, setRemovingItem] = useState(null);
 
-  const loadCart = useCallback(async () => {
+  const loadCart = useCallback(async (silent = false) => {
     const token = localStorage.getItem("token");
     if (!token) {
       setLoading(false);
@@ -72,8 +72,10 @@ export default function Cart() {
       return;
     }
 
-    setLoading(true);
-    setErrorMsg("");
+    if (!silent) {
+      setLoading(true);
+      setErrorMsg("");
+    }
     try {
       const cartItems = await ProductService.getCart();
       setItems(Array.isArray(cartItems) ? cartItems : []);
@@ -82,28 +84,66 @@ export default function Cart() {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setShowLoginModal(true);
-      } else {
+      } else if (!silent) {
         setErrorMsg(
           err.response?.data?.message || "Không thể tải dữ liệu giỏ hàng."
         );
       }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadCart();
+    loadCart(false);
 
-    // Tự động tải lại giỏ hàng khi người dùng đăng nhập qua AuthModal
+    // 1. Tự động tải lại giỏ hàng khi người dùng đăng nhập qua AuthModal
     const handleUserUpdated = () => {
       if (localStorage.getItem("token")) {
         setShowLoginModal(false);
-        loadCart();
+        loadCart(false);
       }
     };
+
+    // 2. Đồng bộ danh sách trong trang /cart ngay khi tab khác hoặc Header cập nhật giỏ
+    const handleCartUpdated = () => {
+      loadCart(true);
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === "bookhouse_cart_sync") {
+        loadCart(true);
+      }
+    };
+
+    // 3. Đồng bộ ngay khi chuyển từ trình duyệt/cửa sổ khác quay lại tab Giỏ hàng
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && localStorage.getItem("token")) {
+        loadCart(true);
+      }
+    };
+
+    // 4. Đồng bộ định kỳ mỗi 8 giây cho trường hợp mở 2 trình duyệt khác nhau (Chrome & Edge)
+    const syncInterval = setInterval(() => {
+      if (document.visibilityState === "visible" && localStorage.getItem("token")) {
+        loadCart(true);
+      }
+    }, 8000);
+
     window.addEventListener("user-updated", handleUserUpdated);
-    return () => window.removeEventListener("user-updated", handleUserUpdated);
+    window.addEventListener("cart-updated", handleCartUpdated);
+    window.addEventListener("storage", handleStorageChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener("user-updated", handleUserUpdated);
+      window.removeEventListener("cart-updated", handleCartUpdated);
+      window.removeEventListener("storage", handleStorageChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [loadCart]);
 
   // Chuẩn hóa & bổ sung đầy đủ thông tin sách cho từng dòng sản phẩm trong giỏ
@@ -153,6 +193,7 @@ export default function Cart() {
         categoryName: categoryName || "",
         originalPrice: Number(enrichedBook.original_price || 0),
         stock: Number(item.stock ?? productObj.stock ?? enrichedBook.stock ?? 0),
+        quantity: Math.max(1, Number(item.quantity || 1)),
         resolvedImage,
         fallbackImage: getFallbackImageUrl(resolvedImage),
       };
@@ -161,7 +202,7 @@ export default function Cart() {
 
   const totalBooks = useMemo(
     () =>
-      enrichedItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      enrichedItems.reduce((sum, item) => sum + Math.max(1, Number(item.quantity || 0)), 0),
     [enrichedItems]
   );
 
@@ -169,16 +210,23 @@ export default function Cart() {
     () =>
       enrichedItems.reduce(
         (sum, item) =>
-          sum + Number(item.price || 0) * Number(item.quantity || 0),
+          sum + Number(item.price || 0) * Math.max(1, Number(item.quantity || 0)),
         0
       ),
     [enrichedItems]
   );
 
   const handleUpdateQuantity = async (item, nextQty) => {
-    if (nextQty < 1 || updatingId === item.id) return;
+    const safeQty = parseInt(nextQty, 10);
+    // Chặn tuyệt đối số lượng âm hoặc <= 0 kể cả khi người dùng mở F12 sửa DOM/HTML
+    if (!Number.isFinite(safeQty) || safeQty < 1 || updatingId === item.id) {
+      if (Number.isFinite(safeQty) && safeQty < 1) {
+        setErrorMsg("Số lượng sản phẩm tối thiểu là 1 cuốn.");
+      }
+      return;
+    }
 
-    if (item.stock > 0 && nextQty > item.stock) {
+    if (item.stock > 0 && safeQty > item.stock) {
       setErrorMsg(
         `Sách "${item.title}" chỉ còn ${item.stock} cuốn trong kho.`
       );
@@ -189,10 +237,10 @@ export default function Cart() {
     setNoticeMsg("");
     setUpdatingId(item.id);
     try {
-      await ProductService.updateCartItem(item.id, nextQty);
+      await ProductService.updateCartItem(item.id, safeQty);
       setItems((prev) =>
         prev.map((row) =>
-          row.id === item.id ? { ...row, quantity: nextQty } : row
+          row.id === item.id ? { ...row, quantity: safeQty } : row
         )
       );
       window.dispatchEvent(new CustomEvent("cart-updated"));

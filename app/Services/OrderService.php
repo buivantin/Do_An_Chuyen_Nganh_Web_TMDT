@@ -6,6 +6,7 @@ use App\Models\CartItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -47,7 +48,6 @@ class OrderService
                 $subtotal += $product->price * $item->quantity;
             }
 
-            // Lấy phí ship từ Frontend gửi lên (mặc định là 0)
             $shippingFee = (float) ($data['shipping_fee'] ?? 0);
             $grandTotal = $subtotal + $shippingFee;
 
@@ -56,10 +56,12 @@ class OrderService
                 'voucher_id'     => null,
                 'status'         => 'pending',
                 'payment_method' => strtolower(trim($data['payment_method'] ?? 'cod')),
-                'total_amount'   => $grandTotal, // Lưu tổng tiền đã cộng phí ship
+                'shipping_fee'   => $shippingFee,
+                'total_amount'   => $grandTotal,
                 'address'        => trim($data['address']),
                 'receiver_name'  => trim($data['receiver_name']),
                 'phone'          => trim($data['phone']),
+                'note'           => !empty($data['note']) ? trim($data['note']) : null,
             ]);
 
             foreach ($cartItems as $item) {
@@ -83,7 +85,8 @@ class OrderService
 
     public function listForUser(int $userId, int $perPage = 10)
     {
-        return Order::withCount('items')
+        return Order::with(['items.product'])
+            ->withCount('items')
             ->where('user_id', $userId)
             ->latest()
             ->paginate($perPage);
@@ -91,12 +94,12 @@ class OrderService
 
     public function findForUser(int $userId, int $orderId): Order
     {
-        return Order::with('items')
+        return Order::with(['items.product'])
             ->where('user_id', $userId)
             ->findOrFail($orderId);
     }
 
-    // TM-07: Khách tự hủy đơn
+    // TM-07: Khách tự hủy đơn khi đang chờ xác nhận
     public function cancelOrder(int $userId, int $orderId): Order
     {
         return DB::transaction(function () use ($userId, $orderId) {
@@ -104,7 +107,7 @@ class OrderService
 
             if ($order->status !== 'pending') {
                 throw ValidationException::withMessages([
-                    'order' => 'Không thể hủy đơn hàng vì đơn hàng đã được bàn giao cho đơn vị vận chuyển.',
+                    'order' => 'Không thể hủy đơn hàng vì đơn hàng đã được tiếp nhận xử lý hoặc bàn giao vận chuyển.',
                 ]);
             }
 
@@ -119,50 +122,157 @@ class OrderService
         });
     }
 
-    // TM-13: Admin lấy danh sách đơn (có lọc)
-    public function listAllForAdmin(?string $status = null, int $perPage = 15)
+    // Khách hàng gửi yêu cầu hoàn đơn / đổi trả trong vòng 3 ngày kể từ khi hoàn thành
+    public function requestReturn(int $userId, int $orderId, array $data, array $imageFiles): Order
     {
-        $query = Order::withCount('items')->with('user')->latest();
-        
+        return DB::transaction(function () use ($userId, $orderId, $data, $imageFiles) {
+            $order = Order::with(['items.product'])
+                ->where('user_id', $userId)
+                ->findOrFail($orderId);
+
+            if ($order->status !== 'completed') {
+                throw ValidationException::withMessages([
+                    'order' => 'Chỉ có thể gửi yêu cầu hoàn đơn / đổi trả đối với đơn hàng đã hoàn thành.',
+                ]);
+            }
+
+            $completedAnchor = $order->completed_at ?? $order->updated_at;
+            if (!$completedAnchor || now()->greaterThan($completedAnchor->copy()->addDays(3))) {
+                throw ValidationException::withMessages([
+                    'order' => 'Đã quá thời hạn 3 ngày kể từ khi hoàn thành đơn hàng, không thể gửi yêu cầu hoàn đơn / đổi trả.',
+                ]);
+            }
+
+            if (empty($imageFiles)) {
+                throw ValidationException::withMessages([
+                    'images' => 'Vui lòng tải lên ít nhất 1 hình ảnh chứng minh tình trạng sản phẩm.',
+                ]);
+            }
+
+            $storedPaths = [];
+            foreach ($imageFiles as $file) {
+                if ($file instanceof UploadedFile && $file->isValid()) {
+                    $path = $file->store('returns', 'public');
+                    $storedPaths[] = '/storage/' . $path;
+                }
+            }
+
+            if (empty($storedPaths)) {
+                throw ValidationException::withMessages([
+                    'images' => 'Không thể lưu hình ảnh chứng minh. Vui lòng thử lại.',
+                ]);
+            }
+
+            $order->status              = 'return_requested';
+            $order->return_type         = $data['return_type'];
+            $order->return_reason       = trim($data['return_reason']);
+            $order->return_images       = $storedPaths;
+            $order->return_requested_at = now();
+            $order->admin_return_note   = null;
+            $order->save();
+
+            return $order->fresh(['items.product']);
+        });
+    }
+
+    // TM-13: Admin lấy danh sách đơn (có lọc trạng thái + tìm kiếm)
+    public function listAllForAdmin(?string $status = null, ?string $keyword = null, int $perPage = 15)
+    {
+        $keyword = trim((string) $keyword);
+
+        $query = Order::with(['user', 'items.product'])
+            ->withCount('items')
+            ->latest();
+
         if ($status && $status !== 'all') {
             $query->where('status', $status);
         }
-        
+
+        if ($keyword !== '') {
+            $numericId = preg_replace('/[^0-9]/', '', $keyword);
+            $query->where(function ($q) use ($keyword, $numericId) {
+                if ($numericId !== '') {
+                    $q->orWhere('id', (int) $numericId);
+                }
+                $q->orWhere('receiver_name', 'like', "%{$keyword}%")
+                  ->orWhere('phone', 'like', "%{$keyword}%")
+                  ->orWhere('tracking_code', 'like', "%{$keyword}%")
+                  ->orWhereHas('user', function ($uq) use ($keyword) {
+                      $uq->where('username', 'like', "%{$keyword}%")
+                         ->orWhere('email', 'like', "%{$keyword}%");
+                  });
+            });
+        }
+
         return $query->paginate($perPage);
     }
 
-    // TM-13: Admin cập nhật trạng thái (chặn đi lùi)
-    public function updateStatus(int $orderId, string $newStatus): Order
+    public function findForAdmin(int $orderId): Order
     {
-        return DB::transaction(function () use ($orderId, $newStatus) {
-            $order = Order::with('items')->findOrFail($orderId);
+        return Order::with(['user', 'items.product'])->findOrFail($orderId);
+    }
+
+    // TM-13: Admin cập nhật trạng thái (hỗ trợ cả processing và duyệt/từ chối hoàn đơn)
+    public function updateStatus(int $orderId, string $newStatus, array $extra = []): Order
+    {
+        return DB::transaction(function () use ($orderId, $newStatus, $extra) {
+            $order = Order::with(['items', 'user'])->findOrFail($orderId);
             $currentStatus = $order->status;
 
-            // Đồng bộ trạng thái với Frontend và Controller
             $allowedTransitions = [
-                'pending'    => ['shipping', 'cancelled'], 
-                'shipping'   => ['completed', 'cancelled'],             
-                'completed'  => [],
-                'cancelled'  => []
+                'pending'          => ['processing', 'shipping', 'cancelled'],
+                'processing'       => ['shipping', 'completed', 'cancelled'],
+                'shipping'         => ['completed', 'cancelled'],
+                'completed'        => ['returned'],
+                'return_requested' => ['returned', 'completed'], // returned = Chấp nhận hoàn đơn; completed = Từ chối hoàn đơn
+                'returned'         => [],
+                'cancelled'        => [],
             ];
 
             if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [])) {
                 throw ValidationException::withMessages([
-                    'status' => "Lỗi: Không thể chuyển từ trạng thái '{$currentStatus}' sang '{$newStatus}'."
+                    'status' => "Không thể chuyển từ trạng thái '{$currentStatus}' sang '{$newStatus}'."
                 ]);
             }
 
-            // Nếu Admin hủy đơn, phải hoàn kho
-            if ($newStatus === 'cancelled') {
+            // Hoàn tồn kho nếu hủy đơn hoặc chấp nhận hoàn đơn
+            if (in_array($newStatus, ['cancelled', 'returned']) && !in_array($currentStatus, ['cancelled', 'returned'])) {
                 foreach ($order->items as $item) {
                     Product::where('id', $item->product_id)->increment('stock', $item->quantity);
                 }
             }
 
+            // Lưu thông tin bàn giao vận chuyển nếu có
+            if (!empty($extra['shipping_provider'])) {
+                $order->shipping_provider = trim((string) $extra['shipping_provider']);
+            }
+            if (!empty($extra['tracking_code'])) {
+                $order->tracking_code = strtoupper(trim((string) $extra['tracking_code']));
+            }
+            if (array_key_exists('shipper_info', $extra) && $extra['shipper_info'] !== null) {
+                $order->shipper_info = trim((string) $extra['shipper_info']) ?: null;
+            }
+            if (array_key_exists('delivery_note', $extra) && $extra['delivery_note'] !== null) {
+                $order->delivery_note = trim((string) $extra['delivery_note']) ?: null;
+            }
+            if (array_key_exists('admin_return_note', $extra) && $extra['admin_return_note'] !== null) {
+                $order->admin_return_note = trim((string) $extra['admin_return_note']) ?: null;
+            }
+
+            // Ghi nhận mốc thời gian hoàn thành (giữ mốc cũ nếu Admin từ chối hoàn đơn quay lại completed)
+            if ($newStatus === 'completed' && !$order->completed_at) {
+                $order->completed_at = now();
+            }
+
             $order->status = $newStatus;
             $order->save();
 
-            return $order;
+            // Tự động tính lại tổng chi tiêu tích lũy và cấp bậc thành viên (1..5)
+            if ($order->user && in_array($newStatus, ['completed', 'returned'])) {
+                $order->user->refreshMembershipTier();
+            }
+
+            return $order->fresh(['user', 'items.product']);
         });
     }
 }

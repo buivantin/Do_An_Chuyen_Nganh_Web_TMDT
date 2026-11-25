@@ -32,14 +32,18 @@ Route::get('/products/{id}', [ProductController::class, 'showPublic'])->whereNum
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     Route::get('/me', fn (Request $request) =>$request->user());
+    
 
     // TM-06: Đặt hàng (Của TV2)
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::get('/orders/{id}', [OrderController::class, 'show'])->whereNumber('id');
     
-    // TM-07: Khách hàng hủy đơn (Của bạn)
+    
+    // TM-07: Khách hàng hủy đơn, hoàn đơn & xác nhận hoàn thành (Của bạn)
     Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+    Route::post('/orders/{id}/return', [OrderController::class, 'requestReturn']);
+    Route::post('/orders/{id}/confirm-completed', [OrderController::class, 'confirmCompleted']);
 
     // Đánh giá sản phẩm (Của TV4)
     Route::post('/reviews', [ReviewController::class, 'store']);
@@ -207,16 +211,14 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::put('/products/{id}/toggle-status', [AdminProductController::class, 'toggleStatus']);
     Route::delete('/products/{id}', [AdminProductController::class, 'destroy']);
     
-    // CRUD Quản lý sản phẩm (Của TV4)
-    //  
-
     
 
     // TM-13: Quản lý đơn hàng (Của TV5)
     // 1. Route đếm số lượng đơn chờ (Dành cho Chuông thông báo)
     Route::get('/orders/pending-count', [OrderController::class, 'getPendingCount']); 
     
-    // 2. Route lấy danh sách và cập nhật trạng thái
+    // 2. Route lấy danh sách, chi tiết và cập nhật trạng thái
     Route::get('/orders', [OrderController::class, 'adminIndex']); 
+    Route::get('/orders/{id}', [OrderController::class, 'adminShow'])->whereNumber('id');
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']); 
 });

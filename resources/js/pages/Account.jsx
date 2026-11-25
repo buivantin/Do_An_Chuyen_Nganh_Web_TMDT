@@ -1,111 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import AccountView, { ACCOUNT_TABS } from "../components/AccountView";
-import LoginRequiredModal from "../components/LoginRequiredModal";
+import AccountView from "../components/AccountView";
 import ConfirmModal from "../components/ConfirmModal";
 import {
   formatVietnamAddress,
   parseAddressParts,
 } from "../components/VietnamAddressSelector";
 
-const PAYMENT_METHOD_LABELS = {
-  cod: "Thanh toán khi nhận hàng (COD)",
-  vnpay: "Thanh toán qua VNPay",
-  momo: "Thanh toán qua Ví MoMo",
-  banking: "Chuyển khoản ngân hàng",
-};
-
-const ORDER_STATUS_CONFIG = {
-  pending: {
-    label: "Chờ xác nhận",
-    badge: "bg-amber-50 text-amber-800 border-amber-200",
-  },
-  processing: {
-    label: "Đang xử lý",
-    badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
-  },
-  shipping: {
-    label: "Đang giao hàng",
-    badge: "bg-sky-50 text-sky-800 border-sky-200",
-  },
-  completed: {
-    label: "Hoàn thành",
-    badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  },
-  cancelled: {
-    label: "Đã hủy",
-    badge: "bg-stone-100 text-stone-600 border-stone-200",
-  },
-};
-
-function normalizeOrderStatus(rawStatus) {
-  const s = String(rawStatus ?? "pending").trim().toLowerCase();
-  if (s === "0" || s === "pending" || s === "chờ xác nhận" || s === "cho xac nhan") {
-    return "pending";
-  }
-  if (
-    s === "1" ||
-    s === "processing" ||
-    s === "confirmed" ||
-    s === "đang xử lý" ||
-    s === "đã xác nhận"
-  ) {
-    return "processing";
-  }
-  if (
-    s === "2" ||
-    s === "shipping" ||
-    s === "shipped" ||
-    s === "delivering" ||
-    s === "đang giao" ||
-    s === "đang giao hàng"
-  ) {
-    return "shipping";
-  }
-  if (
-    s === "3" ||
-    s === "completed" ||
-    s === "delivered" ||
-    s === "success" ||
-    s === "hoàn thành" ||
-    s === "đã giao"
-  ) {
-    return "completed";
-  }
-  if (
-    s === "4" ||
-    s === "cancelled" ||
-    s === "canceled" ||
-    s === "đã hủy" ||
-    s === "da huy"
-  ) {
-    return "cancelled";
-  }
-  return s || "pending";
-}
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeUser(raw) {
-  if (!raw || typeof raw !== "object") {
-    return { username: "", email: "", phone: "", address: "", image_path: null };
-  }
-  return {
-    ...raw,
-    username: raw.username || raw.name || "",
-    email: raw.email || "",
-    phone: raw.phone || "",
-    address: raw.address || "",
-    image_path: raw.image_path || raw.avatar || null,
-  };
-}
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 function resolveAssetUrl(path) {
   if (!path) return null;
@@ -119,290 +21,271 @@ function resolveAssetUrl(path) {
     return raw;
   }
   const clean = raw.replace(/^\/+/, "");
-  if (clean.startsWith("public/")) {
-    return `/storage/${clean.slice(7)}`;
-  }
-  if (
-    clean.startsWith("storage/") ||
-    clean.startsWith("images/") ||
-    clean.startsWith("img/") ||
-    clean.startsWith("uploads/") ||
-    clean.startsWith("assets/")
-  ) {
+  if (clean.startsWith("public/")) return `/storage/${clean.slice(7)}`;
+  if (clean.startsWith("storage/") || clean.startsWith("imgs/")) {
     return `/${clean}`;
   }
-  if (clean.includes("/")) {
-    return `/storage/${clean}`;
-  }
-  return `/${clean}`;
+  return `/storage/${clean}`;
 }
 
-function getAlternateAssetUrl(currentUrl) {
-  if (
-    !currentUrl ||
-    /^https?:\/\//i.test(currentUrl) ||
-    currentUrl.startsWith("data:")
-  ) {
-    return null;
-  }
-  if (currentUrl.startsWith("/storage/")) {
-    return `/${currentUrl.slice(9)}`;
-  }
-  if (currentUrl.startsWith("/")) {
-    return `/storage${currentUrl}`;
-  }
-  return null;
-}
-
-function formatDateTime(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function extractOrderItems(order) {
-  if (!order || typeof order !== "object") return [];
-  const list =
-    order.items ||
-    order.order_items ||
-    order.orderItems ||
-    order.order_details ||
-    order.orderDetails ||
-    order.details ||
-    order.products ||
-    order.lines ||
-    [];
-  return Array.isArray(list) ? list : [];
-}
-
-function extractItemProductInfo(item, productMap = {}) {
-  const nested =
-    (item && typeof item.product === "object" && item.product) ||
-    (item && typeof item.book === "object" && item.book) ||
-    (item && typeof item.item === "object" && item.item) ||
-    {};
-
-  const productId =
-    item?.product_id ||
-    item?.book_id ||
-    nested.id ||
-    (item?.pivot ? item.id : null);
-
-  const cached = productId ? productMap[String(productId)] || {} : {};
-  const merged = { ...cached, ...nested };
-
-  const rawName =
-    item?.product_name ||
-    item?.book_name ||
-    item?.book_title ||
-    item?.name ||
-    item?.title ||
-    merged.name ||
-    merged.title ||
-    merged.book_name ||
-    merged.ten_sach ||
-    merged.ten_san_pham ||
-    "";
-
-  const firstGalleryImg = Array.isArray(merged.images)
-    ? merged.images[0]?.url ||
-      merged.images[0]?.image_path ||
-      merged.images[0]?.path ||
-      (typeof merged.images[0] === "string" ? merged.images[0] : "")
-    : "";
-
-  const rawImage =
-    item?.image ||
-    item?.image_url ||
-    item?.image_path ||
-    item?.product_image ||
-    item?.thumbnail ||
-    merged.image ||
-    merged.image_path ||
-    merged.image_url ||
-    merged.thumbnail ||
-    merged.cover ||
-    merged.cover_image ||
-    merged.anh ||
-    firstGalleryImg ||
-    "";
-
-  const name = rawName
-    ? String(rawName).normalize("NFC").trim()
-    : productId
-    ? `Ấn phẩm sách #${productId}`
-    : "Ấn phẩm sách";
-
-  const imageUrl = resolveAssetUrl(rawImage);
-
-  return {
-    productId,
-    name,
-    hasResolvedName: Boolean(String(rawName).trim()),
-    imageUrl,
-    altImageUrl: getAlternateAssetUrl(imageUrl),
-    hasResolvedImage: Boolean(String(rawImage).trim()),
-  };
-}
-
-/**
- * Thêm từng sản phẩm của đơn cũ vào giỏ hàng để chuyển sang /checkout
- */
-async function addItemToCartApi(token, productId, quantity) {
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
-  const payload = {
-    product_id: Number(productId),
-    quantity: Math.max(1, Number(quantity || 1)),
-  };
-
-  try {
-    return await axios.post("/api/cart", payload, { headers });
-  } catch (err) {
-    if (err.response?.status === 404 || err.response?.status === 405) {
-      try {
-        return await axios.post("/api/cart/add", payload, { headers });
-      } catch (err2) {
-        if (err2.response?.status === 404 || err2.response?.status === 405) {
-          return await axios.post("/api/cart/items", payload, { headers });
-        }
-        throw err2;
-      }
-    }
-    throw err;
-  }
-}
-
-/**
- * Tính hạng thành viên dựa trên số đơn hoàn thành / tổng chi tiêu
- */
-function computeMemberTier(user, orders) {
-  const completedOrders = (Array.isArray(orders) ? orders : []).filter(
-    (o) => normalizeOrderStatus(o.status) === "completed"
-  );
-  const completedCount = completedOrders.length;
-  const totalSpent = completedOrders.reduce(
-    (sum, o) =>
-      sum + Number(o.total_amount ?? o.total_price ?? o.total ?? 0),
-    0
-  );
-
-  if (completedCount >= 7 || totalSpent >= 3000000) {
+function getMemberTier(totalSpent) {
+  if (totalSpent >= 5000000) {
     return {
-      name: "Tri Kỷ Thư Viện",
-      icon: "🏛️",
-      badgeClass: "bg-amber-50 border-amber-300 text-amber-900",
-      hint: `Đã hoàn thành ${completedCount} đơn ấn phẩm tại BookHouse`,
+      name: "Tri Kỷ Kim Cương",
+      icon: "💎",
+      badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
+      hint: "Bạn đang ở hạng thành viên cao nhất của BookHouse.",
       progressPercent: 100,
     };
   }
-
-  if (completedCount >= 3 || totalSpent >= 1000000) {
-    const pct = Math.min(95, Math.round((completedCount / 7) * 100));
+  if (totalSpent >= 1500000) {
+    const pct = Math.min(100, Math.round((totalSpent / 5000000) * 100));
     return {
-      name: "Mọt Sách",
-      icon: "📚",
-      badgeClass: "bg-[#F5EDE2] border-[#E5D5BE] text-[#9A5B13]",
-      hint: `Còn ${Math.max(1, 7 - completedCount)} đơn hoàn thành để lên Tri Kỷ Thư Viện`,
-      progressPercent: Math.max(45, pct),
+      name: "Độc Giả Vàng",
+      icon: "👑",
+      badgeClass: "bg-amber-50 border-amber-200 text-amber-800",
+      hint: `Mua thêm ${(5000000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để lên Tri Kỷ Kim Cương`,
+      progressPercent: pct,
     };
   }
-
-  if (completedCount >= 1 || totalSpent >= 300000) {
-    const pct = Math.min(90, Math.round((completedCount / 3) * 100));
+  if (totalSpent >= 300000) {
+    const pct = Math.min(100, Math.round((totalSpent / 1500000) * 100));
     return {
       name: "Người Đọc",
       icon: "📖",
-      badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
-      hint: `Còn ${Math.max(1, 3 - completedCount)} đơn hoàn thành để lên hạng Mọt Sách`,
-      progressPercent: Math.max(35, pct),
+      badgeClass: "bg-stone-100 border-stone-300 text-stone-800",
+      hint: `Mua thêm ${(1500000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để lên Độc Giả Vàng`,
+      progressPercent: pct,
     };
   }
-
+  const pct = Math.max(15, Math.min(100, Math.round((totalSpent / 300000) * 100)));
   return {
     name: "Mầm Sách",
     icon: "🌱",
     badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    hint: "Hoàn thành 1 đơn hàng để thăng hạng Người Đọc",
-    progressPercent: 15,
+    hint: `Mua thêm ${(300000 - totalSpent).toLocaleString(
+      "vi-VN"
+    )}đ để lên Người Đọc`,
+    progressPercent: pct,
   };
 }
 
-/**
- * SMART COMPONENT: Quản lý dữ liệu tài khoản, địa chỉ, đổi mật khẩu, đơn hàng & Mua lại
- */
-export default function Account({
-  user: propUser = null,
-  orders: propOrders = null,
-}) {
-  const initialUser = useMemo(
-    () => normalizeUser(propUser || getStoredUser()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-  const initialAddr = useMemo(
-    () => parseAddressParts(initialUser.address),
-    [initialUser.address]
-  );
+function normalizeOrder(raw) {
+  const rawStatus = String(raw.status || "pending").toLowerCase();
+  const deliveredAtStr =
+    raw.delivered_at ||
+    (rawStatus === "delivered" ? raw.updated_at : null) ||
+    raw.completed_at;
+  const deliveredMs = deliveredAtStr ? new Date(deliveredAtStr).getTime() : null;
+  const elapsedMs = deliveredMs ? Date.now() - deliveredMs : 0;
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const tab = new URLSearchParams(window.location.search).get("tab");
-    return ACCOUNT_TABS.some((t) => t.id === tab) ? tab : "profile";
+  const isAutoCompleted =
+    rawStatus === "delivered" && deliveredMs && elapsedMs >= THREE_DAYS_MS;
+
+  let statusKey = rawStatus;
+  if (rawStatus === "delivered") {
+    statusKey = "completed";
+  }
+
+  const isCompleted = statusKey === "completed";
+  const isDeliveredWaiting = rawStatus === "delivered" && !isAutoCompleted;
+
+  const canReturn =
+    (rawStatus === "delivered" || rawStatus === "completed") &&
+    deliveredMs &&
+    elapsedMs < THREE_DAYS_MS;
+
+  const returnExpired =
+    (rawStatus === "delivered" || rawStatus === "completed") &&
+    deliveredMs &&
+    elapsedMs >= THREE_DAYS_MS;
+
+  let returnRemainingText = "";
+  if (canReturn) {
+    const remainMs = Math.max(0, THREE_DAYS_MS - elapsedMs);
+    const remainDays = Math.floor(remainMs / (24 * 60 * 60 * 1000));
+    const remainHours = Math.floor(
+      (remainMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000)
+    );
+    returnRemainingText =
+      remainDays > 0
+        ? `Còn ${remainDays} ngày ${remainHours} giờ`
+        : `Còn ${Math.max(1, remainHours)} giờ`;
+  }
+
+  const STATUS_UI = {
+    pending: {
+      label: "Chờ xác nhận",
+      badge: "bg-amber-50 text-amber-800 border-amber-200",
+    },
+    processing: {
+      label: "Đang xử lý",
+      badge: "bg-indigo-50 text-indigo-800 border-indigo-200",
+    },
+    shipping: {
+      label: "Đang giao",
+      badge: "bg-sky-50 text-sky-800 border-sky-200",
+    },
+    delivered: {
+      label: "Đã giao (Trong 3 ngày hỗ trợ đổi/hoàn)",
+      badge: "bg-teal-50 text-teal-800 border-teal-300",
+    },
+    completed: {
+      label: "Hoàn thành",
+      badge: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    },
+    return_requested: {
+      label: "Yêu cầu hoàn đơn",
+      badge: "bg-orange-50 text-orange-800 border-orange-300",
+    },
+    returned: {
+      label: "Đã hoàn đơn",
+      badge: "bg-purple-50 text-purple-800 border-purple-200",
+    },
+    cancelled: {
+      label: "Đã hủy",
+      badge: "bg-red-50 text-red-700 border-red-200",
+    },
+  };
+
+  const uiMeta = isDeliveredWaiting
+    ? STATUS_UI.delivered
+    : STATUS_UI[statusKey] || STATUS_UI.pending;
+
+  const rawItems = raw.items || raw.order_items || raw.orderDetails || [];
+  const items = (Array.isArray(rawItems) ? rawItems : []).map((it, idx) => {
+    const p = it.product || {};
+    const qty = Number(it.quantity || 1);
+    const unitPrice = Number(it.price ?? p.price ?? 0);
+    return {
+      key: it.id || `${raw.id}-${idx}`,
+      productId: it.product_id || p.id,
+      name: it.product_name || p.name || `Ấn phẩm #${it.product_id || idx + 1}`,
+      imageUrl: resolveAssetUrl(p.image_path || p.image || it.image),
+      altImageUrl: resolveAssetUrl(p.thumbnail),
+      quantity: qty,
+      unitPrice,
+      lineTotal: qty * unitPrice,
+      existingReview: it.review || null,
+      raw: it,
+    };
   });
 
-  const [user, setUser] = useState(initialUser);
-  const [profileForm, setProfileForm] = useState({
-    username: initialUser.username,
-    phone: initialUser.phone,
-  });
+  const returnImages = Array.isArray(raw.return_images)
+    ? raw.return_images.map(resolveAssetUrl).filter(Boolean)
+    : [];
+
+  return {
+    id: raw.id,
+    code: raw.order_code || `#MS${raw.id}`,
+    rawStatus,
+    statusKey,
+    statusLabel: uiMeta.label,
+    statusBadge: uiMeta.badge,
+    isCompleted,
+    isReturnRequested: statusKey === "return_requested",
+    isReturned: statusKey === "returned",
+    canCancel: rawStatus === "pending",
+    canReturn,
+    returnExpired,
+    returnRemainingText,
+    canReorder: ["completed", "cancelled", "returned"].includes(statusKey),
+    createdAtLabel: raw.created_at
+      ? new Date(raw.created_at).toLocaleString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "",
+    completedAtLabel:
+      raw.completed_at || isAutoCompleted
+        ? new Date(
+            raw.completed_at || deliveredMs + THREE_DAYS_MS
+          ).toLocaleDateString("vi-VN")
+        : "",
+    totalAmount: Number(raw.total_amount || 0),
+    discountAmount: Number(raw.discount_amount || 0),
+    receiverName: raw.receiver_name || raw.shipping_name || "Độc giả",
+    receiverPhone: raw.phone || raw.shipping_phone || "",
+    shippingAddress: raw.shipping_address || raw.address || "—",
+    shippingProvider: raw.shipping_provider || "",
+    trackingCode: raw.tracking_code || "",
+    paymentLabel:
+      raw.payment_method === "banking"
+        ? "Chuyển khoản ngân hàng"
+        : raw.payment_method === "momo"
+        ? "Ví MoMo"
+        : raw.payment_method === "vnpay"
+        ? "VNPay"
+        : "Thanh toán khi nhận hàng (COD)",
+    note: raw.note || "",
+    returnType: raw.return_type || "refund",
+    returnReason: raw.return_reason || "",
+    returnRequestedAtLabel: raw.return_requested_at
+      ? new Date(raw.return_requested_at).toLocaleString("vi-VN")
+      : "",
+    returnImages,
+    adminReturnNote: raw.admin_return_note || "",
+    items,
+    raw,
+  };
+}
+
+export default function Account() {
+  const fileInputRef = useRef(null);
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get("tab") || "profile";
+
+  const [user, setUser] = useState({});
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState({ type: "", text: "" });
+
+  // Profile & Address
+  const [profileForm, setProfileForm] = useState({ username: "", phone: "" });
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [provinceCode, setProvinceCode] = useState("79");
+  const [districtCode, setDistrictCode] = useState("");
+  const [wardName, setWardName] = useState("");
+  const [streetAddress, setStreetAddress] = useState("");
+
+  // Password
   const [passwordForm, setPasswordForm] = useState({
     old_password: "",
     new_password: "",
     new_password_confirmation: "",
   });
 
-  // Địa chỉ nhận hàng mặc định
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [provinceCode, setProvinceCode] = useState(initialAddr.provinceCode);
-  const [districtCode, setDistrictCode] = useState(initialAddr.districtCode);
-  const [wardName, setWardName] = useState(initialAddr.wardName);
-  const [streetAddress, setStreetAddress] = useState(initialAddr.street);
-
-  // Đơn hàng & cache sản phẩm
-  const [orders, setOrders] = useState(
-    Array.isArray(propOrders) ? propOrders : []
-  );
-  const [productMap, setProductMap] = useState({});
+  // Orders
+  const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [expandedOrderId, setExpandedOrderId] = useState(null);
-  const [detailLoadingId, setDetailLoadingId] = useState(null);
+  const [detailLoadingId] = useState(null);
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [reorderingOrderId, setReorderingOrderId] = useState(null);
 
-  // Modal xác nhận chung (Lưu hồ sơ / Đổi mật khẩu / Hủy đơn)
-  const [confirmState, setConfirmState] = useState({
-    open: false,
-    type: null,
-    title: "",
-    message: "",
-    detailText: "",
-    confirmText: "Xác nhận",
-    variant: "warning",
-    payload: null,
-  });
+  // Modal Form Hoàn đơn / Đổi trả (trong vòng 3 ngày)
+  const [returnModalOrder, setReturnModalOrder] = useState(null);
+  const [returnType, setReturnType] = useState("refund");
+  const [exchangeSelections, setExchangeSelections] = useState({});
+  const [returnReason, setReturnReason] = useState("");
+  const [returnFiles, setReturnFiles] = useState([]);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnError, setReturnError] = useState("");
 
-  // Modal Đánh giá sản phẩm
+  // Confirm Modal hủy đơn
+  const [cancelConfirmOrder, setCancelConfirmOrder] = useState(null);
+
+  // Review Modal
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
@@ -410,958 +293,729 @@ export default function Account({
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewError, setReviewError] = useState("");
 
-  const [loading, setLoading] = useState(!propUser && !getStoredUser());
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState({ type: "", text: "" });
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
-  const fileInputRef = useRef(null);
-  const isProfileDirtyRef = useRef(false);
-  const isAddressDirtyRef = useRef(false);
-  const savedAddressRef = useRef(initialUser.address || "");
-  const syncedPropUserSigRef = useRef("");
-  const hydratedOrderIdsRef = useRef(new Set());
-  const fetchedProductIdsRef = useRef(new Set());
-  const propUserRef = useRef(propUser);
-  const propOrdersRef = useRef(propOrders);
-  propUserRef.current = propUser;
-  propOrdersRef.current = propOrders;
-
-  const applyUserToState = useCallback(
-    (rawUser, { forceReset = false, emitEvent = true } = {}) => {
-      const normalized = normalizeUser(rawUser);
-      savedAddressRef.current = normalized.address || "";
-      setUser(normalized);
-
-      if (forceReset || !isProfileDirtyRef.current) {
-        setProfileForm({
-          username: normalized.username,
-          phone: normalized.phone,
-        });
-      }
-
-      if (forceReset || !isAddressDirtyRef.current) {
-        const parsedAddr = parseAddressParts(normalized.address);
-        setProvinceCode(parsedAddr.provinceCode);
-        setDistrictCode(parsedAddr.districtCode);
-        setWardName(parsedAddr.wardName);
-        setStreetAddress(parsedAddr.street);
-      }
-
-      localStorage.setItem("user", JSON.stringify(normalized));
-      if (emitEvent) {
-        window.dispatchEvent(
-          new CustomEvent("user-updated", { detail: normalized })
-        );
-      }
-    },
-    []
-  );
-
-  const handleDatasetLoaded = useCallback((fullProvinces) => {
-    if (isAddressDirtyRef.current || !savedAddressRef.current) return;
-    const parsed = parseAddressParts(savedAddressRef.current, fullProvinces);
-    setProvinceCode(parsed.provinceCode);
-    setDistrictCode(parsed.districtCode);
-    setWardName(parsed.wardName);
-    setStreetAddress(parsed.street);
-  }, []);
-
-  const handleStartEditAddress = () => {
-    const parsed = parseAddressParts(user.address);
-    setProvinceCode(parsed.provinceCode);
-    setDistrictCode(parsed.districtCode);
-    setWardName(parsed.wardName);
-    setStreetAddress(parsed.street);
-    isAddressDirtyRef.current = false;
-    setIsEditingAddress(true);
-    setMsg({ type: "", text: "" });
-  };
-
-  const handleCancelEditAddress = () => {
-    const parsed = parseAddressParts(user.address);
-    setProvinceCode(parsed.provinceCode);
-    setDistrictCode(parsed.districtCode);
-    setWardName(parsed.wardName);
-    setStreetAddress(parsed.street);
-    isAddressDirtyRef.current = false;
-    setIsEditingAddress(false);
-    setMsg({ type: "", text: "" });
-  };
-
-  const hydrateMissingProducts = useCallback(async (orderList, token) => {
-    const missingIds = new Set();
-    for (const order of orderList) {
-      for (const item of extractOrderItems(order)) {
-        const info = extractItemProductInfo(item);
-        if (
-          info.productId &&
-          (!info.hasResolvedName || !info.hasResolvedImage) &&
-          !fetchedProductIdsRef.current.has(String(info.productId))
-        ) {
-          missingIds.add(String(info.productId));
-        }
-      }
-    }
-
-    if (missingIds.size === 0) return;
-
-    const idsToFetch = Array.from(missingIds);
-    idsToFetch.forEach((id) => fetchedProductIdsRef.current.add(id));
-
-    const headers = token
-      ? { Authorization: `Bearer ${token}`, Accept: "application/json" }
-      : { Accept: "application/json" };
-
-    const results = await Promise.allSettled(
-      idsToFetch.map(async (pid) => {
-        try {
-          const res = await axios.get(`/api/products/${pid}`, { headers });
-          return [pid, res.data?.product || res.data?.data || res.data];
-        } catch {
-          const res = await axios.get(`/api/books/${pid}`, { headers });
-          return [
-            pid,
-            res.data?.book || res.data?.product || res.data?.data || res.data,
-          ];
-        }
-      })
-    );
-
-    const updates = {};
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value?.[1]) {
-        updates[r.value[0]] = r.value[1];
-      }
-    }
-
-    if (Object.keys(updates).length > 0) {
-      setProductMap((prev) => ({ ...prev, ...updates }));
-    }
-  }, []);
-
-  const hydrateOrderDetails = useCallback(
-    async (orderList, token) => {
-      if (!token || !Array.isArray(orderList) || orderList.length === 0) return;
-
-      const ordersNeedingItems = orderList.filter(
-        (ord) =>
-          ord?.id &&
-          extractOrderItems(ord).length === 0 &&
-          !hydratedOrderIdsRef.current.has(ord.id)
-      );
-
-      if (ordersNeedingItems.length === 0) {
-        await hydrateMissingProducts(orderList, token);
-        return;
-      }
-
-      ordersNeedingItems.forEach((ord) => hydratedOrderIdsRef.current.add(ord.id));
-
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      };
-
-      const detailedMap = {};
-      await Promise.allSettled(
-        ordersNeedingItems.map(async (ord) => {
-          const res = await axios.get(`/api/orders/${ord.id}`, { headers });
-          const detail = res.data?.order || res.data?.data || res.data;
-          if (detail && typeof detail === "object") {
-            detailedMap[ord.id] = detail;
-          }
-        })
-      );
-
-      let mergedList = orderList;
-      if (Object.keys(detailedMap).length > 0) {
-        mergedList = orderList.map((ord) =>
-          detailedMap[ord.id] ? { ...ord, ...detailedMap[ord.id] } : ord
-        );
-        setOrders(mergedList);
-      }
-
-      await hydrateMissingProducts(mergedList, token);
-    },
-    [hydrateMissingProducts]
-  );
-
-  const fetchUserOrders = useCallback(
-    async (signal, { forceRehydrate = false } = {}) => {
-      const token = localStorage.getItem("token");
-      if (!token) return;
-
-      if (forceRehydrate) {
-        hydratedOrderIdsRef.current.clear();
-      }
-
-      setOrdersLoading(true);
-      setOrdersError("");
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      };
-
-      try {
-        let res;
-        try {
-          res = await axios.get("/api/orders", { headers, signal });
-        } catch (err) {
-          if (err.response?.status === 404) {
-            res = await axios.get("/api/user/orders", { headers, signal });
-          } else {
-            throw err;
-          }
-        }
-
-        const raw = res.data?.orders ?? res.data?.data ?? res.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : [];
-        setOrders(list);
-        hydrateOrderDetails(list, token);
-      } catch (err) {
-        if (axios.isCancel(err)) return;
-        if (err.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          setShowLoginModal(true);
-        } else {
-          setOrdersError(
-            err.response?.data?.message || "Không thể tải danh sách đơn hàng."
-          );
-        }
-      } finally {
-        setOrdersLoading(false);
-      }
-    },
-    [hydrateOrderDetails]
-  );
-
-  useEffect(() => {
-    const onUserUpdated = (e) => {
-      const nextUser = e.detail || getStoredUser();
-      const token = localStorage.getItem("token");
-      if (token && nextUser) {
-        setShowLoginModal(false);
-        applyUserToState(nextUser, { forceReset: false, emitEvent: false });
-        if (orders.length === 0) {
-          fetchUserOrders();
-        }
-      }
-    };
-    window.addEventListener("user-updated", onUserUpdated);
-    return () => window.removeEventListener("user-updated", onUserUpdated);
-  }, [applyUserToState, fetchUserOrders, orders.length]);
-
-  useEffect(() => {
-    if (!propUser) return;
-    const sig = JSON.stringify({
-      id: propUser.id,
-      username: propUser.username || propUser.name,
-      phone: propUser.phone,
-      address: propUser.address,
-      image_path: propUser.image_path || propUser.avatar,
-    });
-    if (syncedPropUserSigRef.current === sig) return;
-    syncedPropUserSigRef.current = sig;
-
-    applyUserToState(propUser, { forceReset: false });
-    setLoading(false);
-  }, [propUser, applyUserToState]);
-
-  useEffect(() => {
+  const getHeaders = () => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      if (!propUserRef.current) setShowLoginModal(true);
-      return;
-    }
-
-    const controller = new AbortController();
-
-    if (!propUserRef.current) {
-      axios
-        .get("/api/profile", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-          signal: controller.signal,
-        })
-        .then((res) => {
-          const rawUser = res.data?.user || res.data?.data || res.data;
-          applyUserToState(rawUser, { forceReset: false });
-          if (Array.isArray(res.data?.orders) && res.data.orders.length > 0) {
-            setOrders(res.data.orders);
-            hydrateOrderDetails(res.data.orders, token);
-          }
-        })
-        .catch((err) => {
-          if (axios.isCancel(err)) return;
-          if (err.response?.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            setShowLoginModal(true);
-          } else {
-            setMsg({
-              type: "error",
-              text:
-                err.response?.data?.message ||
-                "Không thể kết nối đến máy chủ API.",
-            });
-          }
-        })
-        .finally(() => setLoading(false));
-    }
-
-    if (
-      !Array.isArray(propOrdersRef.current) ||
-      propOrdersRef.current.length === 0
-    ) {
-      fetchUserOrders(controller.signal);
-    } else {
-      hydrateOrderDetails(propOrdersRef.current, token);
-    }
-
-    return () => controller.abort();
-  }, [applyUserToState, fetchUserOrders, hydrateOrderDetails]);
-
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const token = localStorage.getItem("token");
-    if (!token) return setShowLoginModal(true);
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    try {
-      setSaving(true);
-      setMsg({ type: "", text: "" });
-      const res = await axios.post("/api/profile/avatar", formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      const nextPath =
-        res.data?.image_path || res.data?.data?.image_path || user.image_path;
-      const nextUser = { ...user, image_path: nextPath };
-      setUser(nextUser);
-      localStorage.setItem("user", JSON.stringify(nextUser));
-      window.dispatchEvent(
-        new CustomEvent("user-updated", { detail: nextUser })
-      );
-
-      setMsg({
-        type: "success",
-        text: res.data?.message || "Cập nhật ảnh đại diện thành công!",
-      });
-    } catch (err) {
-      setMsg({
-        type: "error",
-        text:
-          err.response?.data?.message ||
-          "Lỗi tải ảnh đại diện. Vui lòng thử lại.",
-      });
-    } finally {
-      setSaving(false);
-      e.target.value = "";
-    }
-  };
-
-  const fullAddress = useMemo(
-    () =>
-      formatVietnamAddress({
-        provinceCode,
-        districtCode,
-        wardName,
-        streetAddress,
-      }),
-    [provinceCode, districtCode, wardName, streetAddress]
-  );
-
-  const handleRequestSaveProfile = (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("token");
-    if (!token) return setShowLoginModal(true);
-
-    if (!profileForm.username.trim()) {
-      setMsg({ type: "error", text: "Vui lòng nhập họ và tên." });
-      return;
-    }
-
-    let nextAddress = user.address || "";
-    if (isEditingAddress) {
-      if (!provinceCode || !streetAddress.trim()) {
-        setMsg({
-          type: "error",
-          text: "Vui lòng chọn Tỉnh/Thành phố và nhập Địa chỉ cụ thể (số nhà, tên đường).",
-        });
-        return;
-      }
-      nextAddress = fullAddress;
-    }
-
-    setMsg({ type: "", text: "" });
-    const payload = {
-      username: profileForm.username.trim(),
-      name: profileForm.username.trim(),
-      phone: profileForm.phone.trim(),
-      address: nextAddress,
-    };
-
-    setConfirmState({
-      open: true,
-      type: "profile",
-      title: "Xác nhận lưu thông tin cá nhân",
-      message:
-        "Bạn có chắc chắn muốn cập nhật thông tin hồ sơ và địa chỉ nhận hàng mặc định không?",
-      detailText: `${payload.username}${
-        payload.phone ? ` • ${payload.phone}` : ""
-      }${payload.address ? ` — ${payload.address}` : ""}`,
-      confirmText: "Lưu thay đổi",
-      variant: "warning",
-      payload,
-    });
-  };
-
-  const handleRequestChangePassword = (e) => {
-    e.preventDefault();
-    const token = localStorage.getItem("token");
-    if (!token) return setShowLoginModal(true);
-
-    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
-      setMsg({ type: "error", text: "Mật khẩu xác nhận không khớp!" });
-      return;
-    }
-
-    setMsg({ type: "", text: "" });
-    setConfirmState({
-      open: true,
-      type: "password",
-      title: "Xác nhận cập nhật mật khẩu",
-      message:
-        "Bạn có chắc chắn muốn thay đổi sang mật khẩu mới cho tài khoản này không?",
-      detailText: `Tài khoản: ${user.email}`,
-      confirmText: "Cập nhật mật khẩu",
-      variant: "warning",
-      payload: { ...passwordForm },
-    });
-  };
-
-  const handleRequestCancelOrder = (order) => {
-    const orderCode = order.order_code || order.code || `#MS${order.id}`;
-    setConfirmState({
-      open: true,
-      type: "cancel_order",
-      title: "Xác nhận hủy đơn hàng",
-      message: "Bạn có chắc chắn muốn hủy đơn hàng này không?",
-      detailText: `Đơn hàng ${orderCode}`,
-      confirmText: "Xác nhận hủy đơn",
-      variant: "danger",
-      payload: order.id,
-    });
-  };
-
-  const handleExecuteConfirmedAction = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setConfirmState((prev) => ({ ...prev, open: false }));
-      return setShowLoginModal(true);
-    }
-
-    const headers = {
+    return {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     };
-
-    if (confirmState.type === "profile") {
-      const payload = confirmState.payload;
-      setSaving(true);
-      setMsg({ type: "", text: "" });
-      try {
-        const res = await axios.put("/api/profile", payload, { headers });
-        isProfileDirtyRef.current = false;
-        isAddressDirtyRef.current = false;
-        setIsEditingAddress(false);
-        applyUserToState({ ...user, ...payload }, { forceReset: true });
-        setMsg({
-          type: "success",
-          text: res.data?.message || "Cập nhật hồ sơ thành công!",
-        });
-      } catch (err) {
-        const firstErr = err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat()[0]
-          : null;
-        setMsg({
-          type: "error",
-          text:
-            firstErr || err.response?.data?.message || "Có lỗi xảy ra khi lưu!",
-        });
-      } finally {
-        setSaving(false);
-        setConfirmState((prev) => ({ ...prev, open: false }));
-      }
-      return;
-    }
-
-    if (confirmState.type === "password") {
-      const payload = confirmState.payload;
-      setSaving(true);
-      setMsg({ type: "", text: "" });
-      try {
-        const res = await axios.put("/api/profile/change-password", payload, {
-          headers,
-        });
-        setMsg({
-          type: "success",
-          text: res.data?.message || "Đổi mật khẩu thành công!",
-        });
-        setPasswordForm({
-          old_password: "",
-          new_password: "",
-          new_password_confirmation: "",
-        });
-      } catch (err) {
-        const firstErr = err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat()[0]
-          : null;
-        setMsg({
-          type: "error",
-          text:
-            firstErr ||
-            err.response?.data?.message ||
-            "Mật khẩu hiện tại không đúng!",
-        });
-      } finally {
-        setSaving(false);
-        setConfirmState((prev) => ({ ...prev, open: false }));
-      }
-      return;
-    }
-
-    if (confirmState.type === "cancel_order") {
-      const orderId = confirmState.payload;
-      setCancellingOrderId(orderId);
-      setMsg({ type: "", text: "" });
-      try {
-        let res;
-        try {
-          res = await axios.post(`/api/orders/${orderId}/cancel`, {}, { headers });
-        } catch (err) {
-          if (err.response?.status === 404 || err.response?.status === 405) {
-            res = await axios.put(
-              `/api/orders/${orderId}/cancel`,
-              {},
-              { headers }
-            );
-          } else {
-            throw err;
-          }
-        }
-
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId ? { ...o, status: "cancelled" } : o
-          )
-        );
-        setMsg({
-          type: "success",
-          text: res?.data?.message || "Đã hủy đơn hàng thành công!",
-        });
-      } catch (err) {
-        setMsg({
-          type: "error",
-          text:
-            err.response?.data?.message ||
-            "Không thể hủy đơn hàng này. Vui lòng thử lại.",
-        });
-      } finally {
-        setCancellingOrderId(null);
-        setConfirmState((prev) => ({ ...prev, open: false }));
-      }
-    }
   };
 
-  /**
-   * Mua lại đơn hàng đã hoàn thành hoặc đã hủy:
-   * Thêm lại đúng các sản phẩm & số lượng của đơn đó vào giỏ hàng rồi chuyển sang /checkout
-   */
-  const handleReorderOrder = async (normalizedOrder) => {
-    const token = localStorage.getItem("token");
-    if (!token) return setShowLoginModal(true);
-
-    setReorderingOrderId(normalizedOrder.id);
-    setMsg({ type: "", text: "" });
-
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    setOrdersError("");
     try {
-      let itemsToReorder = Array.isArray(normalizedOrder.items)
-        ? normalizedOrder.items
-        : [];
-
-      // Nếu danh sách sản phẩm chưa được tải sẵn trong đơn, gọi API chi tiết đơn để lấy
-      if (itemsToReorder.length === 0) {
-        const detailRes = await axios.get(`/api/orders/${normalizedOrder.id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-        const detail =
-          detailRes.data?.order || detailRes.data?.data || detailRes.data;
-        const rawItems = extractOrderItems(detail);
-        itemsToReorder = rawItems.map((item) => {
-          const info = extractItemProductInfo(item, productMap);
-          return {
-            productId: info.productId,
-            name: info.name,
-            quantity: Number(
-              item.quantity ?? item.qty ?? item.pivot?.quantity ?? 1
-            ),
-          };
-        });
-      }
-
-      const validItems = itemsToReorder.filter(
-        (it) => it.productId && Number(it.quantity) > 0
+      const res = await axios.get("/api/orders", { headers: getHeaders() });
+      const rawList = res.data?.data ?? res.data?.orders ?? res.data ?? [];
+      const normalized = (Array.isArray(rawList) ? rawList : []).map(
+        normalizeOrder
       );
-
-      if (validItems.length === 0) {
-        setMsg({
-          type: "error",
-          text: "Không tìm thấy thông tin ấn phẩm hợp lệ trong đơn hàng này để mua lại.",
-        });
-        setReorderingOrderId(null);
-        return;
-      }
-
-      let addedCount = 0;
-      let lastErrorMessage = "";
-
-      for (const item of validItems) {
-        try {
-          await addItemToCartApi(token, item.productId, item.quantity);
-          addedCount += 1;
-        } catch (err) {
-          lastErrorMessage =
-            err.response?.data?.message ||
-            `Không thể thêm "${item.name}" vào giỏ hàng.`;
-        }
-      }
-
-      if (addedCount === 0) {
-        setMsg({
-          type: "error",
-          text:
-            lastErrorMessage ||
-            "Các ấn phẩm trong đơn hàng này hiện đã hết hàng hoặc ngừng kinh doanh.",
-        });
-        setReorderingOrderId(null);
-        return;
-      }
-
-      window.dispatchEvent(new Event("cart-updated"));
-      window.location.href = "/checkout";
+      setOrders(normalized);
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setShowLoginModal(true);
-      } else {
-        setMsg({
-          type: "error",
-          text:
-            err.response?.data?.message ||
-            "Không thể thực hiện mua lại đơn hàng. Vui lòng thử lại.",
-        });
-      }
-      setReorderingOrderId(null);
-    }
-  };
-
-  const handleToggleOrderDetail = async (order) => {
-    if (expandedOrderId === order.id) {
-      setExpandedOrderId(null);
-      return;
-    }
-
-    setExpandedOrderId(order.id);
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    setDetailLoadingId(order.id);
-    try {
-      const res = await axios.get(`/api/orders/${order.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
-      const detail = res.data?.order || res.data?.data || res.data;
-      if (detail && typeof detail === "object") {
-        const mergedOrder = { ...order, ...detail };
-        setOrders((prev) =>
-          prev.map((item) => (item.id === order.id ? mergedOrder : item))
-        );
-        hydrateMissingProducts([mergedOrder], token);
-      }
-    } catch {
-      // Giữ nguyên dữ liệu hiện có nếu API chi tiết lỗi
+      setOrdersError(
+        err.response?.data?.message || "Không thể tải danh sách đơn hàng."
+      );
     } finally {
-      setDetailLoadingId(null);
+      setOrdersLoading(false);
     }
   };
 
-  const openReviewModal = (orderCode, item) => {
-    const info = extractItemProductInfo(item, productMap);
-    setReviewTarget({
-      orderCode,
-      productId: info.productId,
-      productName: info.name,
-      productImage: info.imageUrl,
-      productAltImage: info.altImageUrl,
-    });
-    setReviewRating(5);
-    setHoverRating(0);
-    setReviewComment("");
-    setReviewError("");
-  };
-
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
-    if (!reviewTarget?.productId) return;
-
+  useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      setReviewTarget(null);
-      return setShowLoginModal(true);
+      window.location.href = "/login";
+      return;
     }
 
-    setReviewSubmitting(true);
-    setReviewError("");
+    const loadAll = async () => {
+      setLoading(true);
+      try {
+        const profileRes = await axios.get("/api/profile", {
+          headers: getHeaders(),
+        });
+        const u =
+          profileRes.data?.user || profileRes.data?.data || profileRes.data || {};
+        setUser(u);
+        setProfileForm({
+          username: u.username || u.name || "",
+          phone: u.phone || "",
+        });
+        if (u.address) {
+          const parsed = parseAddressParts(u.address);
+          setProvinceCode(parsed.provinceCode);
+          setDistrictCode(parsed.districtCode);
+          setWardName(parsed.wardName);
+          setStreetAddress(parsed.street);
+        }
+      } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.location.href = "/login";
+          return;
+        }
+      } finally {
+        setLoading(false);
+      }
 
-    try {
-      const res = await axios.post(
-        "/api/reviews",
-        {
-          product_id: reviewTarget.productId,
-          rating: reviewRating,
-          comment: reviewComment.trim() || null,
+      await fetchOrders();
+    };
+
+    loadAll();
+  }, []);
+
+  const totalSpent = useMemo(
+    () =>
+      orders
+        .filter((o) => o.isCompleted)
+        .reduce((sum, o) => sum + o.totalAmount, 0),
+    [orders]
+  );
+
+  const memberTier = useMemo(() => getMemberTier(totalSpent), [totalSpent]);
+
+  const orderCounts = useMemo(() => {
+    const counts = {
+      all: orders.length,
+      pending: 0,
+      processing: 0,
+      shipping: 0,
+      completed: 0,
+      return_requested: 0,
+      returned: 0,
+      cancelled: 0,
+    };
+    orders.forEach((o) => {
+      if (Object.prototype.hasOwnProperty.call(counts, o.statusKey)) {
+        counts[o.statusKey] += 1;
+      }
+    });
+    return counts;
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    if (orderStatusFilter === "all") return orders;
+    return orders.filter((o) => o.statusKey === orderStatusFilter);
+  }, [orders, orderStatusFilter]);
+
+  // Mở Modal Form Hoàn đơn / Đổi trả
+  const handleOpenReturnModal = (order) => {
+    const orderItems = Array.isArray(order?.items) ? order.items : [];
+    const initialSelections = {};
+    orderItems.forEach((it, idx) => {
+      const itemKey = String(it.key || it.productId || idx);
+      // Nếu đơn chỉ có 1 đầu sách thì tự tích chọn sẵn 1 cuốn cho khách tiện thao tác
+      initialSelections[itemKey] = {
+        selected: orderItems.length === 1,
+        quantity: 1,
+      };
+    });
+
+    setReturnModalOrder(order);
+    setReturnType("refund");
+    setExchangeSelections(initialSelections);
+    setReturnReason("");
+    setReturnFiles([]);
+    setReturnError("");
+  };
+
+  // Bật/tắt chọn từng cuốn sách trong hóa đơn khi đổi sách mới
+  const handleToggleExchangeItem = (itemKey) => {
+    setExchangeSelections((prev) => {
+      const current = prev[itemKey] || { selected: false, quantity: 1 };
+      return {
+        ...prev,
+        [itemKey]: {
+          ...current,
+          selected: !current.selected,
+          quantity: Math.max(1, Number(current.quantity || 1)),
         },
+      };
+    });
+  };
+
+  // Tăng/giảm số lượng cuốn sách muốn đổi (từ 1 đến tối đa số lượng đã mua)
+  const handleChangeExchangeQty = (itemKey, nextQty, maxQty) => {
+    const safeQty = Math.min(Math.max(1, Number(nextQty || 1)), Math.max(1, maxQty));
+    setExchangeSelections((prev) => ({
+      ...prev,
+      [itemKey]: {
+        selected: true,
+        quantity: safeQty,
+      },
+    }));
+  };
+
+  // Gửi Form Hoàn đơn / Đổi trả
+  const handleSubmitReturnForm = async (e) => {
+    e.preventDefault();
+    if (!returnModalOrder) return;
+
+    const orderItems = Array.isArray(returnModalOrder.items)
+      ? returnModalOrder.items
+      : [];
+
+    let selectedExchangeBooks = [];
+    if (returnType === "exchange") {
+      selectedExchangeBooks = orderItems
+        .map((it, idx) => {
+          const itemKey = String(it.key || it.productId || idx);
+          const sel = exchangeSelections[itemKey];
+          if (!sel?.selected) return null;
+          return {
+            productId: it.productId,
+            name: it.name,
+            quantity: Math.min(
+              Math.max(1, Number(sel.quantity || 1)),
+              Math.max(1, Number(it.quantity || 1))
+            ),
+            purchasedQuantity: Number(it.quantity || 1),
+          };
+        })
+        .filter(Boolean);
+
+      if (selectedExchangeBooks.length === 0) {
+        setReturnError(
+          "Vui lòng tích chọn ít nhất 1 cuốn sách trong hóa đơn mà bạn muốn đổi mới."
+        );
+        return;
+      }
+    }
+
+    if (returnReason.trim().length < 10) {
+      setReturnError(
+        "Vui lòng nhập lý do hoàn đơn / tình trạng sách tối thiểu 10 ký tự."
+      );
+      return;
+    }
+
+    // Ghép danh sách sách cần đổi vào đầu nội dung lý do để Admin hiển thị rõ ràng
+    const finalReason =
+      returnType === "exchange" && selectedExchangeBooks.length > 0
+        ? `[Sách yêu cầu đổi mới: ${selectedExchangeBooks
+            .map((b) => `${b.name} (x${b.quantity})`)
+            .join(", ")}] — ${returnReason.trim()}`
+        : returnReason.trim();
+
+    setReturnSubmitting(true);
+    setReturnError("");
+    try {
+      const formData = new FormData();
+      formData.append("return_type", returnType);
+      formData.append("return_reason", finalReason);
+      returnFiles.forEach((file) => {
+        formData.append("images[]", file);
+      });
+
+      const res = await axios.post(
+        `/api/orders/${returnModalOrder.id}/return`,
+        formData,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
+            ...getHeaders(),
+            "Content-Type": "multipart/form-data",
           },
         }
-      );
-
-      const savedReview = res.data?.review || {
-        rating: reviewRating,
-        comment: reviewComment.trim(),
-      };
-
-      setOrders((prevOrders) =>
-        prevOrders.map((ord) => {
-          const items = extractOrderItems(ord);
-          if (items.length === 0) return ord;
-          const updatedItems = items.map((it) => {
-            const info = extractItemProductInfo(it, productMap);
-            if (Number(info.productId) === Number(reviewTarget.productId)) {
-              return { ...it, user_review: savedReview };
-            }
-            return it;
-          });
-          return { ...ord, items: updatedItems };
-        })
       );
 
       setMsg({
         type: "success",
         text:
           res.data?.message ||
-          `Đã gửi đánh giá ${reviewRating} sao cho "${reviewTarget.productName}"!`,
+          "Đã gửi yêu cầu hoàn đơn thành công! Cửa hàng sẽ liên hệ với bạn.",
       });
-      setReviewTarget(null);
+      setReturnModalOrder(null);
+      setReturnFiles([]);
+      await fetchOrders();
+      setOrderStatusFilter("return_requested");
     } catch (err) {
-      if (err.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        setReviewTarget(null);
-        setShowLoginModal(true);
-      } else {
-        const firstErr = err.response?.data?.errors
-          ? Object.values(err.response.data.errors).flat()[0]
-          : null;
-        setReviewError(
-          firstErr ||
-            err.response?.data?.message ||
-            "Không thể gửi đánh giá. Vui lòng thử lại."
-        );
+      setReturnError(
+        err.response?.data?.message ||
+          "Không thể gửi yêu cầu hoàn đơn. Vui lòng thử lại."
+      );
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
+  // Lưu hồ sơ
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const addressToSave = isEditingAddress
+        ? formatVietnamAddress({
+            provinceCode,
+            districtCode,
+            wardName,
+            streetAddress,
+          })
+        : user.address || "";
+
+      const res = await axios.put(
+        "/api/profile",
+        {
+          username: profileForm.username.trim(),
+          name: profileForm.username.trim(),
+          phone: profileForm.phone.trim(),
+          address: addressToSave,
+        },
+        { headers: getHeaders() }
+      );
+
+      const updatedUser = res.data?.user || {
+        ...user,
+        username: profileForm.username.trim(),
+        phone: profileForm.phone.trim(),
+        address: addressToSave,
+      };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      window.dispatchEvent(
+        new CustomEvent("user-updated", { detail: updatedUser })
+      );
+      setIsEditingAddress(false);
+      setMsg({ type: "success", text: "Đã cập nhật thông tin tài khoản!" });
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text: err.response?.data?.message || "Cập nhật thông tin thất bại.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Đổi mật khẩu
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMsg({ type: "", text: "" });
+    try {
+      await axios.put("/api/profile/change-password", passwordForm, {
+        headers: getHeaders(),
+      });
+      setPasswordForm({
+        old_password: "",
+        new_password: "",
+        new_password_confirmation: "",
+      });
+      setMsg({ type: "success", text: "Đổi mật khẩu thành công!" });
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text: err.response?.data?.message || "Đổi mật khẩu thất bại.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Hủy đơn hàng
+  const handleConfirmCancelOrder = async () => {
+    if (!cancelConfirmOrder) return;
+    setCancellingOrderId(cancelConfirmOrder.id);
+    try {
+      await axios.post(
+        `/api/orders/${cancelConfirmOrder.id}/cancel`,
+        {},
+        { headers: getHeaders() }
+      );
+      setCancelConfirmOrder(null);
+      setMsg({ type: "success", text: "Đã hủy đơn hàng thành công." });
+      await fetchOrders();
+    } catch (err) {
+      setMsg({
+        type: "error",
+        text: err.response?.data?.message || "Không thể hủy đơn hàng này.",
+      });
+      setCancelConfirmOrder(null);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  // Mua lại đơn hàng
+  const handleReorderOrder = async (order) => {
+    if (!order?.items?.length) return;
+    setReorderingOrderId(order.id);
+    try {
+      for (const item of order.items) {
+        if (item.productId) {
+          await axios.post(
+            "/api/cart/add",
+            { product_id: item.productId, quantity: item.quantity },
+            { headers: getHeaders() }
+          );
+        }
       }
+      window.dispatchEvent(new Event("cart-updated"));
+      window.location.href = "/cart";
+    } catch {
+      setMsg({ type: "error", text: "Không thể thêm lại sản phẩm vào giỏ." });
+    } finally {
+      setReorderingOrderId(null);
+    }
+  };
+
+  // Đánh giá sản phẩm
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewTarget) return;
+    setReviewSubmitting(true);
+    setReviewError("");
+    try {
+      await axios.post(
+        "/api/reviews",
+        {
+          product_id: reviewTarget.productId,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        },
+        { headers: getHeaders() }
+      );
+      setReviewTarget(null);
+      setReviewComment("");
+      setMsg({ type: "success", text: "Cảm ơn bạn đã gửi đánh giá ấn phẩm!" });
+      await fetchOrders();
+    } catch (err) {
+      setReviewError(
+        err.response?.data?.message || "Không thể gửi đánh giá lúc này."
+      );
     } finally {
       setReviewSubmitting(false);
     }
   };
 
-  const switchTab = (tabId) => {
-    setActiveTab(tabId);
-    setMsg({ type: "", text: "" });
-    if (tabId === "orders") {
-      if (orders.length === 0 && !ordersLoading) {
-        fetchUserOrders();
-      } else {
-        const token = localStorage.getItem("token");
-        if (token) hydrateOrderDetails(orders, token);
-      }
-    }
-  };
-
-  const normalizedOrders = useMemo(() => {
-    return (Array.isArray(orders) ? orders : []).map((order) => {
-      const statusKey = normalizeOrderStatus(order.status);
-      const statusInfo = ORDER_STATUS_CONFIG[statusKey] || {
-        label: order.status || "Đang xử lý",
-        badge: "bg-stone-100 text-stone-700 border-stone-200",
-      };
-
-      const rawItems = extractOrderItems(order);
-      const items = rawItems.map((item, idx) => {
-        const info = extractItemProductInfo(item, productMap);
-        const qty = Number(
-          item.quantity ?? item.qty ?? item.pivot?.quantity ?? 1
-        );
-        const unitPrice = Number(
-          item.price ??
-            item.unit_price ??
-            item.pivot?.price ??
-            item.product?.price ??
-            0
-        );
-        return {
-          key: item.id || `${order.id}-${idx}`,
-          raw: item,
-          productId: info.productId,
-          name: info.name,
-          imageUrl: info.imageUrl,
-          altImageUrl: info.altImageUrl,
-          quantity: qty,
-          unitPrice,
-          lineTotal: unitPrice * qty,
-          existingReview: item.user_review || item.review || null,
-        };
-      });
-
-      const computedItemsTotal = items.reduce(
-        (sum, it) => sum + it.lineTotal,
-        0
-      );
-      const shippingFee = Number(order.shipping_fee ?? 0);
-      const discountAmount = Number(order.discount_amount ?? 0);
-      const rawTotal = Number(
-        order.total_amount ??
-          order.total_price ??
-          order.grand_total ??
-          order.total ??
-          0
-      );
-      const totalAmount =
-        rawTotal > 0
-          ? rawTotal
-          : Math.max(0, computedItemsTotal - discountAmount) + shippingFee;
-
-      const paymentKey = String(order.payment_method || "cod").toLowerCase();
-
-      return {
-        id: order.id,
-        raw: order,
-        code: order.order_code || order.code || `#MS${order.id}`,
-        statusKey,
-        statusLabel: statusInfo.label,
-        statusBadge: statusInfo.badge,
-        isCompleted: statusKey === "completed",
-        canCancel: statusKey === "pending",
-        canReorder: statusKey === "completed" || statusKey === "cancelled",
-        createdAtLabel: formatDateTime(order.created_at),
-        totalAmount,
-        discountAmount,
-        items,
-        receiverName:
-          order.shipping_name ||
-          order.receiver_name ||
-          order.customer_name ||
-          user.username,
-        receiverPhone:
-          order.shipping_phone || order.receiver_phone || order.phone || "",
-        shippingAddress:
-          order.shipping_address ||
-          order.receiver_address ||
-          order.address ||
-          "Theo địa chỉ mặc định",
-        paymentLabel:
-          PAYMENT_METHOD_LABELS[paymentKey] ||
-          order.payment_method ||
-          "Thanh toán khi nhận hàng (COD)",
-        note: order.note || order.notes || "",
-      };
-    });
-  }, [orders, productMap, user.username]);
-
-  // Tính số lượng đơn hàng theo từng trạng thái
-  const orderCounts = useMemo(() => {
-    const counts = {
-      all: normalizedOrders.length,
-      pending: 0,
-      processing: 0,
-      shipping: 0,
-      completed: 0,
-      cancelled: 0,
-    };
-    for (const ord of normalizedOrders) {
-      if (Object.prototype.hasOwnProperty.call(counts, ord.statusKey)) {
-        counts[ord.statusKey] += 1;
-      }
-    }
-    return counts;
-  }, [normalizedOrders]);
-
-  const filteredOrders = useMemo(() => {
-    if (orderStatusFilter === "all") return normalizedOrders;
-    return normalizedOrders.filter((o) => o.statusKey === orderStatusFilter);
-  }, [normalizedOrders, orderStatusFilter]);
-
-  const memberTier = useMemo(
-    () => computeMemberTier(user, orders),
-    [user, orders]
-  );
-
-  const avatarSrc = resolveAssetUrl(user.image_path);
+  const avatarSrc = resolveAssetUrl(user.avatar);
   const avatarInitial = (user.username || user.email || "U")
-    .trim()
     .charAt(0)
     .toUpperCase();
-
-  const isConfirmLoading =
-    saving ||
-    (confirmState.type === "cancel_order" &&
-      cancellingOrderId === confirmState.payload);
 
   return (
     <>
       <input
-        type="file"
         ref={fileInputRef}
-        onChange={handleAvatarChange}
+        type="file"
         accept="image/*"
         className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const fd = new FormData();
+          fd.append("avatar", file);
+          try {
+            const res = await axios.post("/api/profile/avatar", fd, {
+              headers: {
+                ...getHeaders(),
+                "Content-Type": "multipart/form-data",
+              },
+            });
+            const updated = res.data?.user || { ...user, avatar: res.data?.avatar };
+            setUser(updated);
+            localStorage.setItem("user", JSON.stringify(updated));
+            window.dispatchEvent(
+              new CustomEvent("user-updated", { detail: updated })
+            );
+          } catch {
+            setMsg({ type: "error", text: "Cập nhật ảnh đại diện thất bại." });
+          }
+        }}
+      />
+
+      {/* MODAL FORM HOÀN ĐƠN / ĐỔI TRẢ (TRONG VÒNG 3 NGÀY) */}
+      {returnModalOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-2xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => !returnSubmitting && setReturnModalOrder(null)}
+        >
+          <div
+            className="bg-white border border-stone-200 rounded-t-3xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-stone-100 pb-3.5">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  Hỗ trợ trong vòng 3 ngày &bull; Đơn {returnModalOrder.code}
+                </span>
+                <h3 className="font-serif text-lg sm:text-xl font-bold text-[#1A1A1A] mt-0.5">
+                  Phiếu Yêu Cầu Hoàn Đơn / Đổi Trả
+                </h3>
+              </div>
+              <button
+                type="button"
+                disabled={returnSubmitting}
+                onClick={() => setReturnModalOrder(null)}
+                className="w-8 h-8 rounded-lg text-stone-400 hover:text-stone-800 hover:bg-stone-100 flex items-center justify-center transition cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-orange-50 border border-orange-200 text-xs text-orange-950 leading-relaxed">
+              Thời hạn hỗ trợ còn lại:{" "}
+              <strong>{returnModalOrder.returnRemainingText}</strong>. Nếu quá 3
+              ngày kể từ khi xác nhận đã giao mà không phát sinh yêu cầu, đơn
+              hàng sẽ tự động chuyển sang trạng thái <strong>Hoàn thành</strong>.
+            </div>
+
+            {returnError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
+                {returnError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitReturnForm} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Hình thức yêu cầu <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label
+                    className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
+                      returnType === "refund"
+                        ? "bg-orange-50 border-orange-400 text-orange-950 font-bold"
+                        : "bg-[#FAF8F5] border-stone-200 text-stone-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="return_type"
+                      value="refund"
+                      checked={returnType === "refund"}
+                      onChange={() => setReturnType("refund")}
+                      className="mr-2 accent-orange-600"
+                    />
+                    Hoàn đơn &amp; Hoàn tiền
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
+                      returnType === "exchange"
+                        ? "bg-orange-50 border-orange-400 text-orange-950 font-bold"
+                        : "bg-[#FAF8F5] border-stone-200 text-stone-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="return_type"
+                      value="exchange"
+                      checked={returnType === "exchange"}
+                      onChange={() => setReturnType("exchange")}
+                      className="mr-2 accent-orange-600"
+                    />
+                    Đổi cuốn sách mới (lỗi in / rách)
+                  </label>
+                </div>
+              </div>
+
+              {/* HIỂN THỊ DANH SÁCH SÁCH TRONG HÓA ĐƠN KHI KHÁCH CHỌN ĐỔI SÁCH MỚI */}
+              {returnType === "exchange" && (
+                <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-orange-200/90 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-orange-900">
+                      Chọn sách trong hóa đơn muốn đổi{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-stone-500">
+                      ({returnModalOrder.items?.length || 0} đầu sách)
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-0.5">
+                    {(returnModalOrder.items || []).map((item, idx) => {
+                      const itemKey = String(
+                        item.key || item.productId || idx
+                      );
+                      const selection = exchangeSelections[itemKey] || {
+                        selected: false,
+                        quantity: 1,
+                      };
+                      const maxQty = Math.max(1, Number(item.quantity || 1));
+
+                      return (
+                        <div
+                          key={itemKey}
+                          onClick={() => handleToggleExchangeItem(itemKey)}
+                          className={`p-2.5 rounded-xl border transition flex items-center justify-between gap-2.5 cursor-pointer ${
+                            selection.selected
+                              ? "bg-white border-orange-400 shadow-2xs"
+                              : "bg-white/70 border-stone-200/80 hover:border-stone-300"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(selection.selected)}
+                              onChange={() => {}}
+                              className="w-4 h-4 accent-orange-600 rounded shrink-0 cursor-pointer"
+                            />
+
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-9 h-12 object-cover rounded border border-stone-200 shrink-0 bg-stone-100"
+                              />
+                            ) : (
+                              <div className="w-9 h-12 rounded border border-stone-200 bg-stone-100 flex items-center justify-center text-[9px] font-bold text-stone-400 shrink-0">
+                                SÁCH
+                              </div>
+                            )}
+
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-stone-900 line-clamp-1">
+                                {item.name}
+                              </div>
+                              <div className="text-[11px] text-stone-500 mt-0.5">
+                                Đã mua: <strong>{maxQty}</strong> cuốn &bull;{" "}
+                                {Number(item.unitPrice || 0).toLocaleString(
+                                  "vi-VN"
+                                )}
+                                đ
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Chọn số lượng cuốn muốn đổi */}
+                          {selection.selected && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1.5 shrink-0"
+                            >
+                              <span className="text-[10px] font-semibold text-stone-500">
+                                Đổi:
+                              </span>
+                              <div className="inline-flex items-center border border-orange-300 rounded-lg bg-orange-50">
+                                <button
+                                  type="button"
+                                  disabled={selection.quantity <= 1}
+                                  onClick={() =>
+                                    handleChangeExchangeQty(
+                                      itemKey,
+                                      selection.quantity - 1,
+                                      maxQty
+                                    )
+                                  }
+                                  className="w-6 h-6 text-xs font-bold text-orange-900 disabled:opacity-40 cursor-pointer"
+                                >
+                                  &minus;
+                                </button>
+                                <span className="w-6 text-center text-xs font-bold text-orange-950">
+                                  {selection.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={selection.quantity >= maxQty}
+                                  onClick={() =>
+                                    handleChangeExchangeQty(
+                                      itemKey,
+                                      selection.quantity + 1,
+                                      maxQty
+                                    )
+                                  }
+                                  className="w-6 h-6 text-xs font-bold text-orange-900 disabled:opacity-40 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Lý do hoàn đơn / Mô tả tình trạng sách{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  placeholder="Ví dụ: Sách bị móp góc bìa, thiếu trang hoặc giao nhầm tựa sách..."
+                  className="w-full bg-[#F5F2EE] border border-stone-200 focus:border-orange-500 focus:bg-white rounded-xl py-2.5 px-3.5 text-xs sm:text-sm text-stone-900 focus:outline-none transition resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
+                  Hình ảnh chứng minh (Tối đa 4 ảnh)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files || []).slice(0, 4);
+                    setReturnFiles(selected);
+                  }}
+                  className="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-orange-100 file:text-orange-900 hover:file:bg-orange-200 cursor-pointer"
+                />
+                {returnFiles.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {returnFiles.map((f, i) => (
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-stone-100 text-[11px] text-stone-700"
+                      >
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  disabled={returnSubmitting}
+                  onClick={() => setReturnModalOrder(null)}
+                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xs font-semibold text-stone-700 transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={returnSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+                >
+                  {returnSubmitting
+                    ? "Đang gửi yêu cầu..."
+                    : returnType === "exchange"
+                    ? "Gửi yêu cầu đổi sách"
+                    : "Gửi yêu cầu hoàn đơn"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM MODAL HỦY ĐƠN HÀNG */}
+      <ConfirmModal
+        open={Boolean(cancelConfirmOrder)}
+        variant="danger"
+        title="Xác nhận hủy đơn hàng"
+        message="Bạn có chắc chắn muốn hủy đơn hàng này không? Thao tác này không thể hoàn tác."
+        detailText={
+          cancelConfirmOrder
+            ? `Đơn hàng ${
+                cancelConfirmOrder.order_code || `#MS${cancelConfirmOrder.id}`
+              }`
+            : ""
+        }
+        confirmText="Xác nhận hủy đơn"
+        cancelText="Giữ lại đơn"
+        loading={Boolean(cancellingOrderId)}
+        onConfirm={handleConfirmCancelOrder}
+        onCancel={() => !cancellingOrderId && setCancelConfirmOrder(null)}
       />
 
       <AccountView
@@ -1380,37 +1034,26 @@ export default function Account({
         wardName={wardName}
         streetAddress={streetAddress}
         onTriggerAvatarPicker={() => fileInputRef.current?.click()}
-        onSwitchTab={switchTab}
-        onProfileFieldChange={(field, val) => {
-          isProfileDirtyRef.current = true;
-          setProfileForm((prev) => ({ ...prev, [field]: val }));
+        onSwitchTab={(tabId) => {
+          setActiveTab(tabId);
+          setMsg({ type: "", text: "" });
         }}
-        onStartEditAddress={handleStartEditAddress}
-        onCancelEditAddress={handleCancelEditAddress}
-        onProvinceChange={(val) => {
-          isAddressDirtyRef.current = true;
-          setProvinceCode(val);
-        }}
-        onDistrictChange={(val) => {
-          isAddressDirtyRef.current = true;
-          setDistrictCode(val);
-        }}
-        onWardChange={(val) => {
-          isAddressDirtyRef.current = true;
-          setWardName(val);
-        }}
-        onStreetChange={(val) => {
-          isAddressDirtyRef.current = true;
-          setStreetAddress(val);
-        }}
-        onDatasetLoaded={handleDatasetLoaded}
-        onRequestSaveProfile={handleRequestSaveProfile}
+        onProfileFieldChange={(field, val) =>
+          setProfileForm((prev) => ({ ...prev, [field]: val }))
+        }
+        onStartEditAddress={() => setIsEditingAddress(true)}
+        onCancelEditAddress={() => setIsEditingAddress(false)}
+        onProvinceChange={setProvinceCode}
+        onDistrictChange={setDistrictCode}
+        onWardChange={setWardName}
+        onStreetChange={setStreetAddress}
+        onRequestSaveProfile={handleSaveProfile}
         passwordForm={passwordForm}
         onPasswordFieldChange={(field, val) =>
           setPasswordForm((prev) => ({ ...prev, [field]: val }))
         }
-        onRequestChangePassword={handleRequestChangePassword}
-        orders={normalizedOrders}
+        onRequestChangePassword={handleChangePassword}
+        orders={orders}
         filteredOrders={filteredOrders}
         orderCounts={orderCounts}
         ordersLoading={ordersLoading}
@@ -1420,47 +1063,43 @@ export default function Account({
         detailLoadingId={detailLoadingId}
         cancellingOrderId={cancellingOrderId}
         reorderingOrderId={reorderingOrderId}
-        onRefreshOrders={() =>
-          fetchUserOrders(undefined, { forceRehydrate: true })
-        }
+        onRefreshOrders={fetchOrders}
         onFilterOrdersChange={setOrderStatusFilter}
-        onToggleOrderDetail={handleToggleOrderDetail}
-        onRequestCancelOrder={handleRequestCancelOrder}
+        onToggleOrderDetail={(rawOrder) =>
+          setExpandedOrderId((prev) =>
+            prev === rawOrder.id ? null : rawOrder.id
+          )
+        }
+        onRequestCancelOrder={(rawOrder) => setCancelConfirmOrder(rawOrder)}
         onReorderOrder={handleReorderOrder}
+        onOpenReturnModal={handleOpenReturnModal}
+        onOpenContactModal={() => {
+          window.open("https://zalo.me", "_blank");
+        }}
         reviewTarget={reviewTarget}
         reviewRating={reviewRating}
         hoverRating={hoverRating}
         reviewComment={reviewComment}
         reviewSubmitting={reviewSubmitting}
         reviewError={reviewError}
-        onOpenReviewModal={openReviewModal}
+        onOpenReviewModal={(orderCode, rawItem) => {
+          const p = rawItem.product || {};
+          setReviewTarget({
+            orderCode,
+            productId: rawItem.product_id || p.id,
+            productName: rawItem.product_name || p.name || "Ấn phẩm",
+            productImage: resolveAssetUrl(p.image_path || p.image),
+            productAltImage: resolveAssetUrl(p.thumbnail),
+          });
+          setReviewRating(5);
+          setReviewComment("");
+          setReviewError("");
+        }}
         onCloseReviewModal={() => setReviewTarget(null)}
         onReviewRatingChange={setReviewRating}
         onHoverRatingChange={setHoverRating}
         onReviewCommentChange={setReviewComment}
         onSubmitReview={handleSubmitReview}
-      />
-
-      <LoginRequiredModal
-        open={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-      />
-
-      {/* Modal xác nhận dùng chung khi Lưu hồ sơ / Đổi mật khẩu / Hủy đơn */}
-      <ConfirmModal
-        open={confirmState.open}
-        variant={confirmState.variant}
-        title={confirmState.title}
-        message={confirmState.message}
-        detailText={confirmState.detailText}
-        confirmText={confirmState.confirmText}
-        cancelText="Quay lại"
-        loading={isConfirmLoading}
-        onConfirm={handleExecuteConfirmedAction}
-        onCancel={() =>
-          !isConfirmLoading &&
-          setConfirmState((prev) => ({ ...prev, open: false }))
-        }
       />
     </>
   );
