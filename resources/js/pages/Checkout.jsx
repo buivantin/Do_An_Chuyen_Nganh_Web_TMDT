@@ -120,7 +120,7 @@ export default function Checkout() {
   const [districtCode, setDistrictCode] = useState("");
   const [wardName, setWardName] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
-  const [saveAsDefault, setSaveAsDefault] = useState(true);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [note, setNote] = useState("");
 
   // Vận chuyển & Thanh toán
@@ -409,14 +409,21 @@ export default function Checkout() {
               })
             ).data;
 
+      // Chỉ cập nhật địa chỉ mặc định nếu người dùng chủ động tick chọn, giữ nguyên tên tài khoản gốc
       if (addressMode === "new" && saveAsDefault && finalShippingAddress) {
+        const currentStored = getStoredUser() || {};
+        const keptName =
+          savedProfile.name || currentStored.username || currentStored.name || "";
+        const keptPhone =
+          savedProfile.phone || currentStored.phone || phone.trim();
+
         axios
           .put(
             "/api/profile",
             {
-              username: fullName.trim(),
-              name: fullName.trim(),
-              phone: phone.trim(),
+              username: keptName,
+              name: keptName,
+              phone: keptPhone,
               address: finalShippingAddress,
             },
             {
@@ -427,15 +434,19 @@ export default function Checkout() {
             }
           )
           .then(() => {
-            const currentStored = getStoredUser() || {};
             const nextUser = {
               ...currentStored,
-              username: fullName.trim(),
-              name: fullName.trim(),
-              phone: phone.trim(),
+              username: keptName,
+              name: keptName,
+              phone: keptPhone,
               address: finalShippingAddress,
             };
             localStorage.setItem("user", JSON.stringify(nextUser));
+            setSavedProfile((prev) => ({
+              ...prev,
+              phone: keptPhone,
+              address: finalShippingAddress,
+            }));
             window.dispatchEvent(
               new CustomEvent("user-updated", { detail: nextUser })
             );
