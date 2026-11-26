@@ -47,7 +47,7 @@ export default function ProductReviews({ productId, onStatsLoaded }) {
     current_page: 1,
     last_page: 1,
   });
-  const [selectedStar, setSelectedStar] = useState(0); // 0 = Tất cả
+  const [selectedStar, setSelectedStar] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -68,18 +68,44 @@ export default function ProductReviews({ productId, onStatsLoaded }) {
           headers: { Accept: "application/json" },
         });
 
-        const nextStats = res.data?.stats || {
-          average_rating: 0,
-          total_reviews: 0,
-          rating_counts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+        const payload = res.data || {};
+        const pageData = payload.reviews || {};
+        const list = Array.isArray(pageData.data)
+          ? pageData.data
+          : Array.isArray(payload.reviews)
+          ? payload.reviews
+          : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+
+        const rawStats = payload.stats || {};
+        const totalReviews = Number(
+          rawStats.total_reviews ?? payload.total_reviews ?? list.length
+        );
+        const avgRating = Number(
+          rawStats.average_rating ?? payload.average_rating ?? 0
+        );
+        const counts = rawStats.rating_counts ||
+          payload.rating_counts ||
+          payload.distribution || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+        const nextStats = {
+          average_rating: avgRating,
+          total_reviews: totalReviews,
+          rating_counts: {
+            5: Number(counts[5] || 0),
+            4: Number(counts[4] || 0),
+            3: Number(counts[3] || 0),
+            2: Number(counts[2] || 0),
+            1: Number(counts[1] || 0),
+          },
         };
-        const pageData = res.data?.reviews || {};
 
         setStats(nextStats);
-        setReviews(Array.isArray(pageData.data) ? pageData.data : []);
+        setReviews(list);
         setPagination({
-          current_page: pageData.current_page || 1,
-          last_page: pageData.last_page || 1,
+          current_page: Number(pageData.current_page || 1),
+          last_page: Number(pageData.last_page || 1),
         });
 
         if (typeof onStatsLoaded === "function") {
@@ -241,9 +267,14 @@ export default function ProductReviews({ productId, onStatsLoaded }) {
         <div className="divide-y divide-stone-100">
           {reviews.map((rev) => {
             const reviewerName = (
-              rev.user?.username || "Độc giả Mọt Sách"
+              rev.user?.username ||
+              rev.user?.name ||
+              rev.user_name ||
+              "Độc giả BookHouse"
             ).normalize("NFC");
-            const avatar = resolveAssetUrl(rev.user?.image_path);
+            const avatar = resolveAssetUrl(
+              rev.user?.image_path || rev.user?.avatar
+            );
             const initial = reviewerName.trim().charAt(0).toUpperCase();
 
             return (
@@ -315,7 +346,8 @@ export default function ProductReviews({ productId, onStatsLoaded }) {
               : "Chưa có đánh giá nào cho ấn phẩm này"}
           </p>
           <p className="text-xs text-stone-500">
-            Hãy là độc giả đầu tiên chia sẻ cảm nhận sau khi nhận sách nhé!
+            Đánh giá sẽ hiển thị tại đây sau khi khách hàng hoàn thành đơn hàng
+            và nhận xét trong mục Tài khoản.
           </p>
         </div>
       )}

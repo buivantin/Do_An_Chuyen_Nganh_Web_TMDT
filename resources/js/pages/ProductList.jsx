@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import MainLayout from "../layouts/MainLayout";
 import ProductListView from "../components/ProductListView";
+import LoginRequiredModal from "../components/LoginRequiredModal";
 import ProductService from "../services/ProductService";
 
 const PER_PAGE = 12;
@@ -61,9 +62,7 @@ export default function ProductList({
   const isFromProp = Array.isArray(products);
 
   const [categories, setCategories] = useState(propCategories || []);
-  const [books, setBooks] = useState(() =>
-    isFromProp ? products.map(enrichBookWithSampleMeta) : []
-  );
+  const [books, setBooks] = useState(() => (isFromProp ? products : []));
   const [pagination, setPagination] = useState(() => ({
     currentPage: 1,
     lastPage: 1,
@@ -95,6 +94,8 @@ export default function ProductList({
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [loading, setLoading] = useState(!isFromProp);
   const [error, setError] = useState("");
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [cartToast, setCartToast] = useState({ type: "", text: "" });
 
   // State & Ref đo vị trí fixed của thanh sắp xếp ngay dưới Navbar
   const sortBarRef = useRef(null);
@@ -222,12 +223,11 @@ export default function ProductList({
   // Tải đúng 12 cuốn sách của trang hiện tại theo điều kiện lọc từ API
   useEffect(() => {
     if (isFromProp) {
-      const enriched = products.map(enrichBookWithSampleMeta);
-      const total = enriched.length;
+      const total = products.length;
       const lastPage = Math.max(1, Math.ceil(total / PER_PAGE));
       const currentPage = Math.min(Math.max(1, filters.page), lastPage);
       const start = (currentPage - 1) * PER_PAGE;
-      setBooks(enriched.slice(start, start + PER_PAGE));
+      setBooks(products.slice(start, start + PER_PAGE));
       setPagination({ currentPage, lastPage, total });
       setLoading(false);
       return;
@@ -426,6 +426,43 @@ export default function ProductList({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleDefaultAddToCart = async (book) => {
+    if (typeof onAddToCart === "function") {
+      await onAddToCart(book);
+      return;
+    }
+    if (!book) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setLoginModalOpen(true);
+      return;
+    }
+
+    try {
+      await ProductService.addToCart(book.id, 1);
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+      setCartToast({
+        type: "success",
+        text: `Đã thêm "${book.name || book.title}" vào giỏ hàng.`,
+      });
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        localStorage.removeItem("token");
+        setLoginModalOpen(true);
+        return;
+      }
+      setCartToast({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          "Không thể thêm vào giỏ hàng, vui lòng thử lại.",
+      });
+    } finally {
+      setTimeout(() => setCartToast({ type: "", text: "" }), 3000);
+    }
+  };
+
   const activeChips = useMemo(() => {
     const chips = [];
     if (filters.keyword) {
@@ -522,74 +559,93 @@ export default function ProductList({
   }, [pagination]);
 
   const viewNode = (
-    <ProductListView
-      books={books}
-      categories={categories}
-      totalAuthorCount={authorOptions.length}
-      filteredAuthors={filteredAuthors}
-      totalPublisherCount={publisherOptions.length}
-      filteredPublishers={filteredPublishers}
-      filters={filters}
-      priceRange={priceRange}
-      yearRange={yearRange}
-      authorSearch={authorSearch}
-      publisherSearch={publisherSearch}
-      openSections={openSections}
-      mobileFilterOpen={mobileFilterOpen}
-      activeFilterCount={activeChips.length}
-      activeChips={activeChips}
-      pagination={pagination}
-      pageNumbers={pageNumbers}
-      loading={loading}
-      error={error}
-      sortBarRef={sortBarRef}
-      sortBarTop={sortBarMetrics.top}
-      sortBarSpacerHeight={sortBarMetrics.spacerHeight}
-      sidebarStickyTop={sortBarMetrics.sidebarStickyTop}
-      onSortChange={(sort) => updateFilter({ sort })}
-      onToggleMobileFilter={setMobileFilterOpen}
-      onResetAll={handleResetAll}
-      onToggleSection={(key) =>
-        setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
-      }
-      onToggleCategory={handleToggleCategory}
-      onSelectRating={(val) => updateFilter({ minRating: val })}
-      onToggleAuthor={handleToggleAuthor}
-      onAuthorSearchChange={setAuthorSearch}
-      onTogglePublisher={handleTogglePublisher}
-      onPublisherSearchChange={setPublisherSearch}
-      onYearRangeChange={setYearRange}
-      onApplyYearRange={() =>
-        updateFilter({ minYear: yearRange.min, maxYear: yearRange.max })
-      }
-      onSelectYearPreset={(preset) => {
-        const isSame =
-          filters.minYear === preset.min && filters.maxYear === preset.max;
-        const nextMin = isSame ? "" : preset.min;
-        const nextMax = isSame ? "" : preset.max;
-        setYearRange({ min: nextMin, max: nextMax });
-        updateFilter({ minYear: nextMin, maxYear: nextMax });
-      }}
-      onPriceRangeChange={(nextRange, immediate = false) => {
-        setPriceRange(nextRange);
-        if (immediate) {
-          updateFilter({ minPrice: nextRange.min, maxPrice: nextRange.max });
+    <>
+      {cartToast.text && (
+        <div
+          className={`fixed bottom-5 right-5 z-50 max-w-sm px-4 py-3 rounded-xl text-xs font-semibold shadow-lg border ${
+            cartToast.type === "success"
+              ? "bg-emerald-900 text-white border-emerald-700"
+              : "bg-red-800 text-white border-red-600"
+          }`}
+        >
+          {cartToast.text}
+        </div>
+      )}
+
+      <ProductListView
+        books={books}
+        categories={categories}
+        totalAuthorCount={authorOptions.length}
+        filteredAuthors={filteredAuthors}
+        totalPublisherCount={publisherOptions.length}
+        filteredPublishers={filteredPublishers}
+        filters={filters}
+        priceRange={priceRange}
+        yearRange={yearRange}
+        authorSearch={authorSearch}
+        publisherSearch={publisherSearch}
+        openSections={openSections}
+        mobileFilterOpen={mobileFilterOpen}
+        activeFilterCount={activeChips.length}
+        activeChips={activeChips}
+        pagination={pagination}
+        pageNumbers={pageNumbers}
+        loading={loading}
+        error={error}
+        sortBarRef={sortBarRef}
+        sortBarTop={sortBarMetrics.top}
+        sortBarSpacerHeight={sortBarMetrics.spacerHeight}
+        sidebarStickyTop={sortBarMetrics.sidebarStickyTop}
+        onSortChange={(sort) => updateFilter({ sort })}
+        onToggleMobileFilter={setMobileFilterOpen}
+        onResetAll={handleResetAll}
+        onToggleSection={(key) =>
+          setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }))
         }
-      }}
-      onApplyPriceRange={() =>
-        updateFilter({ minPrice: priceRange.min, maxPrice: priceRange.max })
-      }
-      onSelectPricePreset={(preset) => {
-        const isSame =
-          filters.minPrice === preset.min && filters.maxPrice === preset.max;
-        const nextMin = isSame ? "" : preset.min;
-        const nextMax = isSame ? "" : preset.max;
-        setPriceRange({ min: nextMin, max: nextMax });
-        updateFilter({ minPrice: nextMin, maxPrice: nextMax });
-      }}
-      onPageChange={handlePageChange}
-      onAddToCart={onAddToCart}
-    />
+        onToggleCategory={handleToggleCategory}
+        onSelectRating={(val) => updateFilter({ minRating: val })}
+        onToggleAuthor={handleToggleAuthor}
+        onAuthorSearchChange={setAuthorSearch}
+        onTogglePublisher={handleTogglePublisher}
+        onPublisherSearchChange={setPublisherSearch}
+        onYearRangeChange={setYearRange}
+        onApplyYearRange={() =>
+          updateFilter({ minYear: yearRange.min, maxYear: yearRange.max })
+        }
+        onSelectYearPreset={(preset) => {
+          const isSame =
+            filters.minYear === preset.min && filters.maxYear === preset.max;
+          const nextMin = isSame ? "" : preset.min;
+          const nextMax = isSame ? "" : preset.max;
+          setYearRange({ min: nextMin, max: nextMax });
+          updateFilter({ minYear: nextMin, maxYear: nextMax });
+        }}
+        onPriceRangeChange={(nextRange, immediate = false) => {
+          setPriceRange(nextRange);
+          if (immediate) {
+            updateFilter({ minPrice: nextRange.min, maxPrice: nextRange.max });
+          }
+        }}
+        onApplyPriceRange={() =>
+          updateFilter({ minPrice: priceRange.min, maxPrice: priceRange.max })
+        }
+        onSelectPricePreset={(preset) => {
+          const isSame =
+            filters.minPrice === preset.min && filters.maxPrice === preset.max;
+          const nextMin = isSame ? "" : preset.min;
+          const nextMax = isSame ? "" : preset.max;
+          setPriceRange({ min: nextMin, max: nextMax });
+          updateFilter({ minPrice: nextMin, maxPrice: nextMax });
+        }}
+        onPageChange={handlePageChange}
+        onAddToCart={handleDefaultAddToCart}
+      />
+
+      <LoginRequiredModal
+        open={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
+    </>
   );
 
   return isFromProp ? viewNode : <MainLayout>{viewNode}</MainLayout>;
