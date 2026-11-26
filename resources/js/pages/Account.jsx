@@ -31,45 +31,60 @@ function resolveAssetUrl(path) {
 function getMemberTier(totalSpent) {
   if (totalSpent >= 5000000) {
     return {
-      name: "Tri Kỷ Kim Cương",
-      icon: "💎",
-      badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
-      hint: "Bạn đang ở hạng thành viên cao nhất của BookHouse.",
+      name: "Đại Sứ Tri Thức",
+      icon: "👑",
+      badgeClass: "bg-[#F5EDE2] border-[#E5D5BE] text-[#9A5B13]",
+      hint: "Danh hiệu cao quý nhất tại BookHouse.",
       progressPercent: 100,
     };
   }
-  if (totalSpent >= 1500000) {
+  if (totalSpent >= 2500000) {
     const pct = Math.min(100, Math.round((totalSpent / 5000000) * 100));
     return {
-      name: "Độc Giả Vàng",
-      icon: "👑",
-      badgeClass: "bg-amber-50 border-amber-200 text-amber-800",
+      name: "Học Giả",
+      icon: "🏅",
+      badgeClass: "bg-yellow-50 border-yellow-300 text-yellow-900",
       hint: `Mua thêm ${(5000000 - totalSpent).toLocaleString(
         "vi-VN"
-      )}đ để lên Tri Kỷ Kim Cương`,
+      )}đ để đạt Đại Sứ Tri Thức`,
+      progressPercent: pct,
+    };
+  }
+  if (totalSpent >= 1000000) {
+    const pct = Math.min(100, Math.round((totalSpent / 2500000) * 100));
+    return {
+      name: "Tri Thức",
+      icon: "💠",
+      badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
+      hint: `Mua thêm ${(2500000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để lên hạng Học Giả`,
       progressPercent: pct,
     };
   }
   if (totalSpent >= 300000) {
-    const pct = Math.min(100, Math.round((totalSpent / 1500000) * 100));
+    const pct = Math.min(100, Math.round((totalSpent / 1000000) * 100));
     return {
       name: "Người Đọc",
       icon: "📖",
-      badgeClass: "bg-stone-100 border-stone-300 text-stone-800",
-      hint: `Mua thêm ${(1500000 - totalSpent).toLocaleString(
+      badgeClass: "bg-amber-50 border-amber-200 text-amber-900",
+      hint: `Mua thêm ${(1000000 - totalSpent).toLocaleString(
         "vi-VN"
-      )}đ để lên Độc Giả Vàng`,
+      )}đ để đạt Tri Thức`,
       progressPercent: pct,
     };
   }
-  const pct = Math.max(15, Math.min(100, Math.round((totalSpent / 300000) * 100)));
+  const pct = Math.max(
+    15,
+    Math.min(100, Math.round((totalSpent / 300000) * 100))
+  );
   return {
     name: "Mầm Sách",
     icon: "🌱",
     badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-800",
     hint: `Mua thêm ${(300000 - totalSpent).toLocaleString(
       "vi-VN"
-    )}đ để lên Người Đọc`,
+    )}đ để lên hạng Người Đọc`,
     progressPercent: pct,
   };
 }
@@ -285,6 +300,9 @@ export default function Account() {
   // Confirm Modal hủy đơn
   const [cancelConfirmOrder, setCancelConfirmOrder] = useState(null);
 
+  // Confirm Modal lưu thông tin & đổi mật khẩu
+  const [confirmAction, setConfirmAction] = useState(null); // "profile" | "password" | null
+
   // Review Modal
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -334,7 +352,10 @@ export default function Account() {
           headers: getHeaders(),
         });
         const u =
-          profileRes.data?.user || profileRes.data?.data || profileRes.data || {};
+          profileRes.data?.user ||
+          profileRes.data?.data ||
+          profileRes.data ||
+          {};
         setUser(u);
         setProfileForm({
           username: u.username || u.name || "",
@@ -404,7 +425,6 @@ export default function Account() {
     const initialSelections = {};
     orderItems.forEach((it, idx) => {
       const itemKey = String(it.key || it.productId || idx);
-      // Nếu đơn chỉ có 1 đầu sách thì tự tích chọn sẵn 1 cuốn cho khách tiện thao tác
       initialSelections[itemKey] = {
         selected: orderItems.length === 1,
         quantity: 1,
@@ -419,7 +439,6 @@ export default function Account() {
     setReturnError("");
   };
 
-  // Bật/tắt chọn từng cuốn sách trong hóa đơn khi đổi sách mới
   const handleToggleExchangeItem = (itemKey) => {
     setExchangeSelections((prev) => {
       const current = prev[itemKey] || { selected: false, quantity: 1 };
@@ -434,9 +453,11 @@ export default function Account() {
     });
   };
 
-  // Tăng/giảm số lượng cuốn sách muốn đổi (từ 1 đến tối đa số lượng đã mua)
   const handleChangeExchangeQty = (itemKey, nextQty, maxQty) => {
-    const safeQty = Math.min(Math.max(1, Number(nextQty || 1)), Math.max(1, maxQty));
+    const safeQty = Math.min(
+      Math.max(1, Number(nextQty || 1)),
+      Math.max(1, maxQty)
+    );
     setExchangeSelections((prev) => ({
       ...prev,
       [itemKey]: {
@@ -446,7 +467,6 @@ export default function Account() {
     }));
   };
 
-  // Gửi Form Hoàn đơn / Đổi trả
   const handleSubmitReturnForm = async (e) => {
     e.preventDefault();
     if (!returnModalOrder) return;
@@ -489,7 +509,6 @@ export default function Account() {
       return;
     }
 
-    // Ghép danh sách sách cần đổi vào đầu nội dung lý do để Admin hiển thị rõ ràng
     const finalReason =
       returnType === "exchange" && selectedExchangeBooks.length > 0
         ? `[Sách yêu cầu đổi mới: ${selectedExchangeBooks
@@ -538,9 +557,19 @@ export default function Account() {
     }
   };
 
-  // Lưu hồ sơ
-  const handleSaveProfile = async (e) => {
+  // Mở ConfirmModal khi bấm Lưu thay đổi hồ sơ
+  const handleRequestSaveProfile = (e) => {
     e.preventDefault();
+    setMsg({ type: "", text: "" });
+    if (!profileForm.username.trim()) {
+      setMsg({ type: "error", text: "Vui lòng nhập họ và tên." });
+      return;
+    }
+    setConfirmAction("profile");
+  };
+
+  // Thực thi gọi API lưu hồ sơ sau khi bấm Xác nhận trên Modal
+  const handleConfirmSaveProfile = async () => {
     setSaving(true);
     setMsg({ type: "", text: "" });
     try {
@@ -584,12 +613,36 @@ export default function Account() {
       });
     } finally {
       setSaving(false);
+      setConfirmAction(null);
     }
   };
 
-  // Đổi mật khẩu
-  const handleChangePassword = async (e) => {
+  // Kiểm tra hợp lệ và mở ConfirmModal khi bấm Cập nhật mật khẩu
+  const handleRequestChangePassword = (e) => {
     e.preventDefault();
+    setMsg({ type: "", text: "" });
+
+    if (passwordForm.new_password === passwordForm.old_password) {
+      setMsg({
+        type: "error",
+        text: "Mật khẩu mới không được trùng với mật khẩu hiện tại.",
+      });
+      return;
+    }
+
+    if (passwordForm.new_password !== passwordForm.new_password_confirmation) {
+      setMsg({
+        type: "error",
+        text: "Xác nhận mật khẩu mới không khớp.",
+      });
+      return;
+    }
+
+    setConfirmAction("password");
+  };
+
+  // Thực thi gọi API đổi mật khẩu sau khi bấm Xác nhận trên Modal
+  const handleConfirmChangePassword = async () => {
     setSaving(true);
     setMsg({ type: "", text: "" });
     try {
@@ -609,6 +662,7 @@ export default function Account() {
       });
     } finally {
       setSaving(false);
+      setConfirmAction(null);
     }
   };
 
@@ -712,7 +766,10 @@ export default function Account() {
                 "Content-Type": "multipart/form-data",
               },
             });
-            const updated = res.data?.user || { ...user, avatar: res.data?.avatar };
+            const updated = res.data?.user || {
+              ...user,
+              avatar: res.data?.avatar,
+            };
             setUser(updated);
             localStorage.setItem("user", JSON.stringify(updated));
             window.dispatchEvent(
@@ -810,7 +867,6 @@ export default function Account() {
                 </div>
               </div>
 
-              {/* HIỂN THỊ DANH SÁCH SÁCH TRONG HÓA ĐƠN KHI KHÁCH CHỌN ĐỔI SÁCH MỚI */}
               {returnType === "exchange" && (
                 <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-orange-200/90 space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
@@ -878,7 +934,6 @@ export default function Account() {
                             </div>
                           </div>
 
-                          {/* Chọn số lượng cuốn muốn đổi */}
                           {selection.selected && (
                             <div
                               onClick={(e) => e.stopPropagation()}
@@ -1018,6 +1073,42 @@ export default function Account() {
         onCancel={() => !cancellingOrderId && setCancelConfirmOrder(null)}
       />
 
+      {/* CONFIRM MODAL LƯU THÔNG TIN & ĐỔI MẬT KHẨU */}
+      <ConfirmModal
+        open={Boolean(confirmAction)}
+        variant="primary"
+        title={
+          confirmAction === "password"
+            ? "Xác nhận đổi mật khẩu"
+            : "Xác nhận lưu thông tin cá nhân"
+        }
+        message={
+          confirmAction === "password"
+            ? "Bạn có chắc chắn muốn cập nhật mật khẩu mới cho tài khoản này không?"
+            : "Bạn có chắc chắn muốn lưu các thay đổi cho thông tin hồ sơ cá nhân không?"
+        }
+        detailText={
+          confirmAction === "profile"
+            ? `${profileForm.username.trim()}${
+                profileForm.phone.trim() ? ` • ${profileForm.phone.trim()}` : ""
+              }`
+            : user.email || ""
+        }
+        confirmText={
+          confirmAction === "password"
+            ? "Xác nhận đổi mật khẩu"
+            : "Xác nhận lưu"
+        }
+        cancelText="Hủy bỏ"
+        loading={saving}
+        onConfirm={
+          confirmAction === "password"
+            ? handleConfirmChangePassword
+            : handleConfirmSaveProfile
+        }
+        onCancel={() => !saving && setConfirmAction(null)}
+      />
+
       <AccountView
         user={user}
         memberTier={memberTier}
@@ -1047,12 +1138,12 @@ export default function Account() {
         onDistrictChange={setDistrictCode}
         onWardChange={setWardName}
         onStreetChange={setStreetAddress}
-        onRequestSaveProfile={handleSaveProfile}
+        onRequestSaveProfile={handleRequestSaveProfile}
         passwordForm={passwordForm}
         onPasswordFieldChange={(field, val) =>
           setPasswordForm((prev) => ({ ...prev, [field]: val }))
         }
-        onRequestChangePassword={handleChangePassword}
+        onRequestChangePassword={handleRequestChangePassword}
         orders={orders}
         filteredOrders={filteredOrders}
         orderCounts={orderCounts}
