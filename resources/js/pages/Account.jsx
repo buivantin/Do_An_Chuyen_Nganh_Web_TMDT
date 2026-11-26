@@ -713,7 +713,7 @@ export default function Account() {
     }
   };
 
-  // Đánh giá sản phẩm
+  // Đánh giá sản phẩm theo đơn hàng
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!reviewTarget) return;
@@ -724,6 +724,8 @@ export default function Account() {
         "/api/reviews",
         {
           product_id: reviewTarget.productId,
+          order_id: reviewTarget.orderId,
+          order_item_id: reviewTarget.orderItemId,
           rating: reviewRating,
           comment: reviewComment.trim(),
         },
@@ -1173,9 +1175,11 @@ export default function Account() {
         reviewComment={reviewComment}
         reviewSubmitting={reviewSubmitting}
         reviewError={reviewError}
-        onOpenReviewModal={(orderCode, rawItem) => {
+        onOpenReviewModal={(orderCode, rawItem, orderId) => {
           const p = rawItem.product || {};
           setReviewTarget({
+            orderId: orderId || rawItem.order_id,
+            orderItemId: rawItem.id,
             orderCode,
             productId: rawItem.product_id || p.id,
             productName: rawItem.product_name || p.name || "Ấn phẩm",

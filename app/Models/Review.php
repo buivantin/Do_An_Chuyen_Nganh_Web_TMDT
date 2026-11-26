@@ -2,20 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Review extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'product_id',
+        'order_id',
         'rating',
         'comment',
-        'status',
-    ];
-
-    protected $casts = [
-        'rating' => 'integer',
+        'status'
     ];
 
     public function user()
@@ -28,8 +28,8 @@ class Review extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function scopeVisible($query)
+    public function order()
     {
-        return $query->where('status', 'visible');
+        return $this->belongsTo(Order::class);
     }
 }

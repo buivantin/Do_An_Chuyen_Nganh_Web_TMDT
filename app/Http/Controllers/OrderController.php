@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\User;
+use App\Models\Review;
 use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -310,12 +311,25 @@ class OrderController extends Controller
      */
     public function index(Request $request)
     {
-        $this->runScheduledOrderChecks();
+        $user = $request->user();
 
         $orders = Order::with(['items.product'])
-            ->where('user_id', $request->user()->id)
-            ->orderByDesc('id')
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
             ->get();
+
+        // Lấy toàn bộ review của user theo từng cặp order_id + product_id
+        $userReviews = Review::where('user_id', $user->id)
+            ->whereNotNull('order_id')
+            ->get()
+            ->keyBy(fn ($r) => $r->order_id . '_' . $r->product_id);
+
+        $orders->each(function ($order) use ($userReviews) {
+            $order->items->each(function ($item) use ($order, $userReviews) {
+                $key = $order->id . '_' . $item->product_id;
+                $item->setAttribute('review', $userReviews->get($key));
+            });
+        });
 
         return response()->json([
             'data' => $orders,
