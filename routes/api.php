@@ -158,10 +158,11 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
                 'products.name as book',
                 'reviews.rating',
                 'reviews.comment',
-                'reviews.status',
+                DB::raw("COALESCE(reviews.status, 'visible') as status"),
                 DB::raw("DATE_FORMAT(reviews.created_at, '%d/%m/%Y %H:%i') as created_at")
             )
             ->orderByDesc('reviews.created_at')
+            ->orderByDesc('reviews.id')
             ->get();
 
         return response()->json([
@@ -179,7 +180,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
             return response()->json(['message' => 'Không tìm thấy đánh giá'], 404);
         }
 
-        $newStatus = $review->status === 'visible' ? 'hidden' : 'visible';
+        $currentStatus = $review->status ?? 'visible';
+        $newStatus = $currentStatus === 'visible' ? 'hidden' : 'visible';
+
         DB::table('reviews')->where('id', $id)->update([
             'status'     => $newStatus,
             'updated_at' => now(),

@@ -101,15 +101,15 @@ class ReviewController extends Controller
             ], 422);
         }
 
-        $review = Review::create([
-            'user_id'    => $userId,
-            'product_id' => $productId,
-            'rating'     => (int) $validated['rating'],
-            'comment'    => isset($validated['comment']) && trim($validated['comment']) !== ''
-                ? trim($validated['comment'])
-                : null,
-            'status'     => 'visible',
-        ]);
+        $review = new Review();
+        $review->user_id = $userId;
+        $review->product_id = $productId;
+        $review->rating = (int) $validated['rating'];
+        $review->comment = isset($validated['comment']) && trim($validated['comment']) !== ''
+            ? trim($validated['comment'])
+            : null;
+        $review->status = 'visible';
+        $review->save();
 
         return response()->json([
             'message' => 'Cảm ơn bạn đã gửi đánh giá cho cuốn sách!',

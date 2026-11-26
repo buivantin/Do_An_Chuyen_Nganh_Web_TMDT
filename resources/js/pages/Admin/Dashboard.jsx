@@ -2,8 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import AdminConfirmModal from '../../components/admin/AdminConfirmModal';
 
-const DEFAULT_START_DATE = '2026-01-01';
-const DEFAULT_END_DATE = '2026-11-23';
+const getTodayISO = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const DEFAULT_START_DATE = `${new Date().getFullYear()}-01-01`;
+const DEFAULT_END_DATE = getTodayISO();
 
 const STATUS_META = {
   pending:    { label: 'Chờ xác nhận',  badge: 'bg-amber-100 text-amber-800',     bar: 'bg-amber-500' },
@@ -562,7 +570,7 @@ export default function Dashboard() {
                     type="button"
                     onClick={handleResetFilter}
                     disabled={isFilterLoading}
-                    title="Quay về thống kê năm nay (2026)"
+                    title={`Quay về thống kê năm nay (${new Date().getFullYear()})`}
                     className="px-2.5 py-2 rounded-xl border border-stone-200 bg-[#FAF8F5] text-xs font-semibold text-stone-700 hover:bg-stone-100 disabled:opacity-60 transition cursor-pointer whitespace-nowrap"
                   >
                     Năm nay

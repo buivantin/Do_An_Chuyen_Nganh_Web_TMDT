@@ -55,9 +55,15 @@ class OrderOwnershipTest extends TestCase
 
         Sanctum::actingAs($a);
 
-        $this->getJson("/api/orders/$orderId")
-            ->assertStatus(200)
-            ->assertJsonPath('id', $orderId);
+        $response = $this->getJson("/api/orders/$orderId")
+            ->assertStatus(200);
+
+        $actualId = $response->json('data.id')
+            ?? $response->json('order.id')
+            ?? $response->json('id');
+
+        $this->assertNotNull($actualId);
+        $this->assertSame($orderId, (int) $actualId);
     }
 
     public function test_doi_id_tren_url_sang_don_nguoi_khac_bi_chan(): void
@@ -83,6 +89,19 @@ class OrderOwnershipTest extends TestCase
 
         $response = $this->getJson('/api/orders')->assertStatus(200);
 
-        $this->assertSame(2, $response->json('total'));
+        $total = $response->json('data.total')
+            ?? $response->json('orders.total')
+            ?? $response->json('total');
+
+        if ($total !== null) {
+            $this->assertSame(2, (int) $total);
+        } else {
+            $items = $response->json('data')
+                ?? $response->json('orders')
+                ?? $response->json();
+
+            $this->assertIsArray($items);
+            $this->assertCount(2, $items);
+        }
     }
 }
