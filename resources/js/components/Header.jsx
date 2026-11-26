@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -21,8 +21,74 @@ function resolveAssetUrl(path) {
   return `/storage/${clean}`;
 }
 
-export default function Header() {
-  const { user, memberTier, logout } = useAuth();
+function parseCartPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return { count: 0, total: 0 };
+  }
+
+  const root = payload.data && !Array.isArray(payload.data) ? payload.data : payload;
+  const items =
+    root.items ||
+    root.cart_items ||
+    root.cart?.items ||
+    root.cart?.cart_items ||
+    (Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : []);
+
+  const list = Array.isArray(items) ? items : [];
+
+  const computedCount = list.reduce(
+    (sum, item) => sum + Number(item.quantity ?? item.qty ?? 1),
+    0
+  );
+
+  const computedTotal = list.reduce((sum, item) => {
+    const qty = Number(item.quantity ?? item.qty ?? 1);
+    if (item.subtotal !== undefined && item.subtotal !== null) {
+      return sum + Number(item.subtotal);
+    }
+    if (item.line_total !== undefined && item.line_total !== null) {
+      return sum + Number(item.line_total);
+    }
+
+    const p = item.product || {};
+    const basePrice = Number(
+      item.unit_price ??
+        item.price ??
+        p.final_price ??
+        p.sale_price ??
+        p.price ??
+        0
+    );
+    const discount = Number(p.discount ?? 0);
+    const effectivePrice =
+      item.unit_price !== undefined || item.price !== undefined || p.final_price !== undefined
+        ? basePrice
+        : discount > 0 && discount < 100
+        ? Math.round(basePrice * (1 - discount / 100))
+        : basePrice;
+
+    return sum + effectivePrice * qty;
+  }, 0);
+
+  const count = Number(
+    root.total_quantity ?? root.total_items ?? root.count ?? computedCount
+  );
+  const total = Number(
+    root.total_amount ??
+      root.total_price ??
+      root.subtotal ??
+      root.total ??
+      computedTotal
+  );
+
+  return {
+    count: Number.isFinite(count) ? count : computedCount,
+    total: Number.isFinite(total) ? total : computedTotal,
+  };
+}
+
+export default function Header({ onOpenAuthModal, onLogout }) {
+  const { user, memberTier, openLoginModal, openRegisterModal, logout } = useAuth();
 
   const [cartSummary, setCartSummary] = useState({ count: 0, total: 0 });
   const [searchTerm, setSearchTerm] = useState(() => {
@@ -32,45 +98,52 @@ export default function Header() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
-  // Đồng bộ giỏ hàng
-  useEffect(() => {
-    const fetchCart = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setCartSummary({ count: 0, total: 0 });
-        return;
+  const fetchCart = useCallback(async (event) => {
+    // Nếu event truyền sẵn dữ liệu giỏ hàng trong detail thì cập nhật ngay lập tức
+    if (event?.detail && typeof event.detail === "object") {
+      if (
+        event.detail.count !== undefined ||
+        event.detail.total !== undefined ||
+        event.detail.items !== undefined
+      ) {
+        setCartSummary(parseCartPayload(event.detail));
       }
-      try {
-        const res = await axios.get("/api/cart", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-        const items =
-          res.data?.items ||
-          res.data?.data?.items ||
-          res.data?.cart?.items ||
-          [];
-        const list = Array.isArray(items) ? items : [];
-        const count = list.reduce(
-          (sum, item) => sum + Number(item.quantity || 1),
-          0
-        );
-        const total = list.reduce((sum, item) => {
-          const price = Number(item.price ?? item.product?.price ?? 0);
-          return sum + price * Number(item.quantity || 1);
-        }, 0);
-        setCartSummary({ count, total });
-      } catch {
-        // Bỏ qua nếu chưa có giỏ hàng
-      }
-    };
+    }
 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setCartSummary({ count: 0, total: 0 });
+      return;
+    }
+
+    try {
+      const res = await axios.get("/api/cart", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+      setCartSummary(parseCartPayload(res.data));
+    } catch {
+      // Bỏ qua nếu chưa có giỏ hàng
+    }
+  }, []);
+
+  // Đồng bộ giỏ hàng khi tải trang, đổi user hoặc khi thêm/sửa/xóa giỏ hàng ở bất kỳ trang nào
+  useEffect(() => {
     fetchCart();
-    window.addEventListener("cart-updated", fetchCart);
-    return () => window.removeEventListener("cart-updated", fetchCart);
-  }, [user?.id]);
+
+    const handleCartChange = (e) => fetchCart(e);
+    window.addEventListener("cart-updated", handleCartChange);
+    window.addEventListener("cartUpdated", handleCartChange);
+    window.addEventListener("storage", handleCartChange);
+
+    return () => {
+      window.removeEventListener("cart-updated", handleCartChange);
+      window.removeEventListener("cartUpdated", handleCartChange);
+      window.removeEventListener("storage", handleCartChange);
+    };
+  }, [user?.id, fetchCart]);
 
   // Đóng dropdown tài khoản khi click ra ngoài
   useEffect(() => {
@@ -94,6 +167,25 @@ export default function Header() {
     window.location.href = q
       ? `/products?search=${encodeURIComponent(q)}`
       : "/products";
+  };
+
+  const handleOpenAuth = (mode) => {
+    if (typeof onOpenAuthModal === "function") {
+      onOpenAuthModal(mode);
+    } else if (mode === "register") {
+      openRegisterModal();
+    } else {
+      openLoginModal();
+    }
+  };
+
+  const handleLogoutClick = () => {
+    setUserMenuOpen(false);
+    if (typeof onLogout === "function") {
+      onLogout();
+    } else {
+      logout();
+    }
   };
 
   return (
@@ -242,7 +334,7 @@ export default function Header() {
                     <div className="border-t border-stone-100 pt-2">
                       <button
                         type="button"
-                        onClick={logout}
+                        onClick={handleLogoutClick}
                         className="w-full text-left px-2 py-1.5 rounded-lg text-xs sm:text-sm font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
                       >
                         Đăng xuất
@@ -253,18 +345,20 @@ export default function Header() {
               </div>
             ) : (
               <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
-                <a
-                  href="/login"
-                  className="px-3.5 py-2 rounded-xl text-stone-700 hover:text-[#9A5B13] transition"
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuth("login")}
+                  className="px-3.5 py-2 rounded-xl text-stone-700 hover:text-[#9A5B13] transition cursor-pointer"
                 >
                   Đăng nhập
-                </a>
-                <a
-                  href="/register"
-                  className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-stone-800 text-white transition"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenAuth("register")}
+                  className="px-4 py-2 rounded-xl bg-[#141414] hover:bg-stone-800 text-white transition cursor-pointer"
                 >
                   Đăng ký
-                </a>
+                </button>
               </div>
             )}
           </div>
