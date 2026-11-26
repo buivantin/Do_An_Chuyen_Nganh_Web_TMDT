@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Banner;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -16,24 +17,46 @@ class BannerController extends Controller
     {
         $product = $b->product;
         $productImage = $product?->image_path ?? $product?->image;
+        $categoryName = $product?->category?->name;
+        $displayLabel = $categoryName ?? $b->promo_label;
 
         return [
-            'id'           => $b->id,
-            'badge_text'   => $b->badge_text,
-            'title'        => $b->title,
-            'description'  => $b->description,
-            'quote'        => $b->promo_label,
-            'promo_label'  => $b->promo_label,
-            'image'        => $b->image,
-            'banner_image' => $b->image,
-            'product_id'   => $b->product_id,
-            'book_id'      => $b->product_id,
-            'book_title'   => $product?->name ?? $product?->title,
-            'book_author'  => $product?->author,
-            'book_image'   => $productImage,
-            'sort_order'   => (int) ($b->sort_order ?? 0),
-            'status'       => $b->status ?: 'active',
+            'id'            => $b->id,
+            'badge_text'    => $b->badge_text,
+            'title'         => $b->title,
+            'description'   => $b->description,
+            'quote'         => $displayLabel,
+            'promo_label'   => $displayLabel,
+            'category_name' => $categoryName,
+            'image'         => $b->image,
+            'banner_image'  => $b->image,
+            'product_id'    => $b->product_id,
+            'book_id'       => $b->product_id,
+            'book_title'    => $product?->name ?? $product?->title,
+            'book_author'   => $product?->author,
+            'book_image'    => $productImage,
+            'sort_order'    => (int) ($b->sort_order ?? 0),
+            'status'        => $b->status ?: 'active',
         ];
+    }
+
+    /**
+     * Tự động lấy tên danh mục theo product_id nếu có gắn sách
+     */
+    private function resolvePromoLabel(?int $productId, ?string $fallbackLabel): ?string
+    {
+        if ($productId) {
+            $categoryName = Product::with('category:id,name')
+                ->find($productId)
+                ?->category
+                ?->name;
+
+            if ($categoryName) {
+                return $categoryName;
+            }
+        }
+
+        return $fallbackLabel;
     }
 
     /**
@@ -41,7 +64,7 @@ class BannerController extends Controller
      */
     public function index()
     {
-        $banners = Banner::with('product')
+        $banners = Banner::with('product.category')
             ->where('status', 'active')
             ->orderBy('sort_order')
             ->orderByDesc('id')
@@ -56,7 +79,7 @@ class BannerController extends Controller
      */
     public function adminIndex()
     {
-        $banners = Banner::with('product')
+        $banners = Banner::with('product.category')
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get()
@@ -86,19 +109,21 @@ class BannerController extends Controller
         ]);
 
         $imagePath = $this->handleImageUpload($request, null);
+        $productId = $validated['product_id'] ?? $validated['book_id'] ?? null;
+        $fallbackLabel = $validated['quote'] ?? $validated['promo_label'] ?? null;
 
         $banner = Banner::create([
             'badge_text'  => $validated['badge_text'] ?? 'Ấn phẩm & Trích dẫn nổi bật',
             'title'       => trim($validated['title']),
             'description' => $validated['description'] ?? null,
-            'promo_label' => $validated['quote'] ?? $validated['promo_label'] ?? null,
+            'promo_label' => $this->resolvePromoLabel($productId, $fallbackLabel),
             'image'       => $imagePath,
-            'product_id'  => $validated['product_id'] ?? $validated['book_id'] ?? null,
+            'product_id'  => $productId,
             'sort_order'  => (int) ($validated['sort_order'] ?? 0),
             'status'      => $validated['status'] ?? 'active',
         ]);
 
-        $banner->load('product');
+        $banner->load('product.category');
 
         return response()->json([
             'success' => true,
@@ -130,23 +155,25 @@ class BannerController extends Controller
         ]);
 
         $imagePath = $this->handleImageUpload($request, $banner->image);
+        $productId = $request->has('product_id') || $request->has('book_id')
+            ? ($validated['product_id'] ?? $validated['book_id'] ?? null)
+            : $banner->product_id;
+        $fallbackLabel = $validated['quote'] ?? $validated['promo_label'] ?? null;
 
         $banner->update([
             'badge_text'  => $validated['badge_text'] ?? $banner->badge_text,
             'title'       => trim($validated['title']),
             'description' => $validated['description'] ?? null,
-            'promo_label' => $validated['quote'] ?? $validated['promo_label'] ?? null,
+            'promo_label' => $this->resolvePromoLabel($productId, $fallbackLabel),
             'image'       => $imagePath,
-            'product_id'  => $request->has('product_id') || $request->has('book_id')
-                ? ($validated['product_id'] ?? $validated['book_id'] ?? null)
-                : $banner->product_id,
+            'product_id'  => $productId,
             'sort_order'  => $request->has('sort_order')
                 ? (int) ($validated['sort_order'] ?? 0)
                 : $banner->sort_order,
             'status'      => $validated['status'] ?? $banner->status,
         ]);
 
-        $banner->load('product');
+        $banner->load('product.category');
 
         return response()->json([
             'success' => true,
@@ -163,7 +190,7 @@ class BannerController extends Controller
         $banner = Banner::findOrFail($id);
         $banner->status = $banner->status === 'active' ? 'inactive' : 'active';
         $banner->save();
-        $banner->load('product');
+        $banner->load('product.category');
 
         return response()->json([
             'success' => true,

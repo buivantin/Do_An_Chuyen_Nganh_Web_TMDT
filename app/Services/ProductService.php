@@ -47,6 +47,7 @@ class ProductService
             'publish_year' => $publishedYear,
             'published_year' => $publishedYear,
             'rating' => isset($book->avg_rating) ? round((float) $book->avg_rating, 1) : ($book->rating ?? null),
+            'reviews_count' => isset($book->reviews_count) ? (int) $book->reviews_count : 0,
             'sold_count' => isset($book->sold_count) ? (int) $book->sold_count : null,
             'created_at' => $book->created_at?->toISOString(),
             'image' => $book->image,
@@ -128,8 +129,15 @@ class ProductService
 
         if (Schema::hasTable('reviews')) {
             $topRatedQuery
-                ->leftJoin('reviews', 'products.id', '=', 'reviews.product_id')
-                ->select('products.*', DB::raw('COALESCE(AVG(reviews.rating), 0) as avg_rating'));
+                ->leftJoin('reviews', function ($join) {
+                    $join->on('products.id', '=', 'reviews.product_id')
+                        ->where('reviews.status', '=', 'visible');
+                })
+                ->select(
+                    'products.*',
+                    DB::raw('COALESCE(AVG(reviews.rating), 0) as avg_rating'),
+                    DB::raw('COUNT(reviews.id) as reviews_count')
+                );
 
             if (!empty($groupedColumns)) {
                 $topRatedQuery->groupBy($groupedColumns);

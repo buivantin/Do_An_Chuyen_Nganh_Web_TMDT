@@ -564,7 +564,7 @@ class DatabaseSeeder extends Seeder
                 'title'       => 'Mỗi trang sách mở ra một chân trời mới',
                 'description' => 'Khám phá không gian sách tinh tuyển tại Mọt Sách BookHouse – nơi hội tụ những tác phẩm văn học kinh điển, tư duy kinh tế hiện đại và ấn phẩm thiếu nhi đầy cảm hứng.',
                 'image'       => '/imgs/banners/hero-bookstore-1.jpg',
-                'promo_label' => 'SÁCH CỦA TUẦN · GIẢM 20%',
+                'promo_label' => 'Văn học',
                 'product_id'  => 1, // Nhà Giả Kim - Paulo Coelho
                 'sort_order'  => 1,
                 'status'      => 'active',
@@ -576,7 +576,7 @@ class DatabaseSeeder extends Seeder
                 'title'       => 'Đừng bao giờ đánh giá thấp sức mạnh của sự thấu cảm',
                 'description' => '“Thành công trong giao tiếp đến từ việc chân thành đặt mình vào vị trí của người khác để lắng nghe và sẻ chia.”',
                 'image'       => '/imgs/banners/hero-bookstore-2.jpg',
-                'promo_label' => 'BÁN CHẠY NHẤT · KỸ NĂNG SỐNG',
+                'promo_label' => 'Kỹ năng sống',
                 'product_id'  => 39, // Đắc Nhân Tâm - Dale Carnegie
                 'sort_order'  => 2,
                 'status'      => 'active',
@@ -588,7 +588,7 @@ class DatabaseSeeder extends Seeder
                 'title'       => 'Nuôi dưỡng trí tưởng tượng bay bổng cho trẻ thơ',
                 'description' => '“Người lớn ai cũng từng là trẻ con, nhưng rất ít người trong số họ còn nhớ điều đó.”',
                 'image'       => '/imgs/banners/hero-bookstore-3.jpg',
-                'promo_label' => 'GỢI Ý BIÊN TẬP',
+                'promo_label' => 'Sách thiếu nhi',
                 'product_id'  => 85, // Hoàng Tử Bé - Antoine de Saint-Exupéry
                 'sort_order'  => 3,
                 'status'      => 'active',
