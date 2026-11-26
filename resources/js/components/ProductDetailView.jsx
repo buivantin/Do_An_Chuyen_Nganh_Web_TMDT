@@ -3,8 +3,9 @@ import { createPortal } from "react-dom";
 import ProductCard from "./ProductCard";
 import ProductReviews from "./ProductReviews";
 
-function StarRatingDisplay({ rating = 4.8 }) {
-  const fullStars = Math.round(Number(rating || 0));
+function StarRatingDisplay({ rating = 0 }) {
+  const numericRating = Number(rating || 0);
+  const fullStars = Math.round(numericRating);
   return (
     <div className="inline-flex items-center gap-1">
       <div className="flex items-center text-amber-500 text-xs sm:text-sm leading-none">
@@ -18,15 +19,12 @@ function StarRatingDisplay({ rating = 4.8 }) {
         ))}
       </div>
       <span className="text-xs sm:text-sm font-bold text-stone-900">
-        {Number(rating || 0).toFixed(1)}
+        {numericRating > 0 ? numericRating.toFixed(1) : "0.0"}
       </span>
     </div>
   );
 }
 
-/**
- * DUMB COMPONENT: Hiển thị chi tiết sản phẩm (Responsive tối ưu riêng cho Mobile & PC)
- */
 export default function ProductDetailView({
   book,
   relatedBooks = [],
@@ -50,6 +48,7 @@ export default function ProductDetailView({
   onToggleZoom,
   onScrollToReviews,
   onAddRelatedToCart,
+  onReviewStatsLoaded,
 }) {
   if (loading) {
     return (
@@ -88,6 +87,7 @@ export default function ProductDetailView({
     );
   }
 
+  const displayTitle = book.name || book.title || "Ấn phẩm đang cập nhật";
   const categoryName =
     typeof book.category === "object" ? book.category?.name : book.category;
   const inStock = Number(book.stock || 0) > 0;
@@ -120,16 +120,15 @@ export default function ProductDetailView({
             </>
           )}
           <span className="text-stone-800 font-medium truncate">
-            {book.title}
+            {displayTitle}
           </span>
         </div>
       </div>
 
       {/* NỘI DUNG CHÍNH */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-4 sm:pt-8 space-y-8 sm:space-y-12">
-        {/* KHỐI CHI TIẾT CHÍNH: ẢNH BÌA (TRÁI) - THÔNG TIN & MUA HÀNG (PHẢI) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-start">
-          {/* CỘT TRÁI: Khung ảnh bìa (Sticky trên PC, gọn chiều cao trên Mobile) */}
+          {/* CỘT TRÁI: Khung ảnh bìa */}
           <div className="lg:col-span-5 lg:sticky lg:top-28">
             <div
               onClick={() => onToggleZoom?.(true)}
@@ -139,27 +138,25 @@ export default function ProductDetailView({
               aria-label="Phóng to ảnh bìa sách"
               className="group relative bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 sm:p-8 flex items-center justify-center h-[290px] sm:h-[390px] lg:h-[460px] cursor-zoom-in overflow-hidden"
             >
-              {/* Nhãn góc trên trái */}
-              <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex flex-wrap items-center gap-1.5">
-                {book.badge && (
-                  <span className="px-2.5 py-1 rounded-full bg-[#9A5B13] text-white text-[10px] sm:text-[11px] font-bold shadow-2xs">
-                    {book.badge}
-                  </span>
-                )}
-                {discountPercent > 0 && (
-                  <span className="px-2 py-1 rounded-full bg-red-600 text-white text-[10px] sm:text-[11px] font-bold">
+              {discountPercent > 0 && (
+                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex flex-wrap items-center gap-1.5">
+                  <span className="px-2.5 py-1 rounded-full bg-red-600 text-white text-[10px] sm:text-[11px] font-bold">
                     -{discountPercent}%
                   </span>
-                )}
-              </div>
+                </div>
+              )}
 
               <img
                 src={imageUrl}
-                alt={book.title}
-                className="max-h-full max-w-full object-contain rounded-lg shadow-md transition-transform duration-300 group-hover:scale-[1.03]"
+                alt={displayTitle}
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src =
+                    "https://placehold.co/320x440/F5EFE6/9A5B13?text=BookHouse";
+                }}
+                className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-md transition-transform duration-300 group-hover:scale-[1.03]"
               />
 
-              {/* Nút gợi ý phóng to */}
               <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-white/90 border border-stone-200/80 text-[10px] sm:text-[11px] font-semibold text-stone-600 shadow-2xs flex items-center gap-1">
                 <svg
                   viewBox="0 0 24 24"
@@ -169,7 +166,10 @@ export default function ProductDetailView({
                   className="w-3.5 h-3.5 text-[#9A5B13]"
                 >
                   <circle cx="11" cy="11" r="7" />
-                  <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" strokeLinecap="round" />
+                  <path
+                    d="M21 21l-4.35-4.35M11 8v6M8 11h6"
+                    strokeLinecap="round"
+                  />
                 </svg>
                 <span>Phóng to</span>
               </span>
@@ -178,7 +178,6 @@ export default function ProductDetailView({
 
           {/* CỘT PHẢI: Thông tin sách, NXB, Giá & Đặt mua */}
           <div className="lg:col-span-7 space-y-4 sm:space-y-5">
-            {/* Thể loại & Năm xuất bản */}
             <div className="flex flex-wrap items-center gap-2">
               {categoryName && (
                 <a
@@ -200,51 +199,66 @@ export default function ProductDetailView({
               )}
             </div>
 
-            {/* Tiêu đề & Tác giả + Nhà xuất bản */}
             <div>
               <h1 className="font-serif text-xl sm:text-3xl lg:text-4xl font-bold text-[#1A1A1A] leading-snug">
-                {book.title}
+                {displayTitle}
               </h1>
 
               <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm text-stone-600">
                 <div>
                   Tác giả:{" "}
-                  <a
-                    href={`/products?author=${encodeURIComponent(
-                      book.author || ""
-                    )}`}
-                    className="font-bold text-stone-900 hover:text-[#9A5B13] underline decoration-stone-300 underline-offset-2 transition"
-                  >
-                    {book.author || "Đang cập nhật"}
-                  </a>
+                  {book.author ? (
+                    <a
+                      href={`/products?author=${encodeURIComponent(book.author)}`}
+                      className="font-bold text-stone-900 hover:text-[#9A5B13] underline decoration-stone-300 underline-offset-2 transition"
+                    >
+                      {book.author}
+                    </a>
+                  ) : (
+                    <span className="font-bold text-stone-900">
+                      Đang cập nhật
+                    </span>
+                  )}
                 </div>
 
                 <span className="text-stone-300 hidden sm:inline">|</span>
 
                 <div>
                   Nhà xuất bản:{" "}
-                  <a
-                    href={`/products?publisher=${encodeURIComponent(
-                      book.publisher || ""
-                    )}`}
-                    className="font-bold text-[#9A5B13] hover:underline"
-                  >
-                    {book.publisher || "Đang cập nhật"}
-                  </a>
+                  {book.publisher ? (
+                    <a
+                      href={`/products?publisher=${encodeURIComponent(
+                        book.publisher
+                      )}`}
+                      className="font-bold text-[#9A5B13] hover:underline"
+                    >
+                      {book.publisher}
+                    </a>
+                  ) : (
+                    <span className="font-bold text-stone-700">
+                      Đang cập nhật
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Đánh giá sao & Lượt đã bán */}
+              {/* Đánh giá sao & Lượt đã bán thật từ DB */}
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-stone-500">
                 <button
                   type="button"
                   onClick={onScrollToReviews}
                   className="inline-flex items-center gap-1.5 hover:text-[#9A5B13] transition cursor-pointer"
                 >
-                  <StarRatingDisplay rating={book.rating} />
-                  <span className="underline decoration-stone-300">
-                    (Xem đánh giá)
-                  </span>
+                  {Number(book.rating || 0) > 0 ? (
+                    <>
+                      <StarRatingDisplay rating={book.rating} />
+                      <span className="underline decoration-stone-300">
+                        ({Number(book.reviews_count || 0)} đánh giá)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-stone-500">Chưa có đánh giá</span>
+                  )}
                 </button>
 
                 <span className="text-stone-300">|</span>
@@ -263,7 +277,7 @@ export default function ProductDetailView({
             <div className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 sm:gap-4">
               <div>
                 <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-stone-400 font-semibold">
-                  Giá bán ưu đãi
+                  {discountPercent > 0 ? "Giá bán ưu đãi" : "Giá bán"}
                 </div>
                 <div className="flex items-baseline gap-2.5 mt-0.5">
                   <span className="text-2xl sm:text-3xl font-bold text-[#9A5B13]">
@@ -295,7 +309,7 @@ export default function ProductDetailView({
               </div>
             </div>
 
-            {/* BẢNG THÔNG TIN XUẤT BẢN CHI TIẾT (Giống ProductCard & đầy đủ thông số) */}
+            {/* BẢNG THÔNG TIN XUẤT BẢN CHI TIẾT */}
             <div className="bg-white border border-stone-200/80 rounded-2xl p-4 sm:p-5">
               <h2 className="text-xs font-bold uppercase tracking-wider text-stone-800 mb-3 flex items-center gap-2">
                 <span className="w-1.5 h-4 rounded-full bg-[#9A5B13]" />
@@ -331,7 +345,7 @@ export default function ProductDetailView({
               </dl>
             </div>
 
-            {/* BỘ CHỌN SỐ LƯỢNG & NÚT MUA HÀNG TRÊN PC / TABLET (Ẩn trên Mobile vì đã có thanh cố định ở đáy) */}
+            {/* BỘ CHỌN SỐ LƯỢNG & NÚT MUA HÀNG TRÊN PC / TABLET */}
             <div className="hidden lg:flex flex-wrap items-center gap-3 pt-1">
               <div className="inline-flex items-center bg-white border border-stone-200 rounded-xl overflow-hidden">
                 <button
@@ -385,7 +399,6 @@ export default function ProductDetailView({
               </button>
             </div>
 
-            {/* Thông báo phản hồi giỏ hàng */}
             {cartNotice.text && (
               <div
                 className={`p-3 rounded-xl text-xs font-medium border ${
@@ -400,7 +413,6 @@ export default function ProductDetailView({
               </div>
             )}
 
-            {/* Cam kết dịch vụ */}
             <div className="pt-3 sm:pt-4 border-t border-stone-200/80 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-[11px] sm:text-xs text-stone-600">
               <div className="flex items-center gap-1.5">
                 <span className="text-emerald-600 font-bold">✓</span>
@@ -418,7 +430,7 @@ export default function ProductDetailView({
           </div>
         </div>
 
-        {/* MÔ TẢ NỘI DUNG SÁCH (Có nút thu gọn / đọc tiếp trên Mobile) */}
+        {/* MÔ TẢ NỘI DUNG SÁCH */}
         <section className="bg-[#FAF8F5] border border-stone-200/80 rounded-2xl p-4 sm:p-8">
           <h2 className="font-serif text-lg sm:text-xl font-bold text-[#1A1A1A] pb-3 border-b border-stone-200/80">
             Giới thiệu tác phẩm
@@ -444,10 +456,13 @@ export default function ProductDetailView({
 
         {/* ĐÁNH GIÁ & NHẬN XÉT */}
         <div id="product-reviews">
-          <ProductReviews productId={book.id} />
+          <ProductReviews
+            productId={book.id}
+            onStatsLoaded={onReviewStatsLoaded}
+          />
         </div>
 
-        {/* SÁCH CÙNG DANH MỤC (4 CUỐN) */}
+        {/* SÁCH CÙNG DANH MỤC */}
         {relatedBooks.length > 0 && (
           <section className="space-y-4">
             <div className="flex items-end justify-between border-b border-stone-200 pb-3">
@@ -480,10 +495,9 @@ export default function ProductDetailView({
         )}
       </div>
 
-      {/* THANH ĐẶT MUA CỐ ĐỊNH Ở ĐÁY MÀN HÌNH RIÊNG CHO ĐIỆN THOẠI (< lg) */}
+      {/* THANH ĐẶT MUA CỐ ĐỊNH Ở ĐÁY MÀN HÌNH RIÊNG CHO ĐIỆN THOẠI */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 px-3 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
         <div className="flex items-center gap-2">
-          {/* Bộ chọn số lượng gọn trên Mobile */}
           <div className="inline-flex items-center bg-[#FAF8F5] border border-stone-200 rounded-xl overflow-hidden shrink-0">
             <button
               type="button"
@@ -549,11 +563,11 @@ export default function ProductDetailView({
               </button>
               <img
                 src={imageUrl}
-                alt={book.title}
+                alt={displayTitle}
                 className="max-h-[78vh] w-auto object-contain rounded-xl shadow-2xl bg-white p-2"
               />
               <p className="text-white/90 text-xs sm:text-sm font-serif font-semibold mt-3 text-center">
-                {book.title} — {book.publisher}
+                {[displayTitle, book.publisher].filter(Boolean).join(" — ")}
               </p>
             </div>
           </div>,
