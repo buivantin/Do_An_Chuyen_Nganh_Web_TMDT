@@ -37,7 +37,7 @@ function readUrlParams() {
   );
 
   return {
-    keyword: sp.get("keyword") || "",
+    keyword: sp.get("keyword") || sp.get("search") || sp.get("q") || "",
     categoryIds,
     authors,
     publishers,
@@ -242,7 +242,9 @@ export default function ProductList({
     params.set("per_page", String(PER_PAGE));
 
     if (filters.keyword.trim()) {
-      params.set("search", filters.keyword.trim());
+      const kw = filters.keyword.trim();
+      params.set("search", kw);
+      params.set("keyword", kw);
     }
     if (filters.categoryIds.length > 0) {
       params.set("category_id", filters.categoryIds.join(","));
@@ -336,7 +338,7 @@ export default function ProductList({
     window.history.pushState({}, "", nextUrl);
   }, [filters]);
 
-  // Nút Back/Forward trình duyệt
+  // Nút Back/Forward trình duyệt & sự kiện tìm kiếm từ Header khi đang ở trang /products
   useEffect(() => {
     const handlePopState = () => {
       const next = readUrlParams();
@@ -344,8 +346,17 @@ export default function ProductList({
       setPriceRange({ min: next.minPrice, max: next.maxPrice });
       setYearRange({ min: next.minYear, max: next.maxYear });
     };
+    const handleHeaderSearch = (e) => {
+      const kw = String(e?.detail?.keyword ?? "").trim();
+      setFilters((prev) => ({ ...prev, keyword: kw, page: 1 }));
+    };
+
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("bookhouse:search", handleHeaderSearch);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("bookhouse:search", handleHeaderSearch);
+    };
   }, []);
 
   const filteredAuthors = useMemo(() => {
@@ -399,6 +410,9 @@ export default function ProductList({
     setYearRange({ min: "", max: "" });
     setAuthorSearch("");
     setPublisherSearch("");
+    window.dispatchEvent(
+      new CustomEvent("bookhouse:search-clear", { detail: { keyword: "" } })
+    );
     setFilters({
       keyword: "",
       categoryIds: [],
@@ -469,7 +483,12 @@ export default function ProductList({
       chips.push({
         key: "keyword",
         label: `Từ khóa: "${filters.keyword}"`,
-        onRemove: () => updateFilter({ keyword: "" }),
+        onRemove: () => {
+          window.dispatchEvent(
+            new CustomEvent("bookhouse:search-clear", { detail: { keyword: "" } })
+          );
+          updateFilter({ keyword: "" });
+        },
       });
     }
     filters.categoryIds.forEach((catId) => {

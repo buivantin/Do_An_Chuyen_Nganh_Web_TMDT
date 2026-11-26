@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { resolveBookImageUrl } from "./ProductCard";
 
 function resolveAssetUrl(path) {
   if (!path) return null;
@@ -26,13 +27,18 @@ function parseCartPayload(payload) {
     return { count: 0, total: 0 };
   }
 
-  const root = payload.data && !Array.isArray(payload.data) ? payload.data : payload;
+  const root =
+    payload.data && !Array.isArray(payload.data) ? payload.data : payload;
   const items =
     root.items ||
     root.cart_items ||
     root.cart?.items ||
     root.cart?.cart_items ||
-    (Array.isArray(payload.data) ? payload.data : Array.isArray(payload) ? payload : []);
+    (Array.isArray(payload.data)
+      ? payload.data
+      : Array.isArray(payload)
+      ? payload
+      : []);
 
   const list = Array.isArray(items) ? items : [];
 
@@ -61,7 +67,9 @@ function parseCartPayload(payload) {
     );
     const discount = Number(p.discount ?? 0);
     const effectivePrice =
-      item.unit_price !== undefined || item.price !== undefined || p.final_price !== undefined
+      item.unit_price !== undefined ||
+      item.price !== undefined ||
+      p.final_price !== undefined
         ? basePrice
         : discount > 0 && discount < 100
         ? Math.round(basePrice * (1 - discount / 100))
@@ -88,18 +96,23 @@ function parseCartPayload(payload) {
 }
 
 export default function Header({ onOpenAuthModal, onLogout }) {
-  const { user, memberTier, openLoginModal, openRegisterModal, logout } = useAuth();
+  const { user, memberTier, openLoginModal, openRegisterModal, logout } =
+    useAuth();
 
   const [cartSummary, setCartSummary] = useState({ count: 0, total: 0 });
   const [searchTerm, setSearchTerm] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get("search") || "";
+    return params.get("keyword") || params.get("search") || params.get("q") || "";
   });
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searching, setSearching] = useState(false);
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
+  const searchBoxRef = useRef(null);
 
   const fetchCart = useCallback(async (event) => {
-    // Nếu event truyền sẵn dữ liệu giỏ hàng trong detail thì cập nhật ngay lập tức
     if (event?.detail && typeof event.detail === "object") {
       if (
         event.detail.count !== undefined ||
@@ -129,7 +142,6 @@ export default function Header({ onOpenAuthModal, onLogout }) {
     }
   }, []);
 
-  // Đồng bộ giỏ hàng khi tải trang, đổi user hoặc khi thêm/sửa/xóa giỏ hàng ở bất kỳ trang nào
   useEffect(() => {
     fetchCart();
 
@@ -145,11 +157,62 @@ export default function Header({ onOpenAuthModal, onLogout }) {
     };
   }, [user?.id, fetchCart]);
 
-  // Đóng dropdown tài khoản khi click ra ngoài
+  // Đồng bộ khi người dùng bấm "Đặt lại tất cả" hoặc xóa chip từ khóa ở ProductList
+  useEffect(() => {
+    const handleClearSearch = () => setSearchTerm("");
+    window.addEventListener("bookhouse:search-clear", handleClearSearch);
+    return () =>
+      window.removeEventListener("bookhouse:search-clear", handleClearSearch);
+  }, []);
+
+  // Gợi ý tìm kiếm nhanh khi gõ từ khóa
+  useEffect(() => {
+    const q = searchTerm.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await axios.get("/api/products", {
+          params: { search: q, keyword: q, per_page: 6 },
+          headers: { Accept: "application/json" },
+        });
+        if (cancelled) return;
+
+        const rawList = Array.isArray(res.data?.data)
+          ? res.data.data
+          : Array.isArray(res.data?.data?.data)
+          ? res.data.data.data
+          : [];
+
+        setSuggestions(rawList.slice(0, 6));
+        setShowSuggestions(true);
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
+  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false);
+      }
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
+        setShowSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -163,9 +226,20 @@ export default function Header({ onOpenAuthModal, onLogout }) {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    setShowSuggestions(false);
     const q = searchTerm.trim();
+    const cleanPath = window.location.pathname.replace(/\/+$/, "") || "/";
+
+    // Nếu đang ở sẵn trang /products thì lọc trực tiếp mà không reload trang
+    if (cleanPath === "/products") {
+      window.dispatchEvent(
+        new CustomEvent("bookhouse:search", { detail: { keyword: q } })
+      );
+      return;
+    }
+
     window.location.href = q
-      ? `/products?search=${encodeURIComponent(q)}`
+      ? `/products?keyword=${encodeURIComponent(q)}`
       : "/products";
   };
 
@@ -189,7 +263,10 @@ export default function Header({ onOpenAuthModal, onLogout }) {
   };
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-stone-200/80">
+    <header
+      id="bookhouse-header"
+      className="bg-white/95 backdrop-blur-md border-b border-stone-200/80 relative z-40"
+    >
       <div className="max-w-7xl mx-auto px-3 sm:px-4">
         <div className="h-16 sm:h-20 flex items-center justify-between gap-3 sm:gap-6">
           <a href="/" className="shrink-0 flex items-baseline gap-1.5">
@@ -201,34 +278,125 @@ export default function Header({ onOpenAuthModal, onLogout }) {
             </span>
           </a>
 
-          <form
-            onSubmit={handleSearchSubmit}
-            className="hidden md:flex flex-1 max-w-xl items-center bg-[#F5F2EE] border border-stone-200/80 focus-within:border-[#9A5B13] focus-within:bg-white rounded-full p-1 transition"
-          >
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
-              className="flex-1 bg-transparent px-4 py-1.5 text-sm text-stone-900 placeholder-stone-400 focus:outline-none"
-            />
-            <button
-              type="submit"
-              aria-label="Tìm kiếm"
-              className="w-9 h-9 rounded-full bg-[#141414] hover:bg-stone-800 text-white flex items-center justify-center transition cursor-pointer shrink-0"
+          {/* Thanh tìm kiếm + Dropdown gợi ý nhanh */}
+          <div ref={searchBoxRef} className="relative flex-1 max-w-xl">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="flex items-center bg-[#F5F2EE] border border-stone-200/80 focus-within:border-[#9A5B13] focus-within:bg-white rounded-full p-1 transition"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-4 h-4"
+              <input
+                type="text"
+                value={searchTerm}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm tựa sách, tác giả, dịch giả, mã ISBN..."
+                className="flex-1 min-w-0 bg-transparent px-3 sm:px-4 py-1.5 text-xs sm:text-sm text-stone-900 placeholder-stone-400 focus:outline-none"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                    if (
+                      (window.location.pathname.replace(/\/+$/, "") || "/") ===
+                      "/products"
+                    ) {
+                      window.dispatchEvent(
+                        new CustomEvent("bookhouse:search", {
+                          detail: { keyword: "" },
+                        })
+                      );
+                    }
+                  }}
+                  aria-label="Xóa từ khóa"
+                  className="px-2 text-stone-400 hover:text-stone-700 text-sm cursor-pointer"
+                >
+                  &times;
+                </button>
+              )}
+              <button
+                type="submit"
+                aria-label="Tìm kiếm"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#141414] hover:bg-stone-800 text-white flex items-center justify-center transition cursor-pointer shrink-0"
               >
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-              </svg>
-            </button>
-          </form>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="w-4 h-4"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+                </svg>
+              </button>
+            </form>
+
+            {showSuggestions && (
+              <div className="absolute left-0 right-0 mt-2 bg-white border border-stone-200 rounded-2xl shadow-xl overflow-hidden z-50">
+                {searching ? (
+                  <div className="px-4 py-3 text-xs text-stone-500">
+                    Đang tìm sách phù hợp...
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-stone-500">
+                    Không tìm thấy sách khớp với "{searchTerm.trim()}".
+                  </div>
+                ) : (
+                  <div className="divide-y divide-stone-100 max-h-80 overflow-y-auto">
+                    {suggestions.map((book) => {
+                      const img = resolveBookImageUrl(
+                        book.image_path || book.image
+                      );
+                      const basePrice = Number(book.price || 0);
+                      const discount = Math.min(
+                        Math.max(Number(book.discount || 0), 0),
+                        100
+                      );
+                      const finalPrice =
+                        discount > 0
+                          ? Math.round(basePrice * (1 - discount / 100))
+                          : basePrice;
+
+                      return (
+                        <a
+                          key={book.id}
+                          href={`/products/${book.id}`}
+                          className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[#FAF8F5] transition"
+                        >
+                          <img
+                            src={img}
+                            alt={book.name || book.title}
+                            className="w-9 h-12 object-contain rounded border border-stone-200 shrink-0 bg-[#F7F3EC] p-0.5"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs sm:text-sm font-bold text-stone-900 truncate">
+                              {book.name || book.title}
+                            </div>
+                            <div className="text-[11px] text-stone-500 truncate">
+                              {book.author || "Đang cập nhật"}
+                            </div>
+                          </div>
+                          <div className="text-xs font-bold text-[#9A5B13] shrink-0">
+                            {finalPrice.toLocaleString("vi-VN")}đ
+                          </div>
+                        </a>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={handleSearchSubmit}
+                      className="w-full py-2.5 text-center text-xs font-bold text-[#9A5B13] bg-[#FAF8F5] hover:bg-[#F5EDE2] transition cursor-pointer"
+                    >
+                      Xem tất cả kết quả cho "{searchTerm.trim()}" &rarr;
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
             {/* Nút Giỏ hàng */}
