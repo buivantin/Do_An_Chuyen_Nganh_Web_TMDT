@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
 
+// Context dùng chung toàn ứng dụng
+import { AuthProvider, useAuth } from './context/AuthContext';
+
 // Pages & Components
 import Home from './pages/Home';
 import ProductList from './pages/ProductList';
@@ -14,17 +17,10 @@ import Checkout from './pages/Checkout';
 import Account from './pages/Account';
 import MainLayout from './layouts/MainLayout';
 
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function App() {
+function AppRoutes() {
   const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const { user } = useAuth();
+  const token = localStorage.getItem('token');
 
   // --- 1. CÁC TRANG ĐỘC LẬP ---
   if (pathname === '/cart') {
@@ -34,9 +30,6 @@ function App() {
   if (pathname === '/checkout') {
     return <Checkout />;
   }
-
-  const token = localStorage.getItem('token');
-  const user = getStoredUser();
 
   // --- 2. XỬ LÝ KHU VỰC ADMIN ---
   const [adminStatus, setAdminStatus] = useState(() => {
@@ -110,7 +103,9 @@ const rootElement = document.getElementById('app');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <App />
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </React.StrictMode>
   );
 }
