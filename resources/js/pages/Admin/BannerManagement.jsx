@@ -9,12 +9,13 @@ import SearchableSelect from "../../components/admin/SearchableSelect";
 const EMPTY_FORM = {
   badge_text: "Ấn phẩm & Trích dẫn nổi bật",
   title: "",
-  quote: "",
   description: "",
   banner_image: "",
   image_file: null,
   image_preview: "",
+  remove_image: false,
   book_id: "",
+  category_name: "",
   sort_order: 1,
   status: "active",
 };
@@ -47,6 +48,7 @@ export const BannerManagementView = memo(function BannerManagementView({
   banners = [],
   bookOptions = [],
   sortOrderOptions = [],
+  selectedBookCategory = "",
   loading = false,
   msg = { type: "", text: "" },
   searchQuery = "",
@@ -72,6 +74,8 @@ export const BannerManagementView = memo(function BannerManagementView({
 }) {
   const inputClass =
     "w-full px-3.5 py-2 text-sm bg-[#FAF8F5] border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#9A5B13]";
+  const readOnlyInputClass =
+    "w-full px-3.5 py-2 text-sm bg-stone-100 border border-stone-300 rounded-xl text-stone-700 font-semibold cursor-not-allowed select-none";
   const labelClass =
     "block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5";
 
@@ -101,8 +105,7 @@ export const BannerManagementView = memo(function BannerManagementView({
                 Danh Sách Banner Quảng Cáo
               </h2>
               <p className="text-xs text-stone-500 mt-0.5">
-                Quản lý slide quảng bá, trích dẫn nổi bật và sách liên kết tại
-                trang chủ
+                Quản lý slide quảng bá, danh mục và sách liên kết tại trang chủ
               </p>
             </div>
 
@@ -122,7 +125,7 @@ export const BannerManagementView = memo(function BannerManagementView({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchQueryChange?.(e.target.value)}
-                placeholder="Tìm kiếm banner theo tiêu đề, trích dẫn hoặc sách liên kết..."
+                placeholder="Tìm kiếm banner theo tiêu đề, nội dung quảng cáo, danh mục hoặc sách..."
                 className={inputClass}
               />
             </div>
@@ -145,8 +148,8 @@ export const BannerManagementView = memo(function BannerManagementView({
               <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase tracking-wider text-stone-500">
                 <th className="py-3.5 px-4 text-center w-16">Thứ tự</th>
                 <th className="py-3.5 px-4">Hình ảnh</th>
-                <th className="py-3.5 px-4">Tiêu đề &amp; Trích dẫn</th>
-                <th className="py-3.5 px-4">Sách liên kết</th>
+                <th className="py-3.5 px-4">Tiêu đề &amp; Nội dung quảng cáo</th>
+                <th className="py-3.5 px-4">Sách &amp; Danh mục</th>
                 <th className="py-3.5 px-4 text-center">Trạng thái</th>
                 <th className="py-3.5 px-4 text-right">Thao tác</th>
               </tr>
@@ -168,7 +171,8 @@ export const BannerManagementView = memo(function BannerManagementView({
                 banners.map((item) => {
                   const isHidden = item.status === "inactive";
                   const imgSrc = item.banner_image || item.image;
-                  const quoteText = item.quote || item.promo_label;
+                  const categoryLabel =
+                    item.category_name || item.promo_label || "";
                   return (
                     <tr
                       key={item.id}
@@ -198,22 +202,27 @@ export const BannerManagementView = memo(function BannerManagementView({
                         <div className="font-semibold text-[#1A1A1A] line-clamp-1">
                           {item.title}
                         </div>
-                        {quoteText && (
-                          <div className="text-xs italic text-[#9A5B13] line-clamp-1 mt-0.5">
-                            &ldquo;{quoteText}&rdquo;
-                          </div>
-                        )}
                         {item.description && (
-                          <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">
+                          <div className="text-xs text-stone-500 line-clamp-2 mt-0.5">
                             {item.description}
                           </div>
                         )}
                       </td>
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         {item.book_title ? (
-                          <span className="inline-block px-2.5 py-1 rounded-lg bg-[#F5EDE2] text-[#9A5B13] text-xs font-semibold max-w-[210px] truncate">
-                            {item.book_title}
-                          </span>
+                          <div className="space-y-1">
+                            <span className="inline-block px-2.5 py-1 rounded-lg bg-[#F5EDE2] text-[#9A5B13] text-xs font-semibold max-w-[210px] truncate">
+                              {item.book_title}
+                            </span>
+                            {categoryLabel && (
+                              <div className="text-[11px] text-stone-500 font-medium">
+                                Danh mục:{" "}
+                                <span className="text-stone-700 font-semibold">
+                                  {categoryLabel}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-stone-400">
                             Không liên kết
@@ -343,7 +352,7 @@ export const BannerManagementView = memo(function BannerManagementView({
             </div>
 
             <div className="sm:col-span-4">
-              <label className={labelClass}>Thứ tự hiển thị (0–9)</label>
+              <label className={labelClass}>Thứ tự hiển thị</label>
               <SearchableSelect
                 options={sortOrderOptions}
                 value={form.sort_order}
@@ -355,35 +364,24 @@ export const BannerManagementView = memo(function BannerManagementView({
             </div>
           </div>
 
-          <div>
-            <label className={labelClass}>
-              Câu nói hay / Trích dẫn nổi bật
-            </label>
-            <textarea
-              rows={2}
-              value={form.quote}
-              onChange={(e) => onFieldChange?.("quote", e.target.value)}
-              placeholder="Nhập câu trích dẫn hay hoặc điểm nổi bật của cuốn sách..."
-              className={inputClass}
-            />
-          </div>
-
+          {/* Ô DANH MỤC (NHỎ, KHÓA SỬA, TỰ ĐỘNG THEO SÁCH) & TRẠNG THÁI */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Nội dung quảng cáo ngắn</label>
+              <label className={labelClass}>
+                Danh mục (Tự động theo sách)
+              </label>
               <input
                 type="text"
-                value={form.description}
-                onChange={(e) =>
-                  onFieldChange?.("description", e.target.value)
-                }
-                placeholder="Mô tả ngắn thu hút độc giả..."
-                className={inputClass}
+                readOnly
+                disabled
+                value={selectedBookCategory || ""}
+                placeholder="Tự động cập nhật khi chọn sách..."
+                className={readOnlyInputClass}
               />
             </div>
 
             <div>
-              <label className={labelClass}>Trạng thái hiển thị (A–Z)</label>
+              <label className={labelClass}>Trạng thái hiển thị</label>
               <SearchableSelect
                 options={STATUS_OPTIONS}
                 value={form.status}
@@ -393,6 +391,18 @@ export const BannerManagementView = memo(function BannerManagementView({
                 sortOrder="az"
               />
             </div>
+          </div>
+
+          {/* Ô NỘI DUNG QUẢNG CÁO (MỞ RỘNG TO RA) */}
+          <div>
+            <label className={labelClass}>Nội dung quảng cáo</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => onFieldChange?.("description", e.target.value)}
+              placeholder="Nhập nội dung quảng cáo chi tiết hoặc đoạn giới thiệu thu hút độc giả..."
+              className={inputClass}
+            />
           </div>
 
           {/* UPLOAD FILE ẢNH BANNER + XEM TRƯỚC */}
@@ -543,24 +553,39 @@ export default function BannerManagement() {
     return books.map((b) => {
       const title = String(b.name || b.title || `Sách #${b.id}`).trim();
       const author = b.author ? ` — ${b.author}` : "";
+      const categoryName =
+        typeof b.category === "string"
+          ? b.category
+          : b.category?.name || b.category_name || "";
       return {
         value: b.id,
         label: `${title}${author}`,
-        subLabel: `Mã sách #${b.id}`,
-        keywords: `${b.id} ${title} ${b.author || ""}`,
+        subLabel: categoryName
+          ? `Danh mục: ${categoryName} · Mã #${b.id}`
+          : `Mã sách #${b.id}`,
+        categoryName,
+        keywords: `${b.id} ${title} ${b.author || ""} ${categoryName}`,
         sortKey: title,
       };
     });
   }, [books]);
 
+  const selectedBookCategory = useMemo(() => {
+    if (!form.book_id) return "";
+    const matched = bookOptions.find(
+      (opt) => String(opt.value) === String(form.book_id)
+    );
+    return matched?.categoryName || form.category_name || "";
+  }, [form.book_id, form.category_name, bookOptions]);
+
   const sortOrderOptions = useMemo(() => {
-    const maxOrder = Math.max(20, banners.length + 5);
-    return Array.from({ length: maxOrder + 1 }, (_, i) => ({
-      value: i,
-      label: i === 0 ? "0 — Ưu tiên đầu tiên" : `Vị trí số ${i}`,
-      sortKey: i,
-    }));
-  }, [banners.length]);
+  const maxOrder = Math.max(1, editingId ? banners.length : banners.length + 1);
+  return Array.from({ length: maxOrder + 1 }, (_, i) => ({
+    value: i,
+    label: i === 0 ? "0 — Ưu tiên đầu tiên" : `Vị trí số ${i}`,
+    sortKey: i,
+  }));
+}, [banners.length, editingId]);
 
   const filteredBanners = useMemo(() => {
     const kw = searchQuery.trim().toLowerCase();
@@ -569,9 +594,9 @@ export default function BannerManagement() {
         return false;
       }
       if (!kw) return true;
-      const haystack = `${item.title || ""} ${item.quote || ""} ${
-        item.description || ""
-      } ${item.book_title || ""}`.toLowerCase();
+      const haystack = `${item.title || ""} ${item.description || ""} ${
+        item.book_title || ""
+      } ${item.category_name || ""}`.toLowerCase();
       return haystack.includes(kw);
     });
   }, [banners, searchQuery, statusFilter]);
@@ -620,12 +645,13 @@ export default function BannerManagement() {
     setForm({
       badge_text: banner.badge_text || "Ấn phẩm & Trích dẫn nổi bật",
       title: banner.title || "",
-      quote: banner.quote || banner.promo_label || "",
       description: banner.description || "",
       banner_image: banner.banner_image || banner.image || "",
       image_file: null,
       image_preview: "",
+      remove_image: false,
       book_id: banner.product_id || banner.book_id || "",
+      category_name: banner.category_name || banner.promo_label || "",
       sort_order: Number(banner.sort_order ?? 0),
       status: banner.status || "active",
     });
@@ -634,7 +660,12 @@ export default function BannerManagement() {
   }, []);
 
   const handleFieldChange = useCallback((field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      if (field === "book_id" && !value) {
+        return { ...prev, book_id: "", category_name: "" };
+      }
+      return { ...prev, [field]: value };
+    });
   }, []);
 
   const handleFileChange = useCallback((e) => {
@@ -659,6 +690,7 @@ export default function BannerManagement() {
         ...prev,
         image_file: file,
         image_preview: preview,
+        remove_image: false,
       };
     });
   }, []);
@@ -676,6 +708,7 @@ export default function BannerManagement() {
         image_file: null,
         image_preview: "",
         banner_image: "",
+        remove_image: true,
       };
     });
   }, []);
@@ -688,17 +721,16 @@ export default function BannerManagement() {
       const formData = new FormData();
       formData.append("title", form.title.trim());
       formData.append("badge_text", form.badge_text.trim());
-      formData.append("quote", form.quote.trim());
+      formData.append("promo_label", selectedBookCategory || "");
       formData.append("description", form.description.trim());
       formData.append("status", form.status);
       formData.append("sort_order", String(form.sort_order ?? 0));
-
-      if (form.book_id) {
-        formData.append("product_id", String(form.book_id));
-      }
+      formData.append("product_id", form.book_id ? String(form.book_id) : "");
 
       if (form.image_file instanceof File) {
         formData.append("image_file", form.image_file);
+      } else if (form.remove_image) {
+        formData.append("remove_image", "1");
       } else if (form.banner_image) {
         formData.append("banner_image", form.banner_image);
       }
@@ -843,6 +875,7 @@ export default function BannerManagement() {
       banners={filteredBanners}
       bookOptions={bookOptions}
       sortOrderOptions={sortOrderOptions}
+      selectedBookCategory={selectedBookCategory}
       loading={loading}
       msg={msg}
       searchQuery={searchQuery}

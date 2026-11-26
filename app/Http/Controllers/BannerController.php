@@ -18,16 +18,15 @@ class BannerController extends Controller
         $product = $b->product;
         $productImage = $product?->image_path ?? $product?->image;
         $categoryName = $product?->category?->name;
-        $displayLabel = $categoryName ?? $b->promo_label;
 
         return [
             'id'            => $b->id,
             'badge_text'    => $b->badge_text,
             'title'         => $b->title,
             'description'   => $b->description,
-            'quote'         => $displayLabel,
-            'promo_label'   => $displayLabel,
             'category_name' => $categoryName,
+            'promo_label'   => $categoryName,
+            'quote'         => $categoryName,
             'image'         => $b->image,
             'banner_image'  => $b->image,
             'product_id'    => $b->product_id,
@@ -40,23 +39,16 @@ class BannerController extends Controller
         ];
     }
 
-    /**
-     * Tự động lấy tên danh mục theo product_id nếu có gắn sách
-     */
-    private function resolvePromoLabel(?int $productId, ?string $fallbackLabel): ?string
+    private function resolveBookCategory(?int $productId): ?string
     {
-        if ($productId) {
-            $categoryName = Product::with('category:id,name')
-                ->find($productId)
-                ?->category
-                ?->name;
-
-            if ($categoryName) {
-                return $categoryName;
-            }
+        if (!$productId) {
+            return null;
         }
 
-        return $fallbackLabel;
+        return Product::with('category:id,name')
+            ->find($productId)
+            ?->category
+            ?->name;
     }
 
     /**
@@ -96,7 +88,6 @@ class BannerController extends Controller
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
             'badge_text'   => 'nullable|string|max:255',
-            'quote'        => 'nullable|string|max:500',
             'promo_label'  => 'nullable|string|max:500',
             'description'  => 'nullable|string|max:2000',
             'product_id'   => 'nullable|integer|exists:products,id',
@@ -110,13 +101,12 @@ class BannerController extends Controller
 
         $imagePath = $this->handleImageUpload($request, null);
         $productId = $validated['product_id'] ?? $validated['book_id'] ?? null;
-        $fallbackLabel = $validated['quote'] ?? $validated['promo_label'] ?? null;
 
         $banner = Banner::create([
             'badge_text'  => $validated['badge_text'] ?? 'Ấn phẩm & Trích dẫn nổi bật',
             'title'       => trim($validated['title']),
             'description' => $validated['description'] ?? null,
-            'promo_label' => $this->resolvePromoLabel($productId, $fallbackLabel),
+            'promo_label' => $this->resolveBookCategory($productId),
             'image'       => $imagePath,
             'product_id'  => $productId,
             'sort_order'  => (int) ($validated['sort_order'] ?? 0),
@@ -142,7 +132,6 @@ class BannerController extends Controller
         $validated = $request->validate([
             'title'        => 'required|string|max:255',
             'badge_text'   => 'nullable|string|max:255',
-            'quote'        => 'nullable|string|max:500',
             'promo_label'  => 'nullable|string|max:500',
             'description'  => 'nullable|string|max:2000',
             'product_id'   => 'nullable|integer|exists:products,id',
@@ -152,19 +141,19 @@ class BannerController extends Controller
             'image_file'   => 'nullable|image|mimes:jpeg,png,jpg,webp,gif|max:5120',
             'banner_image' => 'nullable|string|max:1000',
             'image'        => 'nullable|string|max:1000',
+            'remove_image' => 'nullable|boolean',
         ]);
 
         $imagePath = $this->handleImageUpload($request, $banner->image);
-        $productId = $request->has('product_id') || $request->has('book_id')
+        $productId = ($request->exists('product_id') || $request->exists('book_id'))
             ? ($validated['product_id'] ?? $validated['book_id'] ?? null)
             : $banner->product_id;
-        $fallbackLabel = $validated['quote'] ?? $validated['promo_label'] ?? null;
 
         $banner->update([
             'badge_text'  => $validated['badge_text'] ?? $banner->badge_text,
             'title'       => trim($validated['title']),
             'description' => $validated['description'] ?? null,
-            'promo_label' => $this->resolvePromoLabel($productId, $fallbackLabel),
+            'promo_label' => $this->resolveBookCategory($productId),
             'image'       => $imagePath,
             'product_id'  => $productId,
             'sort_order'  => $request->has('sort_order')
@@ -222,7 +211,7 @@ class BannerController extends Controller
     }
 
     /**
-     * Lưu file ảnh vào public/imgs/banners/ hoặc giữ URL/đường dẫn hiện tại
+     * Lưu file ảnh vào public/imgs/banners/, xóa ảnh hoặc giữ URL/đường dẫn hiện tại
      */
     private function handleImageUpload(Request $request, ?string $currentImage): ?string
     {
@@ -245,6 +234,16 @@ class BannerController extends Controller
             $file->move($dir, $filename);
 
             return '/imgs/banners/' . $filename;
+        }
+
+        if ($request->boolean('remove_image')) {
+            if ($currentImage && str_starts_with($currentImage, '/imgs/banners/')) {
+                $oldFile = public_path(ltrim($currentImage, '/'));
+                if (File::exists($oldFile)) {
+                    File::delete($oldFile);
+                }
+            }
+            return null;
         }
 
         $manualUrl = trim((string) ($request->input('banner_image') ?? $request->input('image') ?? ''));

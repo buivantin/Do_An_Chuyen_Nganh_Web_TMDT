@@ -243,11 +243,13 @@ class DatabaseSeeder extends Seeder
         ];
 
         $bookIndex = 0;
+        $categoryOrder = 0;
 
         foreach ($catalog as $categoryName => $books) {
             $categoryId = DB::table('categories')->insertGetId([
                 'name' => $categoryName,
                 'description' => "Các đầu sách thuộc thể loại $categoryName",
+                'display_order' => $categoryOrder++, // 0, 1, 2, 3, 4
                 'status' => 'active',
                 'created_at' => $now->copy()->subYears(5),
                 'updated_at' => $now->copy()->subYears(5),
@@ -557,16 +559,16 @@ class DatabaseSeeder extends Seeder
 
         DB::table('reviews')->insert($sampleReviews);
 
-        // 6. Seed danh sách Hero Banner trang chủ
+        // 6. Seed danh sách Hero Banner trang chủ (bắt đầu từ 0)
         DB::table('banners')->insert([
             [
                 'badge_text'  => 'TUYỂN CHỌN THÁNG 11',
                 'title'       => 'Mỗi trang sách mở ra một chân trời mới',
-                'description' => 'Khám phá không gian sách tinh tuyển tại Mọt Sách BookHouse – nơi hội tụ những tác phẩm văn học kinh điển, tư duy kinh tế hiện đại và ấn phẩm thiếu nhi đầy cảm hứng.',
-                'image'       => '/imgs/banners/hero-bookstore-1.jpg',
                 'promo_label' => 'Văn học',
-                'product_id'  => 1, // Nhà Giả Kim - Paulo Coelho
-                'sort_order'  => 1,
+                'description' => 'Ấn phẩm kinh điển bán chạy toàn cầu — đặt mua ngay tại BookHouse để nhận ưu đãi giao nhanh và bọc sách miễn phí.',
+                'image'       => '/imgs/banners/hero-bookstore-1.jpg',
+                'product_id'  => 1, // Nhà Giả Kim - Paulo Coelho (Văn học)
+                'sort_order'  => 0,
                 'status'      => 'active',
                 'created_at'  => $now,
                 'updated_at'  => $now,
@@ -574,11 +576,11 @@ class DatabaseSeeder extends Seeder
             [
                 'badge_text'  => 'GÓC TRÍCH DẪN HAY',
                 'title'       => 'Đừng bao giờ đánh giá thấp sức mạnh của sự thấu cảm',
-                'description' => '“Thành công trong giao tiếp đến từ việc chân thành đặt mình vào vị trí của người khác để lắng nghe và sẻ chia.”',
-                'image'       => '/imgs/banners/hero-bookstore-2.jpg',
                 'promo_label' => 'Kỹ năng sống',
-                'product_id'  => 39, // Đắc Nhân Tâm - Dale Carnegie
-                'sort_order'  => 2,
+                'description' => 'Cẩm nang nghệ thuật giao tiếp và thu phục lòng người vượt thời gian — lựa chọn hàng đầu cho hành trình phát triển bản thân.',
+                'image'       => '/imgs/banners/hero-bookstore-2.jpg',
+                'product_id'  => 39, // Đắc Nhân Tâm - Dale Carnegie (Kỹ năng sống)
+                'sort_order'  => 1,
                 'status'      => 'active',
                 'created_at'  => $now,
                 'updated_at'  => $now,
@@ -586,11 +588,11 @@ class DatabaseSeeder extends Seeder
             [
                 'badge_text'  => 'TỦ SÁCH THIẾU NHI',
                 'title'       => 'Nuôi dưỡng trí tưởng tượng bay bổng cho trẻ thơ',
-                'description' => '“Người lớn ai cũng từng là trẻ con, nhưng rất ít người trong số họ còn nhớ điều đó.”',
-                'image'       => '/imgs/banners/hero-bookstore-3.jpg',
                 'promo_label' => 'Sách thiếu nhi',
-                'product_id'  => 85, // Hoàng Tử Bé - Antoine de Saint-Exupéry
-                'sort_order'  => 3,
+                'description' => 'Ấn phẩm kinh điển với minh họa màu tinh xảo dành cho mọi lứa tuổi — món quà ý nghĩa nuôi dưỡng tâm hồn.',
+                'image'       => '/imgs/banners/hero-bookstore-3.jpg',
+                'product_id'  => 85, // Hoàng Tử Bé - Antoine de Saint-Exupéry (Sách thiếu nhi)
+                'sort_order'  => 2,
                 'status'      => 'active',
                 'created_at'  => $now,
                 'updated_at'  => $now,

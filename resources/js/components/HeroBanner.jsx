@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState, memo } from "react";
 import axios from "axios";
-import { DEFAULT_HERO_BANNERS } from "../data/homeMockData";
+import { ADMIN_BANNERS_STORAGE_KEY, DEFAULT_HERO_BANNERS } from "../data/homeMockData";
 import { resolveBookImageUrl } from "./ProductCard";
 
 /**
@@ -38,15 +38,22 @@ export const HeroBannerView = memo(function HeroBannerView({
             ? `/products/${linkedProductId}`
             : "/products";
           const bgImage = item.image || item.banner_image;
-          const quoteText = item.promo_label || item.quote;
+          const categoryName = (
+            item.category_name ||
+            item.book_category ||
+            item.product?.category?.name ||
+            item.promo_label ||
+            ""
+          ).trim();
           const bookTitle =
-            item.book_title || item.product?.name || "Xem chi tiết ấn phẩm";
+            item.book_title || item.product?.name || item.product?.title || "";
           const bookAuthor = item.book_author || item.product?.author || "";
           const bookImage =
             item.book_image ||
             item.product?.image_path ||
             item.product?.image ||
             "";
+          const hasLinkedBook = Boolean(linkedProductId || bookTitle);
 
           return (
             <div
@@ -69,7 +76,11 @@ export const HeroBannerView = memo(function HeroBannerView({
               </div>
 
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-7 sm:py-11 lg:py-14 pb-14 sm:pb-16 grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-center">
-                <div className="lg:col-span-8 space-y-3.5 sm:space-y-5">
+                <div
+                  className={`${
+                    hasLinkedBook ? "lg:col-span-8" : "lg:col-span-10"
+                  } space-y-3.5 sm:space-y-5`}
+                >
                   <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-[#9A5B13]/30 border border-[#E5B87B]/40 text-[#F3D19E] text-[10px] sm:text-[11px] font-bold uppercase tracking-widest">
                     <span>✦</span>
                     <span>
@@ -81,16 +92,16 @@ export const HeroBannerView = memo(function HeroBannerView({
                     {item.title}
                   </h1>
 
-                  {quoteText && (
-                    <blockquote className="border-l-4 border-[#D99B4E] pl-3 sm:pl-4 py-1 bg-white/5 rounded-r-xl">
-                      <p className="font-serif italic text-xs sm:text-lg text-[#F7E7CE] leading-relaxed">
-                        {quoteText}
+                  {categoryName && (
+                    <div className="border-l-4 border-[#D99B4E] pl-3 sm:pl-4 py-1.5 bg-white/5 rounded-r-xl">
+                      <p className="font-serif italic text-xs sm:text-lg font-semibold text-[#F7E7CE] leading-relaxed">
+                        {categoryName}
                       </p>
-                    </blockquote>
+                    </div>
                   )}
 
                   {item.description && (
-                    <p className="hidden sm:block text-sm text-stone-300 max-w-2xl leading-relaxed">
+                    <p className="text-xs sm:text-sm text-stone-300 max-w-2xl leading-relaxed">
                       {item.description}
                     </p>
                   )}
@@ -111,40 +122,42 @@ export const HeroBannerView = memo(function HeroBannerView({
                   </div>
                 </div>
 
-                <div className="lg:col-span-4 flex justify-start lg:justify-end">
-                  <a
-                    href={linkedBookHref}
-                    className="group bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-3 sm:p-5 flex items-center gap-3.5 sm:gap-4 max-w-md lg:max-w-sm w-full transition"
-                  >
-                    <div className="w-16 sm:w-24 aspect-[3/4] rounded-xl bg-[#F5EFE6] p-1.5 shrink-0 overflow-hidden shadow-lg">
-                      <img
-                        src={resolveBookImageUrl(bookImage)}
-                        alt={bookTitle}
-                        loading="lazy"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src =
-                            "https://placehold.co/240x340/F5EFE6/9A5B13?text=Book";
-                        }}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                      />
-                    </div>
-
-                    <div className="min-w-0 space-y-1">
-                      <h2 className="font-serif text-sm sm:text-lg font-bold text-white line-clamp-2 group-hover:text-[#F3D19E] transition-colors">
-                        {bookTitle}
-                      </h2>
-                      {bookAuthor && (
-                        <p className="text-[11px] sm:text-xs text-stone-300 truncate">
-                          {bookAuthor}
-                        </p>
-                      )}
-                      <div className="pt-0.5 text-[11px] sm:text-xs font-bold text-[#F3D19E] group-hover:underline">
-                        Xem chi tiết &rsaquo;
+                {hasLinkedBook && (
+                  <div className="lg:col-span-4 flex justify-start lg:justify-end">
+                    <a
+                      href={linkedBookHref}
+                      className="group bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/20 rounded-2xl p-3 sm:p-5 flex items-center gap-3.5 sm:gap-4 max-w-md lg:max-w-sm w-full transition"
+                    >
+                      <div className="w-16 sm:w-24 aspect-[3/4] rounded-xl bg-[#F5EFE6] p-1.5 shrink-0 overflow-hidden shadow-lg">
+                        <img
+                          src={resolveBookImageUrl(bookImage)}
+                          alt={bookTitle || "Sách nổi bật"}
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src =
+                              "https://placehold.co/240x340/F5EFE6/9A5B13?text=Book";
+                          }}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                        />
                       </div>
-                    </div>
-                  </a>
-                </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <h2 className="font-serif text-sm sm:text-lg font-bold text-white line-clamp-2 group-hover:text-[#F3D19E] transition-colors">
+                          {bookTitle || "Xem chi tiết ấn phẩm"}
+                        </h2>
+                        {bookAuthor && (
+                          <p className="text-[11px] sm:text-xs text-stone-300 truncate">
+                            {bookAuthor}
+                          </p>
+                        )}
+                        <div className="pt-0.5 text-[11px] sm:text-xs font-bold text-[#F3D19E] group-hover:underline">
+                          Xem chi tiết &rsaquo;
+                        </div>
+                      </div>
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -198,9 +211,7 @@ export const HeroBannerView = memo(function HeroBannerView({
  */
 export default function HeroBanner({ initialBanners = null }) {
   const [banners, setBanners] = useState(() =>
-    Array.isArray(initialBanners) && initialBanners.length > 0
-      ? initialBanners
-      : DEFAULT_HERO_BANNERS
+    Array.isArray(initialBanners) ? initialBanners : DEFAULT_HERO_BANNERS
   );
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -208,10 +219,16 @@ export default function HeroBanner({ initialBanners = null }) {
 
   const loadBanners = useCallback(() => {
     axios
-      .get("/api/banners", { headers: { Accept: "application/json" } })
+      .get("/api/banners", {
+        params: { _t: Date.now() },
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
+        },
+      })
       .then((res) => {
-        const list = res.data?.data || res.data?.banners || res.data;
-        if (Array.isArray(list) && list.length > 0) {
+        const list = res.data?.data ?? res.data?.banners ?? res.data;
+        if (Array.isArray(list)) {
           setBanners(list);
           setActiveIndex((prev) => (prev >= list.length ? 0 : prev));
         }
@@ -221,8 +238,22 @@ export default function HeroBanner({ initialBanners = null }) {
 
   useEffect(() => {
     loadBanners();
+
+    const handleStorageSync = (e) => {
+      if (e.key === ADMIN_BANNERS_STORAGE_KEY) {
+        loadBanners();
+      }
+    };
+
     window.addEventListener("banners-updated", loadBanners);
-    return () => window.removeEventListener("banners-updated", loadBanners);
+    window.addEventListener("focus", loadBanners);
+    window.addEventListener("storage", handleStorageSync);
+
+    return () => {
+      window.removeEventListener("banners-updated", loadBanners);
+      window.removeEventListener("focus", loadBanners);
+      window.removeEventListener("storage", handleStorageSync);
+    };
   }, [loadBanners]);
 
   useEffect(() => {
