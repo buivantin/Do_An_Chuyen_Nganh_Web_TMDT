@@ -1,4 +1,11 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import axios from "axios";
 
 const AuthContext = createContext(null);
@@ -20,7 +27,9 @@ export function calculateMemberTier(totalSpentValue) {
       name: "Học Giả",
       icon: "🏅",
       badgeClass: "bg-yellow-50 border-yellow-300 text-yellow-900",
-      hint: `Mua thêm ${(5000000 - totalSpent).toLocaleString("vi-VN")}đ để đạt Đại Sứ Tri Thức`,
+      hint: `Mua thêm ${(5000000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để đạt Đại Sứ Tri Thức`,
       progressPercent: Math.min(100, Math.round((totalSpent / 5000000) * 100)),
     };
   }
@@ -29,7 +38,9 @@ export function calculateMemberTier(totalSpentValue) {
       name: "Tri Thức",
       icon: "💠",
       badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
-      hint: `Mua thêm ${(2500000 - totalSpent).toLocaleString("vi-VN")}đ để lên hạng Học Giả`,
+      hint: `Mua thêm ${(2500000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để lên hạng Học Giả`,
       progressPercent: Math.min(100, Math.round((totalSpent / 2500000) * 100)),
     };
   }
@@ -38,7 +49,9 @@ export function calculateMemberTier(totalSpentValue) {
       name: "Người Đọc",
       icon: "📖",
       badgeClass: "bg-amber-50 border-amber-200 text-amber-900",
-      hint: `Mua thêm ${(1000000 - totalSpent).toLocaleString("vi-VN")}đ để đạt Tri Thức`,
+      hint: `Mua thêm ${(1000000 - totalSpent).toLocaleString(
+        "vi-VN"
+      )}đ để đạt Tri Thức`,
       progressPercent: Math.min(100, Math.round((totalSpent / 1000000) * 100)),
     };
   }
@@ -46,8 +59,13 @@ export function calculateMemberTier(totalSpentValue) {
     name: "Mầm Sách",
     icon: "🌱",
     badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    hint: `Mua thêm ${(300000 - totalSpent).toLocaleString("vi-VN")}đ để lên hạng Người Đọc`,
-    progressPercent: Math.max(15, Math.min(100, Math.round((totalSpent / 300000) * 100))),
+    hint: `Mua thêm ${(300000 - totalSpent).toLocaleString(
+      "vi-VN"
+    )}đ để lên hạng Người Đọc`,
+    progressPercent: Math.max(
+      15,
+      Math.min(100, Math.round((totalSpent / 300000) * 100))
+    ),
   };
 }
 
@@ -60,6 +78,11 @@ export function AuthProvider({ children }) {
     }
   });
   const [authLoading, setAuthLoading] = useState(true);
+  const [authModal, setAuthModal] = useState(null); // null | 'login' | 'register'
+
+  const openLoginModal = useCallback(() => setAuthModal("login"), []);
+  const openRegisterModal = useCallback(() => setAuthModal("register"), []);
+  const closeAuthModal = useCallback(() => setAuthModal(null), []);
 
   const refreshUser = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -98,6 +121,19 @@ export function AuthProvider({ children }) {
     refreshUser();
   }, [refreshUser]);
 
+  // Hỗ trợ cả các component cũ bắn sự kiện window để mở modal đăng nhập
+  useEffect(() => {
+    const handleOpenLogin = () => setAuthModal("login");
+    const handleOpenRegister = () => setAuthModal("register");
+
+    window.addEventListener("open-login-modal", handleOpenLogin);
+    window.addEventListener("open-register-modal", handleOpenRegister);
+    return () => {
+      window.removeEventListener("open-login-modal", handleOpenLogin);
+      window.removeEventListener("open-register-modal", handleOpenRegister);
+    };
+  }, []);
+
   const logout = useCallback(async () => {
     const token = localStorage.getItem("token");
     try {
@@ -119,7 +155,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       setUser(null);
-      window.location.href = "/login";
+      window.location.href = "/";
     }
   }, []);
 
@@ -136,8 +172,23 @@ export function AuthProvider({ children }) {
       authLoading,
       refreshUser,
       logout,
+      authModal,
+      setAuthModal,
+      openLoginModal,
+      openRegisterModal,
+      closeAuthModal,
     }),
-    [user, memberTier, authLoading, refreshUser, logout]
+    [
+      user,
+      memberTier,
+      authLoading,
+      refreshUser,
+      logout,
+      authModal,
+      openLoginModal,
+      openRegisterModal,
+      closeAuthModal,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
