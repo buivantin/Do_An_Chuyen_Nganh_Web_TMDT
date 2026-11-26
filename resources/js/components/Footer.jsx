@@ -154,16 +154,15 @@ export default function Footer() {
                         Liên hệ &amp; Thanh toán
                     </h3>
                     <div className="space-y-2 text-xs text-stone-600">
-                        <p>65 Huỳnh Thúc Kháng, phường Sài Gòn, tp. Hồ Chí Minh7</p>
+                        <p>130 Đ. Số 65, Khu định cư Tân Quy Đông, Tân Hưng, Hồ Chí Minh</p>
                         <p>
-                            Hotline: <span className="font-semibold text-stone-800">1900 6886</span>{" "}
-                            •{" "}
+                            Hotline: <span className="font-semibold text-stone-800">1900 6886</span>{" "}{" "}
                             <a
                                 href="mailto:thuquan@motsachbookhouse.vn"
                                 className="hover:text-[#9A5B13] transition-colors"
                             >
                                 thuquan@motsachbookhouse.vn
-                            </a>
+                            </a>    
                         </p>
                     </div>
 

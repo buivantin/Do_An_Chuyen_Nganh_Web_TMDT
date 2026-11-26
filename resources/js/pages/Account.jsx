@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 import AccountView from "../components/AccountView";
 import ConfirmModal from "../components/ConfirmModal";
 import {
@@ -26,67 +27,6 @@ function resolveAssetUrl(path) {
     return `/${clean}`;
   }
   return `/storage/${clean}`;
-}
-
-function getMemberTier(totalSpent) {
-  if (totalSpent >= 5000000) {
-    return {
-      name: "Đại Sứ Tri Thức",
-      icon: "👑",
-      badgeClass: "bg-[#F5EDE2] border-[#E5D5BE] text-[#9A5B13]",
-      hint: "Danh hiệu cao quý nhất tại BookHouse.",
-      progressPercent: 100,
-    };
-  }
-  if (totalSpent >= 2500000) {
-    const pct = Math.min(100, Math.round((totalSpent / 5000000) * 100));
-    return {
-      name: "Học Giả",
-      icon: "🏅",
-      badgeClass: "bg-yellow-50 border-yellow-300 text-yellow-900",
-      hint: `Mua thêm ${(5000000 - totalSpent).toLocaleString(
-        "vi-VN"
-      )}đ để đạt Đại Sứ Tri Thức`,
-      progressPercent: pct,
-    };
-  }
-  if (totalSpent >= 1000000) {
-    const pct = Math.min(100, Math.round((totalSpent / 2500000) * 100));
-    return {
-      name: "Tri Thức",
-      icon: "💠",
-      badgeClass: "bg-sky-50 border-sky-200 text-sky-800",
-      hint: `Mua thêm ${(2500000 - totalSpent).toLocaleString(
-        "vi-VN"
-      )}đ để lên hạng Học Giả`,
-      progressPercent: pct,
-    };
-  }
-  if (totalSpent >= 300000) {
-    const pct = Math.min(100, Math.round((totalSpent / 1000000) * 100));
-    return {
-      name: "Người Đọc",
-      icon: "📖",
-      badgeClass: "bg-amber-50 border-amber-200 text-amber-900",
-      hint: `Mua thêm ${(1000000 - totalSpent).toLocaleString(
-        "vi-VN"
-      )}đ để đạt Tri Thức`,
-      progressPercent: pct,
-    };
-  }
-  const pct = Math.max(
-    15,
-    Math.min(100, Math.round((totalSpent / 300000) * 100))
-  );
-  return {
-    name: "Mầm Sách",
-    icon: "🌱",
-    badgeClass: "bg-emerald-50 border-emerald-200 text-emerald-800",
-    hint: `Mua thêm ${(300000 - totalSpent).toLocaleString(
-      "vi-VN"
-    )}đ để lên hạng Người Đọc`,
-    progressPercent: pct,
-  };
 }
 
 function normalizeOrder(raw) {
@@ -253,13 +193,15 @@ function normalizeOrder(raw) {
 }
 
 export default function Account() {
+  const { user: authUser, memberTier, authLoading, refreshUser } = useAuth();
+  const user = authUser || {};
+
   const fileInputRef = useRef(null);
+  const initializedFormRef = useRef(false);
   const urlParams = new URLSearchParams(window.location.search);
   const initialTab = urlParams.get("tab") || "profile";
 
-  const [user, setUser] = useState({});
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState({ type: "", text: "" });
 
@@ -338,62 +280,32 @@ export default function Account() {
     }
   };
 
+  // Kiểm tra đăng nhập & tải đơn hàng
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
       window.location.href = "/login";
       return;
     }
-
-    const loadAll = async () => {
-      setLoading(true);
-      try {
-        const profileRes = await axios.get("/api/profile", {
-          headers: getHeaders(),
-        });
-        const u =
-          profileRes.data?.user ||
-          profileRes.data?.data ||
-          profileRes.data ||
-          {};
-        setUser(u);
-        setProfileForm({
-          username: u.username || u.name || "",
-          phone: u.phone || "",
-        });
-        if (u.address) {
-          const parsed = parseAddressParts(u.address);
-          setProvinceCode(parsed.provinceCode);
-          setDistrictCode(parsed.districtCode);
-          setWardName(parsed.wardName);
-          setStreetAddress(parsed.street);
-        }
-      } catch (err) {
-        if (err.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          window.location.href = "/login";
-          return;
-        }
-      } finally {
-        setLoading(false);
-      }
-
-      await fetchOrders();
-    };
-
-    loadAll();
+    fetchOrders();
   }, []);
 
-  const totalSpent = useMemo(
-    () =>
-      orders
-        .filter((o) => o.isCompleted)
-        .reduce((sum, o) => sum + o.totalAmount, 0),
-    [orders]
-  );
-
-  const memberTier = useMemo(() => getMemberTier(totalSpent), [totalSpent]);
+  // Đồng bộ dữ liệu user từ AuthContext vào form chỉnh sửa hồ sơ
+  useEffect(() => {
+    if (!user?.id || initializedFormRef.current) return;
+    initializedFormRef.current = true;
+    setProfileForm({
+      username: user.username || user.name || "",
+      phone: user.phone || "",
+    });
+    if (user.address) {
+      const parsed = parseAddressParts(user.address);
+      setProvinceCode(parsed.provinceCode);
+      setDistrictCode(parsed.districtCode);
+      setWardName(parsed.wardName);
+      setStreetAddress(parsed.street);
+    }
+  }, [user]);
 
   const orderCounts = useMemo(() => {
     const counts = {
@@ -546,6 +458,7 @@ export default function Account() {
       setReturnModalOrder(null);
       setReturnFiles([]);
       await fetchOrders();
+      await refreshUser();
       setOrderStatusFilter("return_requested");
     } catch (err) {
       setReturnError(
@@ -582,7 +495,7 @@ export default function Account() {
           })
         : user.address || "";
 
-      const res = await axios.put(
+      await axios.put(
         "/api/profile",
         {
           username: profileForm.username.trim(),
@@ -593,17 +506,7 @@ export default function Account() {
         { headers: getHeaders() }
       );
 
-      const updatedUser = res.data?.user || {
-        ...user,
-        username: profileForm.username.trim(),
-        phone: profileForm.phone.trim(),
-        address: addressToSave,
-      };
-      setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      window.dispatchEvent(
-        new CustomEvent("user-updated", { detail: updatedUser })
-      );
+      await refreshUser();
       setIsEditingAddress(false);
       setMsg({ type: "success", text: "Đã cập nhật thông tin tài khoản!" });
     } catch (err) {
@@ -679,6 +582,7 @@ export default function Account() {
       setCancelConfirmOrder(null);
       setMsg({ type: "success", text: "Đã hủy đơn hàng thành công." });
       await fetchOrders();
+      await refreshUser();
     } catch (err) {
       setMsg({
         type: "error",
@@ -744,7 +648,7 @@ export default function Account() {
     }
   };
 
-  const avatarSrc = resolveAssetUrl(user.avatar);
+  const avatarSrc = resolveAssetUrl(user.avatar || user.image_path);
   const avatarInitial = (user.username || user.email || "U")
     .charAt(0)
     .toUpperCase();
@@ -762,21 +666,14 @@ export default function Account() {
           const fd = new FormData();
           fd.append("avatar", file);
           try {
-            const res = await axios.post("/api/profile/avatar", fd, {
+            await axios.post("/api/profile/avatar", fd, {
               headers: {
                 ...getHeaders(),
                 "Content-Type": "multipart/form-data",
               },
             });
-            const updated = res.data?.user || {
-              ...user,
-              avatar: res.data?.avatar,
-            };
-            setUser(updated);
-            localStorage.setItem("user", JSON.stringify(updated));
-            window.dispatchEvent(
-              new CustomEvent("user-updated", { detail: updated })
-            );
+            await refreshUser();
+            setMsg({ type: "success", text: "Đã cập nhật ảnh đại diện!" });
           } catch {
             setMsg({ type: "error", text: "Cập nhật ảnh đại diện thất bại." });
           }
@@ -1117,7 +1014,7 @@ export default function Account() {
         avatarSrc={avatarSrc}
         avatarInitial={avatarInitial}
         activeTab={activeTab}
-        loading={loading}
+        loading={authLoading && !user?.id}
         saving={saving}
         msg={msg}
         profileForm={profileForm}
