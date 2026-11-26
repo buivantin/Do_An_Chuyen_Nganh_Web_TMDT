@@ -3,61 +3,44 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreReviewRequest;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\Review;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ReviewController extends Controller
 {
     /**
-     * Lấy danh sách đánh giá hiển thị (status = visible) & thống kê sao của 1 sản phẩm.
+     * Lấy thống kê & danh sách đánh giá theo sản phẩm (Public)
      */
-    public function index(Request $request, int $productId): JsonResponse
+    public function index(Request $request, $productId)
     {
-        $baseQuery = Review::visible()->where('product_id', $productId);
+        $baseQuery = Review::where('product_id', $productId);
 
         $totalReviews = (clone $baseQuery)->count();
         $averageRating = $totalReviews > 0
             ? round((float) (clone $baseQuery)->avg('rating'), 1)
             : 0;
 
-        $rawCounts = (clone $baseQuery)
-            ->selectRaw('rating, COUNT(*) as total')
-            ->groupBy('rating')
-            ->pluck('total', 'rating');
+        $ratingCounts = [
+            5 => (clone $baseQuery)->where('rating', 5)->count(),
+            4 => (clone $baseQuery)->where('rating', 4)->count(),
+            3 => (clone $baseQuery)->where('rating', 3)->count(),
+            2 => (clone $baseQuery)->where('rating', 2)->count(),
+            1 => (clone $baseQuery)->where('rating', 1)->count(),
+        ];
 
-        $ratingCounts = [];
-        for ($star = 5; $star >= 1; $star--) {
-            $ratingCounts[(string) $star] = (int) ($rawCounts[$star] ?? 0);
-        }
-
-        $listQuery = Review::with('user')
-            ->visible()
+        $listQuery = Review::with('user:id,username,image_path')
             ->where('product_id', $productId)
-            ->latest();
+            ->orderByDesc('created_at');
 
-        $filterRating = (int) $request->query('rating', 0);
-        if ($filterRating >= 1 && $filterRating <= 5) {
-            $listQuery->where('rating', $filterRating);
+        $starFilter = (int) $request->query('rating', 0);
+        if ($starFilter >= 1 && $starFilter <= 5) {
+            $listQuery->where('rating', $starFilter);
         }
 
-        $paginated = $listQuery->paginate(10);
-
-        $paginated->getCollection()->transform(function (Review $review) {
-            return [
-                'id'         => $review->id,
-                'rating'     => $review->rating,
-                'comment'    => $review->comment,
-                'created_at' => $review->created_at,
-                'user'       => [
-                    'id'         => $review->user?->id,
-                    'username'   => $review->user?->username ?? $review->user?->name ?? 'Độc giả Mọt Sách',
-                    'image_path' => $review->user?->image_path ?? null,
-                ],
-            ];
-        });
+        $reviews = $listQuery->paginate(10);
 
         return response()->json([
             'stats' => [
@@ -65,61 +48,79 @@ class ReviewController extends Controller
                 'total_reviews'  => $totalReviews,
                 'rating_counts'  => $ratingCounts,
             ],
-            'reviews' => $paginated,
+            'reviews' => $reviews,
         ]);
     }
 
     /**
-     * Lưu đánh giá mới từ khách hàng đã mua hàng thành công (order status = completed).
+     * Gửi đánh giá sản phẩm theo từng đơn hàng đã giao hoặc đã hoàn thành (Auth)
      */
-    public function store(StoreReviewRequest $request): JsonResponse
+    public function store(Request $request)
     {
-        $userId = (int) $request->user()->id;
-        $validated = $request->validated();
-        $productId = (int) $validated['product_id'];
+        $user = $request->user();
 
-        $hasCompletedOrder = Order::where('user_id', $userId)
-            ->where('status', 'completed')
-            ->whereHas('items', function ($query) use ($productId) {
-                $query->where('product_id', $productId);
+        $validated = $request->validate([
+            'product_id'    => 'required|integer|exists:products,id',
+            'order_id'      => 'required|integer',
+            'order_item_id' => 'nullable|integer',
+            'rating'        => 'required|integer|min:1|max:5',
+            'comment'       => 'nullable|string|max:1000',
+        ]);
+
+        // 1. Xác minh đúng đơn hàng đó thuộc về user, đã giao/hoàn thành và có chứa sản phẩm này
+        $order = Order::where('id', $validated['order_id'])
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['delivered', 'completed'])
+            ->whereHas('items', function ($q) use ($validated) {
+                $q->where('product_id', $validated['product_id']);
             })
-            ->exists();
+            ->first();
 
-        if (!$hasCompletedOrder) {
+        if (!$order) {
             return response()->json([
-                'message' => 'Bạn chỉ có thể đánh giá sản phẩm thuộc đơn hàng đã hoàn thành.',
-            ], 403);
+                'message' => 'Bạn chỉ có thể đánh giá sản phẩm thuộc đơn hàng đã giao hoặc đã hoàn thành.',
+            ], 422);
         }
 
-        $alreadyReviewed = Review::where('user_id', $userId)
-            ->where('product_id', $productId)
+        // 2. Chỉ chặn nếu CHÍNH ĐƠN HÀNG NÀY đã đánh giá sản phẩm này rồi
+        $alreadyReviewed = Review::where('user_id', $user->id)
+            ->where('product_id', $validated['product_id'])
+            ->where('order_id', $order->id)
             ->exists();
 
         if ($alreadyReviewed) {
             return response()->json([
-                'message' => 'Bạn đã đánh giá đầu sách này trước đó.',
+                'message' => 'Bạn đã đánh giá sản phẩm này cho đơn hàng này rồi.',
             ], 422);
         }
 
-        $review = new Review();
-        $review->user_id = $userId;
-        $review->product_id = $productId;
-        $review->rating = (int) $validated['rating'];
-        $review->comment = isset($validated['comment']) && trim($validated['comment']) !== ''
-            ? trim($validated['comment'])
-            : null;
-        $review->status = 'visible';
-        $review->save();
+        // 3. Tạo đánh giá gắn với order_id cụ thể
+        $review = Review::create([
+            'user_id'    => $user->id,
+            'product_id' => $validated['product_id'],
+            'order_id'   => $order->id,
+            'rating'     => $validated['rating'],
+            'comment'    => $validated['comment'] ?? null,
+        ]);
+
+        // 4. Đồng bộ lại điểm sao trung bình & tổng lượt đánh giá trên sản phẩm
+        $avgRating = Review::where('product_id', $validated['product_id'])->avg('rating');
+        $totalReviews = Review::where('product_id', $validated['product_id'])->count();
+
+        $productUpdates = [];
+        if (Schema::hasColumn('products', 'rating')) {
+            $productUpdates['rating'] = round((float) $avgRating, 1);
+        }
+        if (Schema::hasColumn('products', 'reviews_count')) {
+            $productUpdates['reviews_count'] = $totalReviews;
+        }
+        if (!empty($productUpdates)) {
+            Product::where('id', $validated['product_id'])->update($productUpdates);
+        }
 
         return response()->json([
-            'message' => 'Cảm ơn bạn đã gửi đánh giá cho cuốn sách!',
-            'review'  => [
-                'id'         => $review->id,
-                'product_id' => $review->product_id,
-                'rating'     => $review->rating,
-                'comment'    => $review->comment,
-                'created_at' => $review->created_at,
-            ],
+            'message' => 'Đánh giá sản phẩm thành công!',
+            'review'  => $review,
         ], 201);
     }
 }

@@ -1063,7 +1063,8 @@ export default function AccountView({
                                             onClick={() =>
                                               onOpenReviewModal?.(
                                                 order.code,
-                                                item.raw
+                                                item.raw,
+                                                order.id
                                               )
                                             }
                                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#FAF6F0] hover:bg-[#F5EDE2] border border-[#E5D5BE] text-xs font-bold text-[#9A5B13] transition cursor-pointer"
